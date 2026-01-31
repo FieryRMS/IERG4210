@@ -16,6 +16,7 @@ body {
     @media (prefers-color-scheme: dark) {
         color-scheme: dark;
     }
+    overflow-x: hidden;
 }
 
 @theme inline {
@@ -135,4 +136,8 @@ body {
     body {
         @apply bg-background text-foreground;
     }
+}
+
+.hide-lucide-chevron-down .lucide-chevron-down {
+    display: none;
 }
