@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Link } from "react-router";
+import { Link, useMatches, type UIMatch } from "react-router";
 import {
     NavigationMenu,
     NavigationMenuContent,
@@ -12,7 +12,15 @@ import {
     NavigationMenuPositioner,
     NavigationMenuPopup,
 } from "@/components/ui/navigation-menu";
-import { Moon, Search, ShoppingCart, Sun, UserRound } from "lucide-react";
+import {
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Moon, Search, ShoppingCart, Sun, HomeIcon, UserRound, ChevronsRightIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "@/components/theme-provider";
@@ -20,9 +28,11 @@ import { LoginForm } from "./login-form";
 
 export function NavBar() {
     const { toggleTheme } = useTheme();
-
+    const matches = (useMatches() as UIMatch<unknown, PageHandle>[]).filter(
+        (match) => match.handle && match.handle.breadcrumb,
+    );
     return (
-        <NavigationMenu className="max-w-full grid w-full grid-cols-3 items-center gap-4 px-4 py-2">
+        <NavigationMenu className="max-w-full grid w-full grid-cols-3 items-center gap-x-2 px-4 py-2">
             <NavigationMenuList className="flex justify-start items-center h-full">
                 <NavigationMenuItem className="h-full">
                     <NavigationMenuLink
@@ -144,6 +154,34 @@ export function NavBar() {
             <NavigationMenuPositioner>
                 <NavigationMenuPopup />
             </NavigationMenuPositioner>
+            {matches.length > 0 && (
+                <div className="flex flex-col gap-8 col-span-3 justify-center items-center">
+                    <Breadcrumb>
+                        <BreadcrumbList>
+                            {matches.map((match, index, array) => (
+                                <React.Fragment key={index}>
+                                    {index < array.length - 1 ? (
+                                        <BreadcrumbItem>
+                                            <BreadcrumbLink
+                                                render={<Link to={match.pathname}>{match.handle!.breadcrumb}</Link>}
+                                            />
+                                        </BreadcrumbItem>
+                                    ) : (
+                                        <BreadcrumbItem>
+                                            <BreadcrumbPage>{match.handle!.breadcrumb}</BreadcrumbPage>
+                                        </BreadcrumbItem>
+                                    )}
+                                    {index < array.length - 1 && (
+                                        <BreadcrumbSeparator>
+                                            <ChevronsRightIcon />
+                                        </BreadcrumbSeparator>
+                                    )}
+                                </React.Fragment>
+                            ))}
+                        </BreadcrumbList>
+                    </Breadcrumb>
+                </div>
+            )}
         </NavigationMenu>
     );
 }
