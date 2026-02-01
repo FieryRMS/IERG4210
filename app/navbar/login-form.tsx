@@ -72,6 +72,7 @@ function Form({ type }: { type: string }) {
                 };
             },
             onChangeAsyncDebounceMs: 300,
+            onSubmit: schema,
         },
         onSubmit: (data) => {
             console.log(data);
