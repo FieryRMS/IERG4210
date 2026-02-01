@@ -23,11 +23,11 @@ export function NavBar() {
 
     return (
         <NavigationMenu className="max-w-full grid w-full grid-cols-3 items-center gap-4 px-4 py-2">
-            <NavigationMenuList className="flex justify-start items-center">
-                <NavigationMenuItem>
+            <NavigationMenuList className="flex justify-start items-center h-full">
+                <NavigationMenuItem className="h-full">
                     <NavigationMenuLink
                         render={
-                            <Link to="/" className="flex items-center gap-2">
+                            <Link to="/" className="flex items-center gap-2 h-full justify-center">
                                 <div className="flex items-center justify-center rounded-full p-2 bg-primary text-primary-foreground font-bold">
                                     LOGO
                                 </div>
@@ -35,8 +35,8 @@ export function NavBar() {
                         }
                     />
                 </NavigationMenuItem>
-                <NavigationMenuItem>
-                    <NavigationMenuTrigger>Shop</NavigationMenuTrigger>
+                <NavigationMenuItem className="h-full">
+                    <NavigationMenuTrigger className="h-full">Shop</NavigationMenuTrigger>
                     <NavigationMenuContent>
                         <ul className="grid w-75 gap-3 p-4 md:w-100 md:grid-cols-2 list-none">
                             <ListItem title="New Arrivals" href="/new">
@@ -55,20 +55,20 @@ export function NavBar() {
                     </NavigationMenuContent>
                 </NavigationMenuItem>
 
-                <NavigationMenuItem className="hidden lg:block">
+                <NavigationMenuItem className="hidden lg:block h-full">
                     <NavigationMenuLink
                         render={
-                            <Link to="/deals" className="text-sm font-medium">
+                            <Link to="/deals" className="text-sm font-medium h-full justify-center">
                                 Deals
                             </Link>
                         }
                     />
                 </NavigationMenuItem>
 
-                <NavigationMenuItem className="hidden lg:block">
+                <NavigationMenuItem className="hidden lg:block h-full">
                     <NavigationMenuLink
                         render={
-                            <Link to="/collections" className="text-sm font-medium">
+                            <Link to="/collections" className="text-sm font-medium h-full justify-center">
                                 Collections
                             </Link>
                         }
@@ -76,8 +76,7 @@ export function NavBar() {
                 </NavigationMenuItem>
             </NavigationMenuList>
 
-            {/* Center: logo + search */}
-            <NavigationMenuList className="flex flex-col gap-2 justify-center items-center">
+            <NavigationMenuList className="flex flex-col gap-2 justify-center items-center h-full">
                 <NavigationMenuItem className="w-full max-w-md">
                     <form
                         className="flex w-full items-center gap-2"
@@ -94,17 +93,16 @@ export function NavBar() {
                 </NavigationMenuItem>
             </NavigationMenuList>
 
-            {/* Right: theme, account, cart */}
-            <NavigationMenuList className="flex justify-end items-center">
-                <NavigationMenuItem>
-                    <Button variant="outline" size="icon" onClick={toggleTheme} className="relative">
-                        <Sun className="h-[1.2rem] w-[1.2rem] scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
-                        <Moon className="absolute h-[1.2rem] w-[1.2rem] scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
+            <NavigationMenuList className="flex justify-end items-center h-full">
+                <NavigationMenuItem className=" min-w-fit h-full flex flex-col items-center justify-center">
+                    <Button variant="outline" size="icon-lg" onClick={toggleTheme} className="relative">
+                        <Sun className="scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
+                        <Moon className="absolute scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
                         <span className="sr-only">Toggle theme</span>
                     </Button>
                 </NavigationMenuItem>
 
-                <NavigationMenuItem className="hidden md:flex">
+                <NavigationMenuItem className="hidden md:flex h-full">
                     <NavigationMenuTrigger className="hide-lucide-chevron-down min-w-fit h-full flex flex-col items-center justify-center">
                         <UserRound />
                     </NavigationMenuTrigger>
