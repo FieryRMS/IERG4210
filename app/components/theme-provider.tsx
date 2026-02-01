@@ -37,7 +37,7 @@ function getSavedTheme(storageKey: string): Theme | null {
 export function ThemeProvider({
     children,
     defaultTheme = "system",
-    storageKey = "vite-ui-theme",
+    storageKey = "theme",
     ...props
 }: ThemeProviderProps) {
     const [theme, setTheme] = useState<Theme>(() => getSavedTheme(storageKey) || defaultTheme);

@@ -26,6 +26,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <Meta />
                 <Links />
+                <script>
+                    {`document.documentElement.classList.toggle("dark", localStorage.theme === "dark" ||
+                        (!("theme" in localStorage) && window.matchMedia("(prefers-color-scheme: dark)").matches));`}
+                </script>
             </head>
             <ThemeProvider>
                 <body className="min-h-screen bg-background font-sans antialiased">
