@@ -23,7 +23,7 @@ export function NavBar() {
 
     return (
         <NavigationMenu className="max-w-full grid w-full grid-cols-3 items-center gap-4 px-4 py-2">
-            <NavigationMenuList className="flex justify-start items-center gap-4">
+            <NavigationMenuList className="flex justify-start items-center">
                 <NavigationMenuItem>
                     <NavigationMenuLink
                         render={
@@ -55,7 +55,7 @@ export function NavBar() {
                     </NavigationMenuContent>
                 </NavigationMenuItem>
 
-                <NavigationMenuItem className="hidden md:block">
+                <NavigationMenuItem className="hidden lg:block">
                     <NavigationMenuLink
                         render={
                             <Link to="/deals" className="text-sm font-medium">
@@ -65,7 +65,7 @@ export function NavBar() {
                     />
                 </NavigationMenuItem>
 
-                <NavigationMenuItem className="hidden md:block">
+                <NavigationMenuItem className="hidden lg:block">
                     <NavigationMenuLink
                         render={
                             <Link to="/collections" className="text-sm font-medium">
@@ -88,14 +88,14 @@ export function NavBar() {
                     >
                         <div className="relative flex-1">
                             <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input type="search" placeholder="Search products..." className="pl-8" />
+                            <Input type="search" placeholder="Search..." className="pl-8" />
                         </div>
                     </form>
                 </NavigationMenuItem>
             </NavigationMenuList>
 
             {/* Right: theme, account, cart */}
-            <NavigationMenuList className="flex justify-end items-center gap-2">
+            <NavigationMenuList className="flex justify-end items-center">
                 <NavigationMenuItem>
                     <Button variant="outline" size="icon" onClick={toggleTheme} className="relative">
                         <Sun className="h-[1.2rem] w-[1.2rem] scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
