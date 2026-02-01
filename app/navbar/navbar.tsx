@@ -92,7 +92,7 @@ export function NavBar() {
                         className="flex w-full items-center gap-2"
                         onSubmit={(e) => {
                             e.preventDefault();
-                            // hook this up to your search logic
+                            // TODO: search logic
                         }}
                     >
                         <div className="relative flex-1">
@@ -122,6 +122,7 @@ export function NavBar() {
                 </NavigationMenuItem>
 
                 <NavigationMenuItem>
+                    {/* TODO: cart logic */}
                     <NavigationMenuTrigger className="hide-lucide-chevron-down min-w-fit h-full flex flex-col items-center justify-center">
                         <div className="relative flex flex-col items-center">
                             <div className="relative flex items-center">

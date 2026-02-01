@@ -76,6 +76,7 @@ function Form({ type }: { type: string }) {
         },
         onSubmit: (data) => {
             console.log(data);
+            // TODO: handle form submission
         },
     });
     return (
