@@ -104,8 +104,8 @@ export function NavBar() {
                     </Button>
                 </NavigationMenuItem>
 
-                <NavigationMenuItem className="hidden md:flex hide-lucide-chevron-down">
-                    <NavigationMenuTrigger>
+                <NavigationMenuItem className="hidden md:flex">
+                    <NavigationMenuTrigger className="hide-lucide-chevron-down min-w-fit h-full flex flex-col items-center justify-center">
                         <UserRound />
                     </NavigationMenuTrigger>
                     <NavigationMenuContent>
@@ -114,13 +114,15 @@ export function NavBar() {
                 </NavigationMenuItem>
 
                 <NavigationMenuItem>
-                    <NavigationMenuTrigger className="hide-lucide-chevron-down">
-                        <div className="relative flex items-center gap-1">
-                            <ShoppingCart className="h-5 w-5" />
-                            <span className="hidden text-sm font-medium md:inline">Cart</span>{" "}
-                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[0.7rem] font-semibold text-primary-foreground">
-                                3
-                            </span>
+                    <NavigationMenuTrigger className="hide-lucide-chevron-down min-w-fit h-full flex flex-col items-center justify-center">
+                        <div className="relative flex flex-col items-center">
+                            <div className="relative flex items-center">
+                                <ShoppingCart className="h-8 w-8" />
+                                <span className="absolute top-0 right-0 -mt-1 -mr-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[0.8rem] font-semibold text-primary-foreground shadow">
+                                    3
+                                </span>
+                            </div>
+                            <span className="text-xs font-medium text-muted-foreground mt-1">$123.45</span>
                         </div>
                     </NavigationMenuTrigger>
                     <NavigationMenuContent>
