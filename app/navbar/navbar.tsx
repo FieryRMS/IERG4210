@@ -16,6 +16,7 @@ import { Moon, Search, ShoppingCart, Sun, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "@/components/theme-provider";
+import { LoginForm } from "./login-form";
 
 export function NavBar() {
     const { toggleTheme } = useTheme();
@@ -37,7 +38,7 @@ export function NavBar() {
                 <NavigationMenuItem>
                     <NavigationMenuTrigger>Shop</NavigationMenuTrigger>
                     <NavigationMenuContent>
-                        <ul className="grid w-[300px] gap-3 p-4 md:w-[400px] md:grid-cols-2 list-none">
+                        <ul className="grid w-75 gap-3 p-4 md:w-100 md:grid-cols-2 list-none">
                             <ListItem title="New Arrivals" href="/new">
                                 Fresh drops and the latest products.
                             </ListItem>
@@ -107,7 +108,9 @@ export function NavBar() {
                     <NavigationMenuTrigger>
                         <UserRound />
                     </NavigationMenuTrigger>
-                    <NavigationMenuContent></NavigationMenuContent>
+                    <NavigationMenuContent>
+                        <LoginForm />
+                    </NavigationMenuContent>
                 </NavigationMenuItem>
 
                 <NavigationMenuItem>
@@ -121,7 +124,7 @@ export function NavBar() {
                         </div>
                     </NavigationMenuTrigger>
                     <NavigationMenuContent>
-                        <div className="w-[260px] p-4 space-y-3 text-sm">
+                        <div className="w-65 p-4 space-y-3 text-sm">
                             <p className="font-medium">Your cart</p>
                             <p className="text-muted-foreground">
                                 You have 3 items in your cart. Proceed to checkout to complete your order.
