@@ -3,7 +3,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 
 import type { Route } from "./+types/root";
 import "./app.css";
-import { NavBar } from "./components/navbar/navbar";
+import { Navbar } from "@/components/navbar";
 
 export const links: Route.LinksFunction = () => [
     { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -34,7 +34,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <ThemeProvider>
                 <body className="min-h-screen bg-background font-sans antialiased">
                     <header>
-                        <NavBar />
+                        <Navbar />
                     </header>
                     <main>{children}</main>
                     <footer></footer>

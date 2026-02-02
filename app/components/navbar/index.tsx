@@ -28,7 +28,7 @@ import { LoginForm } from "./login-form";
 import { Badge } from "@/components/ui/badge";
 import { ButtonGroup } from "@/components/ui/button-group";
 
-export function NavBar() {
+export function Navbar() {
     const { toggleTheme } = useTheme();
     const matches = (useMatches() as UIMatch<unknown, PageHandle>[]).filter(
         (match) => match.handle && match.handle.breadcrumb,
