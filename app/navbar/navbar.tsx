@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "@/components/theme-provider";
 import { LoginForm } from "./login-form";
+import { Badge } from "@/components/ui/badge";
 
 export function NavBar() {
     const { toggleTheme } = useTheme();
@@ -46,7 +47,7 @@ export function NavBar() {
                     />
                 </NavigationMenuItem>
                 <NavigationMenuItem className="h-full">
-                    <NavigationMenuTrigger className="h-full">Shop</NavigationMenuTrigger>
+                    <NavigationMenuTrigger className="h-full px-2">Shop</NavigationMenuTrigger>
                     <NavigationMenuContent>
                         <ul className="grid w-75 gap-3 p-4 md:w-100 md:grid-cols-2 list-none">
                             <ListItem title="New Arrivals" href="/new">
@@ -113,7 +114,7 @@ export function NavBar() {
                 </NavigationMenuItem>
 
                 <NavigationMenuItem className="hidden md:flex h-full">
-                    <NavigationMenuTrigger className="hide-lucide-chevron-down min-w-fit h-full flex flex-col items-center justify-center">
+                    <NavigationMenuTrigger className="hide-lucide-chevron-down min-w-fit h-full flex flex-col items-center justify-center px-2">
                         <UserRound />
                     </NavigationMenuTrigger>
                     <NavigationMenuContent>
@@ -123,13 +124,13 @@ export function NavBar() {
 
                 <NavigationMenuItem>
                     {/* TODO: cart logic */}
-                    <NavigationMenuTrigger className="hide-lucide-chevron-down min-w-fit h-full flex flex-col items-center justify-center">
+                    <NavigationMenuTrigger className="hide-lucide-chevron-down min-w-fit h-full flex flex-col items-center justify-center px-2">
                         <div className="relative flex flex-col items-center">
                             <div className="relative flex items-center">
-                                <ShoppingCart className="h-8 w-8" />
-                                <span className="absolute top-0 right-0 -mt-1 -mr-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[0.8rem] font-semibold text-primary-foreground shadow">
+                                <ShoppingCart  />
+                                <Badge className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 h-5 min-w-5 p-0 px-0.5 rounded-full empty:h-2.5 empty:min-w-2.5">
                                     3
-                                </span>
+                                </Badge>
                             </div>
                             <span className="text-xs font-medium text-muted-foreground mt-1">$123.45</span>
                         </div>
