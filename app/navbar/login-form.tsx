@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
+// TODO: add descriptions "input-group"
 const temp = z.object({
     type: z.literal("Register"),
     Username: z.string().min(2).max(50),

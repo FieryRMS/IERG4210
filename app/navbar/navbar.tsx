@@ -126,7 +126,7 @@ export function NavBar() {
                 </NavigationMenuItem>
 
                 <NavigationMenuItem>
-                    {/* TODO: cart logic */}
+                    {/* TODO: cart logic, use "item" */}
                     <NavigationMenuTrigger className="hide-lucide-chevron-down min-w-fit h-full flex flex-col items-center justify-center px-2">
                         <div className="relative flex flex-col items-center">
                             <div className="relative flex items-center">
