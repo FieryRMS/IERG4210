@@ -20,12 +20,13 @@ import {
     BreadcrumbPage,
     BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Moon, Search, ShoppingCart, Sun, HomeIcon, UserRound, ChevronsRightIcon } from "lucide-react";
+import { Moon, ShoppingCart, Sun, UserRound, ChevronsRightIcon, SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "@/components/theme-provider";
 import { LoginForm } from "./login-form";
 import { Badge } from "@/components/ui/badge";
+import { ButtonGroup } from "@/components/ui/button-group";
 
 export function NavBar() {
     const { toggleTheme } = useTheme();
@@ -90,16 +91,18 @@ export function NavBar() {
             <NavigationMenuList className="flex flex-col gap-2 justify-center items-center h-full">
                 <NavigationMenuItem className="w-full max-w-md">
                     <form
-                        className="flex w-full items-center gap-2"
+                        className="flex w-full items-center gap-2 justify-center "
                         onSubmit={(e) => {
                             e.preventDefault();
                             // TODO: search logic
                         }}
                     >
-                        <div className="relative flex-1">
-                            <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input type="search" placeholder="Search..." className="pl-8" />
-                        </div>
+                        <ButtonGroup className="flex-1">
+                            <Input placeholder="Search..." />
+                            <Button variant="outline" aria-label="Search" type="submit">
+                                <SearchIcon />
+                            </Button>
+                        </ButtonGroup>
                     </form>
                 </NavigationMenuItem>
             </NavigationMenuList>
@@ -127,7 +130,7 @@ export function NavBar() {
                     <NavigationMenuTrigger className="hide-lucide-chevron-down min-w-fit h-full flex flex-col items-center justify-center px-2">
                         <div className="relative flex flex-col items-center">
                             <div className="relative flex items-center">
-                                <ShoppingCart  />
+                                <ShoppingCart />
                                 <Badge className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 h-5 min-w-5 p-0 px-0.5 rounded-full empty:h-2.5 empty:min-w-2.5">
                                     3
                                 </Badge>
