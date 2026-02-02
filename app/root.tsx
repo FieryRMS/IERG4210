@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import type { Route } from "./+types/root";
 import "./app.css";
 import { Navbar } from "@/components/navbar";
+import { Footer } from "@/components/footer";
 
 export const links: Route.LinksFunction = () => [
     { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -32,12 +33,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </script>
             </head>
             <ThemeProvider>
-                <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden">
+                <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden flex flex-col">
                     <header className="sticky top-0 z-50 w-full bg-background pb-2">
                         <Navbar />
                     </header>
-                    <main className="py-4">{children}</main>
-                    <footer></footer>
+                    <main className="py-4 h-full w-full flex-1">{children}</main>
+                    <footer className="w-full py-6">
+                        <Footer />
+                    </footer>
                     <ScrollRestoration />
                     <Scripts />
                 </body>
