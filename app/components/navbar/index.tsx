@@ -34,7 +34,7 @@ export function Navbar() {
         (match) => match.handle && match.handle.breadcrumb,
     );
     return (
-        <NavigationMenu className="max-w-full grid w-full grid-cols-3 items-center gap-x-2 px-4 py-2">
+        <NavigationMenu className="max-w-full grid w-full grid-cols-3 items-center gap-x-2 px-4 py-2 sticky top-0">
             <NavigationMenuList className="flex justify-start items-center h-full">
                 <NavigationMenuItem className="h-full">
                     <NavigationMenuLink

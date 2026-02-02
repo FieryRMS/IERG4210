@@ -32,11 +32,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </script>
             </head>
             <ThemeProvider>
-                <body className="min-h-screen bg-background font-sans antialiased">
-                    <header>
+                <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden">
+                    <header className="sticky top-0 z-50 w-full bg-background pb-2">
                         <Navbar />
                     </header>
-                    <main>{children}</main>
+                    <main className="py-4">{children}</main>
                     <footer></footer>
                     <ScrollRestoration />
                     <Scripts />
