@@ -36,8 +36,8 @@ export default function ({ loaderData }: Route.ComponentProps) {
                             {Array.from({ length: 5 }).map((_, index) => (
                                 <CarouselItem key={index}>
                                     <div className="h-full">
-                                        <Card className="h-full">
-                                            <CardContent className="h-full flex items-center justify-center">
+                                        <Card className="h-full p-3">
+                                            <CardContent className="h-full flex items-center justify-center p-0 overflow-hidden rounded-xl">
                                                 <img
                                                     src={`https://avatar.vercel.sh/shadcn${loaderData.id}${index}`}
                                                     alt={`Product ${loaderData.id}`}

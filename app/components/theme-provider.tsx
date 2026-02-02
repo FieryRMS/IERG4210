@@ -24,14 +24,7 @@ const initialState: ThemeProviderState = {
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
 function saveTheme(storageKey: string, theme: Theme) {
-    if (typeof window === "undefined") return;
     localStorage.setItem(storageKey, theme);
-}
-
-function getSavedTheme(storageKey: string): Theme | null {
-    if (typeof window === "undefined") return null;
-    const savedTheme = localStorage.getItem(storageKey) as Theme | null;
-    return savedTheme;
 }
 
 export function ThemeProvider({
@@ -40,7 +33,7 @@ export function ThemeProvider({
     storageKey = "theme",
     ...props
 }: ThemeProviderProps) {
-    const [theme, setTheme] = useState<Theme>(() => getSavedTheme(storageKey) || defaultTheme);
+    const [theme, setTheme] = useState<Theme>(() => defaultTheme);
 
     useEffect(() => {
         const root = window.document.documentElement;
