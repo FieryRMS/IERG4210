@@ -28,7 +28,7 @@ export function ProductCard({
                     <img
                         src={imageUrl}
                         alt={name}
-                        className="w-full h-full object-cover pointer-events-none"
+                        className="w-full h-full object-cover pointer-events-none select-none"
                         draggable={false}
                     />
                 </AspectRatio>

@@ -2,10 +2,10 @@ import { ProductCard } from "./product-card";
 
 export function Category() {
     // Generate 10 random products
-    const products = Array.from({ length: 100    }, (_, i) => ({
-        id: (i + 1).toString(),
-        name: `Product ${i + 1}`,
-        imageUrl: `https://avatar.vercel.sh/shadcn${i + 1}`,
+    const products = Array.from({ length: 100 }, (_, i) => ({
+        id: i.toString(),
+        name: `Product ${i}`,
+        imageUrl: `https://avatar.vercel.sh/shadcn${i}`,
         price: Math.round((Math.random() * 100 + 1) * 100) / 100, // $1.00 - $100.00
     }));
 

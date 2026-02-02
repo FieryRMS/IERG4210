@@ -30,6 +30,7 @@ import { ButtonGroup } from "@/components/ui/button-group";
 
 export function Navbar() {
     const { toggleTheme } = useTheme();
+    console.log(useMatches());
     const matches = (useMatches() as UIMatch<unknown, PageHandle>[]).filter(
         (match) => match.handle && match.handle.breadcrumb,
     );

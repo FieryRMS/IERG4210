@@ -37,7 +37,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     <header className="sticky top-0 z-50 w-full bg-background pb-2">
                         <Navbar />
                     </header>
-                    <main className="py-4 h-full w-full flex-1">{children}</main>
+                    <main className="py-4 w-full h-full flex-1 flex flex-col">{children}</main>
                     <footer className="w-full py-6">
                         <Footer />
                     </footer>
