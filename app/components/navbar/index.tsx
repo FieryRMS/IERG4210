@@ -168,12 +168,14 @@ export function Navbar() {
                                     {index < array.length - 1 ? (
                                         <BreadcrumbItem>
                                             <BreadcrumbLink
-                                                render={<Link to={match.pathname}>{match.handle!.breadcrumb}</Link>}
+                                                render={
+                                                    <Link to={match.pathname}>{match.handle.breadcrumb!(match)}</Link>
+                                                }
                                             />
                                         </BreadcrumbItem>
                                     ) : (
                                         <BreadcrumbItem>
-                                            <BreadcrumbPage>{match.handle!.breadcrumb}</BreadcrumbPage>
+                                            <BreadcrumbPage>{match.handle.breadcrumb!(match)}</BreadcrumbPage>
                                         </BreadcrumbItem>
                                     )}
                                     {index < array.length - 1 && (

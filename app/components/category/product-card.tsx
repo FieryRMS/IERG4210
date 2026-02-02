@@ -23,7 +23,7 @@ export function ProductCard({
 
     return (
         <Card className="w-full max-w-sm p-0 relative overflow-hidden">
-            <Link to={`/products/${id}`} className="block w-full h-full">
+            <Link to={`/p/${id}`} className="block w-full h-full">
                 <AspectRatio ratio={3 / 4}>
                     <img
                         src={imageUrl}

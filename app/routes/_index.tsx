@@ -15,5 +15,5 @@ export default function Home() {
 }
 
 export const handle: PageHandle = {
-    breadcrumb: <HomeIcon className="size-4" />,
+    breadcrumb: () => <HomeIcon className="size-4" />,
 };

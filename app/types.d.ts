@@ -1,3 +1,3 @@
 interface PageHandle {
-    breadcrumb?: React.ReactNode;
+    breadcrumb?: (match: UIMatch<unknown, PageHandle>) => React.ReactNode;
 }
