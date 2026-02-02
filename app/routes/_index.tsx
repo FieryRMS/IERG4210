@@ -1,7 +1,6 @@
 import { HomeIcon } from "lucide-react";
 import type { Route } from "../+types/root";
 import { Welcome } from "../welcome/welcome";
-import { BreadcrumbItem, BreadcrumbLink } from "@/components/ui/breadcrumb";
 
 export function meta({}: Route.MetaArgs) {
     return [{ title: "New React Router App" }, { name: "description", content: "Welcome to React Router!" }];
