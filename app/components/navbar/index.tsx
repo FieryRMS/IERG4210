@@ -21,7 +21,17 @@ import {
     BreadcrumbPage,
     BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Moon, ShoppingCart, Sun, UserRound, ChevronsRightIcon, SearchIcon, HomeIcon } from "lucide-react";
+import {
+    Moon,
+    ShoppingCart,
+    Sun,
+    UserRound,
+    ChevronsRightIcon,
+    SearchIcon,
+    HomeIcon,
+    PlusIcon,
+    MinusIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "@/hooks/theme-provider";
@@ -30,6 +40,7 @@ import { Badge } from "@/components/ui/badge";
 import { ButtonGroup } from "@/components/ui/button-group";
 import type { LocationState, PageHandle } from "@/types";
 import { useCart } from "@/hooks/cart-provider";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../ui/item";
 
 export function Navbar() {
     const { toggleTheme } = useTheme();
@@ -40,7 +51,7 @@ export function Navbar() {
     if (location.state?.breadcrumbs?.length) breadcrumbs.slice(1);
     breadcrumbs = [...(location.state?.breadcrumbs || []), ...breadcrumbs];
 
-    const { cart } = useCart();
+    const { cart, addQuantity, removeQuantity, setQuantity } = useCart();
 
     return (
         <NavigationMenu className="max-w-full grid w-full grid-cols-3 items-center gap-x-2 px-4 py-2 sticky top-0">
@@ -144,7 +155,6 @@ export function Navbar() {
                 </NavigationMenuItem>
 
                 <NavigationMenuItem>
-                    {/* TODO: cart logic, use "item" */}
                     <NavigationMenuTrigger className="hide-lucide-chevron-down min-w-fit h-full flex flex-col items-center justify-center px-2">
                         <div className="relative flex flex-col items-center">
                             <div className="relative flex items-center">
@@ -162,24 +172,54 @@ export function Navbar() {
                         </div>
                     </NavigationMenuTrigger>
                     <NavigationMenuContent>
-                        <div className="w-65 p-4 space-y-3 text-sm">
-                            <p className="font-medium">Your cart</p>
-                            <p className="text-muted-foreground">
-                                You have {cart.size} items in your cart. Proceed to checkout to complete your order.
-                            </p>
-                            <div className="flex justify-end gap-2">
-                                <Button variant="outline" size="sm">
-                                    <Link to="/cart" viewTransition>
-                                        View cart
-                                    </Link>
-                                </Button>
-                                <Button size="sm">
-                                    <Link to="/checkout" viewTransition>
-                                        Checkout
-                                    </Link>
-                                </Button>
-                            </div>
+                        <div className="flex w-full max-w-md flex-col gap-6">
+                            <ItemGroup className="gap-4">
+                                {[...cart.values()].map(({ p, q }) => (
+                                    <Item key={p.id} variant="outline" role="listitem">
+                                        <ItemMedia variant="image">
+                                            <img
+                                                src={p.imageUrl}
+                                                alt={p.name}
+                                                className="w-16 h-16 object-cover pointer-events-none select-none"
+                                                draggable={false}
+                                            />
+                                        </ItemMedia>
+                                        <ItemContent>
+                                            <ItemTitle className="line-clamp-1">{p.name}</ItemTitle>
+                                            <ItemDescription>${p.price}</ItemDescription>
+                                        </ItemContent>
+                                        <ItemContent className="flex-none text-center">
+                                            <ButtonGroup>
+                                                <Button
+                                                    variant="outline"
+                                                    aria-label="add-quantity"
+                                                    onClick={() => removeQuantity(p)}
+                                                >
+                                                    <MinusIcon />
+                                                </Button>
+                                                <Input
+                                                    value={q}
+                                                    className="w-12 text-center"
+                                                    onChange={(e) => {
+                                                        const value = parseInt(e.target.value, 10);
+                                                        if (isNaN(value) || value < 0) return;
+                                                        setQuantity(p, value);
+                                                    }}
+                                                />
+                                                <Button
+                                                    variant="outline"
+                                                    aria-label="remove-quantity"
+                                                    onClick={() => addQuantity(p)}
+                                                >
+                                                    <PlusIcon />
+                                                </Button>
+                                            </ButtonGroup>
+                                        </ItemContent>
+                                    </Item>
+                                ))}
+                            </ItemGroup>
                         </div>
+                        <Button className="w-full mt-4">Checkout</Button>
                     </NavigationMenuContent>
                 </NavigationMenuItem>
             </NavigationMenuList>
