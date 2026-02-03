@@ -4,14 +4,16 @@ import { createContext, useContext, useState } from "react";
 
 type CartProviderState = {
     cart: Map<string, { p: Product; q: number }>;
-    addToCart: (product: Product, quantity?: number) => void;
-    removeFromCart: (productId: string, quantity?: number) => void;
+    addQuantity: (product: Product, quantity?: number) => void;
+    removeQuantity: (product: Product, quantity?: number) => void;
+    setQuantity: (product: Product, quantity: number) => void;
 };
 
 const CartProviderContext = createContext<CartProviderState>({
     cart: new Map(),
-    addToCart: () => null,
-    removeFromCart: () => null,
+    addQuantity: () => null,
+    removeQuantity: () => null,
+    setQuantity: () => null,
 });
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
@@ -19,7 +21,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     const value: CartProviderState = {
         cart,
-        addToCart: (product: Product, quantity: number = 1) => {
+        addQuantity: (product: Product, quantity: number = 1) => {
             setCart((prevCart) => {
                 const newCart = new Map(prevCart);
                 const existingItem = newCart.get(product.id);
@@ -31,17 +33,27 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 return newCart;
             });
         },
-        removeFromCart: (productId: string, quantity: number = 1) => {
+        removeQuantity: (product: Product, quantity: number = 1) => {
             setCart((prevCart) => {
                 const newCart = new Map(prevCart);
-                const existingItem = newCart.get(productId);
+                const existingItem = newCart.get(product.id);
                 if (existingItem) {
-                    newCart.set(productId, { p: existingItem.p, q: existingItem.q - quantity });
-                    if (existingItem.q <= 0) {
-                        newCart.delete(productId);
+                    if (existingItem.q - quantity <= 0) {
+                        newCart.delete(product.id);
                     } else {
-                        newCart.set(productId, existingItem);
+                        newCart.set(product.id, { p: existingItem.p, q: existingItem.q - quantity });
                     }
+                }
+                return newCart;
+            });
+        },
+        setQuantity: (product: Product, quantity: number) => {
+            setCart((prevCart) => {
+                const newCart = new Map(prevCart);
+                if (quantity <= 0) {
+                    newCart.delete(product.id);
+                } else {
+                    newCart.set(product.id, { p: product, q: quantity });
                 }
                 return newCart;
             });

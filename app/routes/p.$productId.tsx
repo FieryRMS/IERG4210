@@ -45,7 +45,7 @@ export default function ({ params }: Route.ComponentProps) {
         }
     }, [location, params.productId, productFetcher]);
 
-    const { addToCart } = useCart();
+    const { addQuantity: addToCart } = useCart();
 
     return (
         <>

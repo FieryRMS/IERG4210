@@ -12,7 +12,7 @@ export function ProductCard({ product }: { product: Product }) {
     const cents = Math.round((product.price - dollars) * 100)
         .toString()
         .padStart(2, "0");
-    const { addToCart } = useCart();
+    const { addQuantity: addToCart } = useCart();
 
     return (
         <Card className="w-full max-w-sm p-0 relative overflow-hidden">
