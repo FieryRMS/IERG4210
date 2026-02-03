@@ -11,22 +11,37 @@ import {
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import type { Route } from "./+types/p.$productId";
 import { ShoppingCartIcon } from "lucide-react";
+import { fetchProduct } from "@/lib/api";
+import { useFetcher, useLocation } from "react-router";
+import { useEffect } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export async function clientLoader({ params }: Route.LoaderArgs) {
-    return {
-        id: params.productId,
-        name: "Product " + params.productId,
-        imageUrl: `https://avatar.vercel.sh/shadcn${params.productId}`,
-        desc: "Why did the price change? such an unstable market, damn",
-        price: Math.round((Math.random() * 100 + 1) * 100) / 100, // $1.00 - $100.00
-    };
+export async function clientAction({ params }: Route.ClientActionArgs) {
+    // add delay to simulate network latency
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    return fetchProduct(params.productId);
 }
 
-export default function ({ loaderData }: Route.ComponentProps) {
-    const dollars = Math.floor(loaderData.price);
-    const cents = Math.round((loaderData.price - dollars) * 100)
+export default function ({ params }: Route.ComponentProps) {
+    const fetcher = useFetcher();
+    const location = useLocation();
+    const dollars = Math.floor(fetcher.data?.price);
+    const cents = Math.round((fetcher.data?.price - dollars) * 100)
         .toString()
         .padStart(2, "0");
+
+    console.log(fetcher);
+
+    useEffect(() => {
+        if (location.state?.product && location.state.product.id === params.productId) {
+            fetcher.data = location.state.product;
+            return;
+        }
+        if (fetcher.state === "idle" && !fetcher.data) {
+            fetcher.submit({}, { method: "post" });
+        }
+    }, [fetcher]);
+
     return (
         <>
             <div className="items-center justify-center flex-1 flex">
@@ -38,11 +53,15 @@ export default function ({ loaderData }: Route.ComponentProps) {
                                     <div className="h-full">
                                         <Card className="h-full p-3">
                                             <CardContent className="h-full flex items-center justify-center p-0 overflow-hidden rounded-xl">
-                                                <img
-                                                    src={`https://avatar.vercel.sh/shadcn${loaderData.id}${index}`}
-                                                    alt={`Product ${loaderData.id}`}
-                                                    className="h-full w-full object-cover pointer-events-none select-none"
-                                                />
+                                                {fetcher.data ? (
+                                                    <img
+                                                        src={`https://avatar.vercel.sh/shadcn${fetcher.data.id}${index}`}
+                                                        alt={`Product ${fetcher.data.id}`}
+                                                        className="h-full w-full object-cover pointer-events-none select-none"
+                                                    />
+                                                ) : (
+                                                    <Skeleton className="h-full w-full" />
+                                                )}
                                             </CardContent>
                                         </Card>
                                     </div>
@@ -54,11 +73,31 @@ export default function ({ loaderData }: Route.ComponentProps) {
                     </Carousel>
                     <div className="p-6 px-3 h-full w-full relative min-h-fit min-w-fit flex flex-col">
                         <CardHeader>
-                            <CardTitle className="text-5xl font-bold mb-2">{loaderData.name}</CardTitle>
-                            <CardDescription className="mb-4">{loaderData.desc}</CardDescription>
+                            <CardTitle className="text-5xl font-bold mb-2">
+                                {fetcher.data ? fetcher.data.name : <Skeleton className="h-9 w-52" />}
+                            </CardTitle>
+                            <CardDescription className="mb-4">
+                                {fetcher.data ? (
+                                    fetcher.data.desc
+                                ) : (
+                                    <div className="space-y-2">
+                                        <Skeleton className="h-6 w-64" />
+                                        <Skeleton className="h-6 w-74" />
+                                    </div>
+                                )}
+                            </CardDescription>
                             <CardAction className="px-3 py-1 rounded-full items-stretch inline-block">
-                                <span className="text-4xl font-semibold leading-none">${dollars}</span>
-                                <span className="align-top text-xl leading-none">.{cents}</span>
+                                <span className="text-4xl font-semibold leading-none">
+                                    $
+                                    {fetcher.data ? (
+                                        `${dollars}`
+                                    ) : (
+                                        <Skeleton className="h-10 w-11 inline-block align-bottom" />
+                                    )}
+                                </span>
+                                <span className="align-top text-xl leading-none">
+                                    .{fetcher.data ? cents : <Skeleton className="h-6 w-5 inline-block" />}
+                                </span>
                             </CardAction>
                         </CardHeader>
                         <CardFooter className="flex-col gap-2 mt-auto">

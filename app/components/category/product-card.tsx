@@ -5,35 +5,32 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "../ui/badge";
 import { Link } from "react-router";
 
-export function ProductCard({
-    id,
-    name,
-    imageUrl,
-    price,
-}: {
-    id: string;
-    name: string;
-    imageUrl: string;
-    price: number;
-}) {
-    const dollars = Math.floor(price);
-    const cents = Math.round((price - dollars) * 100)
+export function ProductCard({ product }: { product: Product }) {
+    const dollars = Math.floor(product.price);
+    const cents = Math.round((product.price - dollars) * 100)
         .toString()
         .padStart(2, "0");
 
     return (
         <Card className="w-full max-w-sm p-0 relative overflow-hidden">
-            <Link to={`/p/${id}`} className="block w-full h-full" viewTransition>
+            <Link
+                to={`/p/${product.id}`}
+                className="block w-full h-full"
+                viewTransition
+                state={{
+                    product,
+                }}
+            >
                 <AspectRatio ratio={3 / 4}>
                     <img
-                        src={imageUrl}
-                        alt={name}
+                        src={product.imageUrl}
+                        alt={product.name}
                         className="w-full h-full object-cover pointer-events-none select-none"
                         draggable={false}
                     />
                 </AspectRatio>
                 <CardHeader className="absolute w-full bottom-2 p-3">
-                    <CardTitle className="row-start-2 text-2xl">{name}</CardTitle>
+                    <CardTitle className="row-start-2 text-2xl">{product.name}</CardTitle>
                     <CardAction className="">
                         <Badge
                             variant="secondary"
