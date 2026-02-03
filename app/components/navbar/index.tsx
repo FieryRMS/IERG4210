@@ -177,7 +177,7 @@ export function Navbar() {
                         </div>
                     </NavigationMenuTrigger>
                     <NavigationMenuContent>
-                        <div className="flex w-full max-w-md flex-col gap-6">
+                        <div className="flex w-sm flex-col gap-6">
                             <ItemGroup className="gap-2">
                                 {[...cart.values()].map(({ p, q }) => (
                                     <Item key={p.id} variant="outline" role="listitem">
@@ -232,6 +232,11 @@ export function Navbar() {
                                         </ItemContent>
                                     </Item>
                                 ))}
+                                {cart.size === 0 && (
+                                    <Item variant="outline" className="text-center flex justify-center items-center text-muted-foreground">
+                                        No items in cart.
+                                    </Item>
+                                )}
                             </ItemGroup>
                         </div>
                         <Button className="w-full mt-4">Checkout</Button>
