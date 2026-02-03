@@ -1,3 +1,4 @@
+import type { Product } from "@/types";
 import { ProductCard } from "./product-card";
 
 export function Category({ products }: { products: Product[] }) {

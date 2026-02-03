@@ -27,6 +27,7 @@ import { useTheme } from "@/components/theme-provider";
 import { LoginForm } from "./login-form";
 import { Badge } from "@/components/ui/badge";
 import { ButtonGroup } from "@/components/ui/button-group";
+import type { PageHandle } from "@/types";
 
 export function Navbar() {
     const { toggleTheme } = useTheme();
@@ -81,7 +82,11 @@ export function Navbar() {
                 <NavigationMenuItem className="hidden lg:block h-full">
                     <NavigationMenuLink
                         render={
-                            <Link to="/collections" className="text-sm font-medium h-full justify-center" viewTransition>
+                            <Link
+                                to="/collections"
+                                className="text-sm font-medium h-full justify-center"
+                                viewTransition
+                            >
                                 Collections
                             </Link>
                         }
@@ -147,10 +152,14 @@ export function Navbar() {
                             </p>
                             <div className="flex justify-end gap-2">
                                 <Button variant="outline" size="sm">
-                                    <Link to="/cart" viewTransition>View cart</Link>
+                                    <Link to="/cart" viewTransition>
+                                        View cart
+                                    </Link>
                                 </Button>
                                 <Button size="sm">
-                                    <Link to="/checkout" viewTransition>Checkout</Link>
+                                    <Link to="/checkout" viewTransition>
+                                        Checkout
+                                    </Link>
                                 </Button>
                             </div>
                         </div>
@@ -170,7 +179,9 @@ export function Navbar() {
                                         <BreadcrumbItem>
                                             <BreadcrumbLink
                                                 render={
-                                                    <Link to={match.pathname} viewTransition>{match.handle.breadcrumb!(match)}</Link>
+                                                    <Link to={match.pathname} viewTransition>
+                                                        {match.handle.breadcrumb!(match)}
+                                                    </Link>
                                                 }
                                             />
                                         </BreadcrumbItem>

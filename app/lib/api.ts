@@ -1,3 +1,5 @@
+import type { Product } from "@/types";
+
 export async function fetchProduct(productId: Product["id"]): Promise<Product> {
     return {
         id: productId,

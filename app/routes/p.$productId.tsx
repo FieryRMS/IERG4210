@@ -12,9 +12,10 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import type { Route } from "./+types/p.$productId";
 import { ShoppingCartIcon } from "lucide-react";
 import { fetchProduct } from "@/lib/api";
-import { useFetcher, useLocation } from "react-router";
+import { useFetcher, useLocation, type Location, type UIMatch } from "react-router";
 import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { LocationState, PageHandle } from "@/types";
 
 export async function clientAction({ params }: Route.ClientActionArgs) {
     // add delay to simulate network latency
@@ -24,7 +25,7 @@ export async function clientAction({ params }: Route.ClientActionArgs) {
 
 export default function ({ params }: Route.ComponentProps) {
     const fetcher = useFetcher();
-    const location = useLocation();
+    const location: Location<LocationState> = useLocation();
     const dollars = Math.floor(fetcher.data?.price);
     const cents = Math.round((fetcher.data?.price - dollars) * 100)
         .toString()
@@ -39,6 +40,9 @@ export default function ({ params }: Route.ComponentProps) {
         }
         if (fetcher.state === "idle" && !fetcher.data) {
             fetcher.submit({}, { method: "post" });
+        }
+        if (fetcher.data) {
+            location.state = { product: fetcher.data };
         }
     }, [fetcher]);
 
@@ -113,5 +117,5 @@ export default function ({ params }: Route.ComponentProps) {
 }
 
 export const handle: PageHandle = {
-    breadcrumb: ({ params }: Route.ComponentProps) => params.productId,
+    breadcrumb: ({ params }: UIMatch<unknown, PageHandle>) => params.productId,
 };
