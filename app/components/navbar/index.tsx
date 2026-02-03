@@ -49,8 +49,10 @@ export function Navbar() {
     let breadcrumbs = (useMatches() as UIMatch<unknown, PageHandle>[])
         .filter((match) => match.handle && match.handle.breadcrumb)
         .map((match) => match.handle!.breadcrumb!(match));
-    if (location.state?.breadcrumbs?.length) breadcrumbs.slice(1);
+
+    const root = breadcrumbs.shift();
     breadcrumbs = [...(location.state?.breadcrumbs || []), ...breadcrumbs];
+    if (location.state?.breadcrumbs?.length && location.state.breadcrumbs[0].id !== "root") breadcrumbs.unshift(root!);
 
     const { cart, addQuantity, removeQuantity, setQuantity } = useCart();
 
@@ -233,7 +235,10 @@ export function Navbar() {
                                     </Item>
                                 ))}
                                 {cart.size === 0 && (
-                                    <Item variant="outline" className="text-center flex justify-center items-center text-muted-foreground">
+                                    <Item
+                                        variant="outline"
+                                        className="text-center flex justify-center items-center text-muted-foreground"
+                                    >
                                         No items in cart.
                                     </Item>
                                 )}

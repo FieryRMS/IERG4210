@@ -1,12 +1,26 @@
-import { isRouteErrorResponse, Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
+import {
+    type BlockerFunction,
+    isRouteErrorResponse,
+    Links,
+    Meta,
+    Outlet,
+    Scripts,
+    ScrollRestoration,
+    useBlocker,
+    useLocation,
+    useMatches,
+    type Location,
+    type UIMatch,
+} from "react-router";
 import { ThemeProvider } from "@/hooks/theme-provider";
 
 import type { Route } from "./+types/root";
 import "./app.css";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import type { PageHandle } from "./types";
+import type { LocationState, PageHandle } from "./types";
 import { CartProvider } from "./hooks/cart-provider";
+import { useCallback } from "react";
 
 export const links: Route.LinksFunction = () => [
     { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -22,6 +36,30 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
+    const location: Location<LocationState> = useLocation();
+    const matches = useMatches();
+    const breadcrumbs = (matches as UIMatch<unknown, PageHandle>[])
+        .filter((match) => match.handle && match.handle.breadcrumb)
+        .map((match) => match.handle!.breadcrumb!(match));
+    const shouldBlock = useCallback<BlockerFunction>(
+        ({ currentLocation, nextLocation, historyAction }) => {
+            if (
+                historyAction === "PUSH" &&
+                currentLocation.pathname === location.pathname &&
+                nextLocation.pathname !== currentLocation.pathname
+            ) {
+                if (location.state?.breadcrumbs?.length && location.state.breadcrumbs[0].id === "root")
+                    breadcrumbs.shift();
+                nextLocation.state = {
+                    breadcrumbs: [...(location.state?.breadcrumbs || []), ...breadcrumbs],
+                    ...nextLocation.state,
+                };
+            }
+            return false;
+        },
+        [location, breadcrumbs],
+    );
+    useBlocker(shouldBlock);
     return (
         <html lang="en">
             <head>
