@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useLocation, useMatches, type Location, type UIMatch } from "react-router";
+import { useLocation, useMatches, useNavigate, type Location, type UIMatch } from "react-router";
 import { Link } from "@/components/link-wrapper";
 import {
     NavigationMenu,
@@ -45,6 +45,7 @@ import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } f
 export function Navbar() {
     const { toggleTheme } = useTheme();
     const location: Location<LocationState> = useLocation();
+    const navigate = useNavigate();
     let breadcrumbs = (useMatches() as UIMatch<unknown, PageHandle>[])
         .filter((match) => match.handle && match.handle.breadcrumb)
         .map((match) => match.handle!.breadcrumb!(match));
@@ -123,11 +124,15 @@ export function Navbar() {
                         className="flex w-full items-center gap-2 justify-center "
                         onSubmit={(e) => {
                             e.preventDefault();
-                            // TODO: search logic
+                            const formData = new FormData(e.currentTarget);
+                            const query = formData.get("search")?.toString().trim();
+                            if (query) {
+                                navigate(`/p/${query}`, { viewTransition: true });
+                            }
                         }}
                     >
                         <ButtonGroup className="flex-1">
-                            <Input placeholder="Search..." />
+                            <Input name="search" placeholder="Search..." />
                             <Button variant="outline" aria-label="Search" type="submit">
                                 <SearchIcon />
                             </Button>
@@ -173,7 +178,7 @@ export function Navbar() {
                     </NavigationMenuTrigger>
                     <NavigationMenuContent>
                         <div className="flex w-full max-w-md flex-col gap-6">
-                            <ItemGroup className="gap-4">
+                            <ItemGroup className="gap-2">
                                 {[...cart.values()].map(({ p, q }) => (
                                     <Item key={p.id} variant="outline" role="listitem">
                                         <ItemMedia variant="image">
@@ -197,15 +202,25 @@ export function Navbar() {
                                                 >
                                                     <MinusIcon />
                                                 </Button>
-                                                <Input
-                                                    value={q}
-                                                    className="w-12 text-center"
-                                                    onChange={(e) => {
-                                                        const value = parseInt(e.target.value, 10);
-                                                        if (isNaN(value) || value < 0) return;
+                                                {(() => {
+                                                    const fn = (e: React.FormEvent<HTMLInputElement>) => {
+                                                        let value = parseInt(e.currentTarget.value, 10);
+                                                        if (isNaN(value)) value = q;
                                                         setQuantity(p, value);
-                                                    }}
-                                                />
+                                                    };
+                                                    return (
+                                                        <Input
+                                                            defaultValue={q}
+                                                            className="w-12 text-center"
+                                                            onBlur={fn}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === "Enter") {
+                                                                    e.currentTarget.blur();
+                                                                }
+                                                            }}
+                                                        />
+                                                    );
+                                                })()}
                                                 <Button
                                                     variant="outline"
                                                     aria-label="remove-quantity"
