@@ -24,7 +24,7 @@ import {
 import { Moon, ShoppingCart, Sun, UserRound, ChevronsRightIcon, SearchIcon, HomeIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useTheme } from "@/components/theme-provider";
+import { useTheme } from "@/hooks/theme-provider";
 import { LoginForm } from "./login-form";
 import { Badge } from "@/components/ui/badge";
 import { ButtonGroup } from "@/components/ui/button-group";
