@@ -9,6 +9,7 @@ export function meta({ matches }: Route.MetaArgs) {
         .filter((match) => match.handle && match.handle.breadcrumb)
         .map((match) => match.handle!.breadcrumb!(match));
     const name = breadcrumbs.length ? breadcrumbs.at(-1)!.name : null;
+    console.log(breadcrumbs);
     return [
         { title: `${name ? `${name} | ` : ""}The Generic Company` },
         { name: "description", content: "A generic company that sells generic products" },
@@ -26,3 +27,11 @@ export default function MainPage({ loaderData }: Route.ComponentProps) {
         </>
     );
 }
+
+export const handle: PageHandle = {
+    breadcrumb: ({ params, id, pathname }) => ({
+        id,
+        name: `Category ${params.categoryId}`,
+        pathname,
+    }),
+};

@@ -52,7 +52,7 @@ export function Navbar() {
 
     const root = breadcrumbs.shift();
     breadcrumbs = [...(location.state?.breadcrumbs || []), ...breadcrumbs];
-    if (location.state?.breadcrumbs?.length && location.state.breadcrumbs[0].id !== "root") breadcrumbs.unshift(root!);
+    if (!location.state?.breadcrumbs?.length || location.state.breadcrumbs[0].id !== "root") breadcrumbs.unshift(root!);
 
     const { cart, addQuantity, removeQuantity, setQuantity } = useCart();
 
@@ -79,16 +79,16 @@ export function Navbar() {
                     <NavigationMenuTrigger className="h-full px-2">Shop</NavigationMenuTrigger>
                     <NavigationMenuContent>
                         <ul className="grid w-75 gap-3 p-4 md:w-100 md:grid-cols-2 list-none">
-                            <ListItem title="New Arrivals" href="/new">
+                            <ListItem title="New Arrivals" href="/c/new">
                                 Fresh drops and the latest products.
                             </ListItem>
-                            <ListItem title="Best Sellers" href="/best-sellers">
+                            <ListItem title="Best Sellers" href="/c/best-sellers">
                                 Customer favorites and top-rated picks.
                             </ListItem>
-                            <ListItem title="Men" href="/men">
+                            <ListItem title="Men" href="/c/men">
                                 Clothing, shoes, and accessories for men.
                             </ListItem>
-                            <ListItem title="Women" href="/women">
+                            <ListItem title="Women" href="/c/women">
                                 Styles, outfits, and essentials for women.
                             </ListItem>
                         </ul>
@@ -98,7 +98,7 @@ export function Navbar() {
                 <NavigationMenuItem className="hidden lg:block h-full">
                     <NavigationMenuLink
                         render={
-                            <Link to="/deals" className="text-sm font-medium h-full justify-center" viewTransition>
+                            <Link to="/c/deals" className="text-sm font-medium h-full justify-center" viewTransition>
                                 Deals
                             </Link>
                         }
@@ -109,7 +109,7 @@ export function Navbar() {
                     <NavigationMenuLink
                         render={
                             <Link
-                                to="/collections"
+                                to="/c/collections"
                                 className="text-sm font-medium h-full justify-center"
                                 viewTransition
                             >
