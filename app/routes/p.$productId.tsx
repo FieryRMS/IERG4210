@@ -37,11 +37,11 @@ export default function ({ params }: Route.ComponentProps) {
             productFetcher.data = location.state.product;
             return;
         }
-        if (productFetcher.state === "idle" && !productFetcher.data) {
+        if (productFetcher.state === "idle" && productFetcher.data?.id !== params.productId) {
             productFetcher.submit({}, { method: "post" });
         }
-        if (productFetcher.data) {
-            location.state = { product: productFetcher.data };
+        if (productFetcher.data?.id === params.productId) {
+            location.state = { ...location.state, product: productFetcher.data };
         }
     }, [location, params.productId, productFetcher]);
 
@@ -58,7 +58,7 @@ export default function ({ params }: Route.ComponentProps) {
                                     <div className="h-full">
                                         <Card className="h-full p-3">
                                             <CardContent className="h-full flex items-center justify-center p-0 overflow-hidden rounded-xl">
-                                                {productFetcher.data ? (
+                                                {productFetcher.data?.id === params.productId ? (
                                                     <img
                                                         src={`https://avatar.vercel.sh/shadcn${productFetcher.data.id}${index}`}
                                                         alt={`Product ${productFetcher.data.id}`}
@@ -79,10 +79,14 @@ export default function ({ params }: Route.ComponentProps) {
                     <div className="p-6 px-3 h-full w-full relative min-h-fit min-w-fit flex flex-col">
                         <CardHeader>
                             <CardTitle className="text-5xl font-bold mb-2">
-                                {productFetcher.data ? productFetcher.data.name : <Skeleton className="h-9 w-52" />}
+                                {productFetcher.data?.id === params.productId ? (
+                                    productFetcher.data.name
+                                ) : (
+                                    <Skeleton className="h-9 w-52" />
+                                )}
                             </CardTitle>
                             <CardDescription className="mb-4">
-                                {productFetcher.data ? (
+                                {productFetcher.data?.id === params.productId ? (
                                     productFetcher.data.desc
                                 ) : (
                                     <div className="space-y-2">
@@ -94,14 +98,19 @@ export default function ({ params }: Route.ComponentProps) {
                             <CardAction className="px-3 py-1 rounded-full items-stretch inline-block">
                                 <span className="text-4xl font-semibold leading-none">
                                     $
-                                    {productFetcher.data ? (
+                                    {productFetcher.data?.id === params.productId ? (
                                         `${dollars}`
                                     ) : (
                                         <Skeleton className="h-10 w-11 inline-block align-bottom" />
                                     )}
                                 </span>
                                 <span className="align-top text-xl leading-none">
-                                    .{productFetcher.data ? cents : <Skeleton className="h-6 w-5 inline-block" />}
+                                    .
+                                    {productFetcher.data?.id === params.productId ? (
+                                        cents
+                                    ) : (
+                                        <Skeleton className="h-6 w-5 inline-block" />
+                                    )}
                                 </span>
                             </CardAction>
                         </CardHeader>
@@ -110,7 +119,7 @@ export default function ({ params }: Route.ComponentProps) {
                                 size="lg"
                                 className="w-full mb-2"
                                 onClick={() => {
-                                    if (productFetcher.data) {
+                                    if (productFetcher.data?.id === params.productId) {
                                         addToCart(productFetcher.data);
                                     }
                                 }}
