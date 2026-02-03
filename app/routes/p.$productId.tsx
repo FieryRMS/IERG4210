@@ -31,8 +31,6 @@ export default function ({ params }: Route.ComponentProps) {
         .toString()
         .padStart(2, "0");
 
-    console.log(fetcher);
-
     useEffect(() => {
         if (location.state?.product && location.state.product.id === params.productId) {
             fetcher.data = location.state.product;
