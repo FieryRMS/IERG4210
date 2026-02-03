@@ -12,7 +12,7 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import type { Route } from "./+types/p.$productId";
 import { ShoppingCartIcon } from "lucide-react";
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function clientLoader({ params }: Route.LoaderArgs) {
     return {
         id: params.productId,
         name: "Product " + params.productId,

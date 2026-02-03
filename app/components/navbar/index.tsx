@@ -40,7 +40,7 @@ export function Navbar() {
                 <NavigationMenuItem className="h-full">
                     <NavigationMenuLink
                         render={
-                            <Link to="/" className="flex items-center gap-2 h-full justify-center">
+                            <Link to="/" className="flex items-center gap-2 h-full justify-center" viewTransition>
                                 <div className="flex items-center justify-center rounded-full p-2 bg-primary text-primary-foreground font-bold">
                                     LOGO
                                 </div>
@@ -71,7 +71,7 @@ export function Navbar() {
                 <NavigationMenuItem className="hidden lg:block h-full">
                     <NavigationMenuLink
                         render={
-                            <Link to="/deals" className="text-sm font-medium h-full justify-center">
+                            <Link to="/deals" className="text-sm font-medium h-full justify-center" viewTransition>
                                 Deals
                             </Link>
                         }
@@ -81,7 +81,7 @@ export function Navbar() {
                 <NavigationMenuItem className="hidden lg:block h-full">
                     <NavigationMenuLink
                         render={
-                            <Link to="/collections" className="text-sm font-medium h-full justify-center">
+                            <Link to="/collections" className="text-sm font-medium h-full justify-center" viewTransition>
                                 Collections
                             </Link>
                         }
@@ -147,10 +147,10 @@ export function Navbar() {
                             </p>
                             <div className="flex justify-end gap-2">
                                 <Button variant="outline" size="sm">
-                                    <Link to="/cart">View cart</Link>
+                                    <Link to="/cart" viewTransition>View cart</Link>
                                 </Button>
                                 <Button size="sm">
-                                    <Link to="/checkout">Checkout</Link>
+                                    <Link to="/checkout" viewTransition>Checkout</Link>
                                 </Button>
                             </div>
                         </div>
@@ -170,7 +170,7 @@ export function Navbar() {
                                         <BreadcrumbItem>
                                             <BreadcrumbLink
                                                 render={
-                                                    <Link to={match.pathname}>{match.handle.breadcrumb!(match)}</Link>
+                                                    <Link to={match.pathname} viewTransition>{match.handle.breadcrumb!(match)}</Link>
                                                 }
                                             />
                                         </BreadcrumbItem>
@@ -199,7 +199,7 @@ function ListItem({ title, children, href, ...props }: React.ComponentPropsWitho
         <li {...props}>
             <NavigationMenuLink
                 render={
-                    <Link to={href}>
+                    <Link to={href} viewTransition>
                         <div className="flex flex-col gap-1 text-sm">
                             <div className="leading-none font-medium">{title}</div>
                             <div className="text-muted-foreground line-clamp-2">{children}</div>
