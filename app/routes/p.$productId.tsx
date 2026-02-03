@@ -16,6 +16,7 @@ import { useFetcher, useLocation, type Location } from "react-router";
 import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { LocationState, PageHandle, Product } from "@/types";
+import { useCart } from "@/hooks/cart-provider";
 
 export async function clientAction({ params }: Route.ClientActionArgs) {
     // add delay to simulate network latency
@@ -42,7 +43,9 @@ export default function ({ params }: Route.ComponentProps) {
         if (productFetcher.data) {
             location.state = { product: productFetcher.data };
         }
-    }, [productFetcher]);
+    }, [location, params.productId, productFetcher]);
+
+    const { addToCart } = useCart();
 
     return (
         <>
@@ -103,7 +106,15 @@ export default function ({ params }: Route.ComponentProps) {
                             </CardAction>
                         </CardHeader>
                         <CardFooter className="flex-col gap-2 mt-auto">
-                            <Button size="lg" className="w-full mb-2">
+                            <Button
+                                size="lg"
+                                className="w-full mb-2"
+                                onClick={() => {
+                                    if (productFetcher.data) {
+                                        addToCart(productFetcher.data);
+                                    }
+                                }}
+                            >
                                 <ShoppingCartIcon className="mr-2" />
                             </Button>
                         </CardFooter>

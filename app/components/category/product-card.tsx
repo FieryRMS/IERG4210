@@ -5,12 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "../ui/badge";
 import { Link } from "@/components/link-wrapper";
 import type { Product } from "@/types";
+import { useCart } from "@/hooks/cart-provider";
 
 export function ProductCard({ product }: { product: Product }) {
     const dollars = Math.floor(product.price);
     const cents = Math.round((product.price - dollars) * 100)
         .toString()
         .padStart(2, "0");
+    const { addToCart } = useCart();
 
     return (
         <Card className="w-full max-w-sm p-0 relative overflow-hidden">
@@ -43,7 +45,12 @@ export function ProductCard({ product }: { product: Product }) {
                     </CardAction>
                 </CardHeader>
             </Link>
-            <Button size="icon-lg" className="rounded-full absolute top-2 right-2" variant="secondary">
+            <Button
+                size="icon-lg"
+                className="rounded-full absolute top-2 right-2"
+                variant="secondary"
+                onClick={() => addToCart(product)}
+            >
                 <ShoppingCartIcon />
             </Button>
         </Card>

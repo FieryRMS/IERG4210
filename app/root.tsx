@@ -6,6 +6,7 @@ import "./app.css";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import type { PageHandle } from "./types";
+import { CartProvider } from "./hooks/cart-provider";
 
 export const links: Route.LinksFunction = () => [
     { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -34,17 +35,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </script>
             </head>
             <ThemeProvider>
-                <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden flex flex-col">
-                    <header className="sticky top-0 z-50 w-full bg-background pb-2">
-                        <Navbar />
-                    </header>
-                    <main className="py-4 w-full h-full flex-1 flex flex-col">{children}</main>
-                    <footer className="w-full py-6">
-                        <Footer />
-                    </footer>
-                    <ScrollRestoration />
-                    <Scripts />
-                </body>
+                <CartProvider>
+                    <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden flex flex-col">
+                        <header className="sticky top-0 z-50 w-full bg-background pb-2">
+                            <Navbar />
+                        </header>
+                        <main className="py-4 w-full h-full flex-1 flex flex-col">{children}</main>
+                        <footer className="w-full py-6">
+                            <Footer />
+                        </footer>
+                        <ScrollRestoration />
+                        <Scripts />
+                    </body>
+                </CartProvider>
             </ThemeProvider>
         </html>
     );

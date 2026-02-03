@@ -29,6 +29,7 @@ import { LoginForm } from "./login-form";
 import { Badge } from "@/components/ui/badge";
 import { ButtonGroup } from "@/components/ui/button-group";
 import type { LocationState, PageHandle } from "@/types";
+import { useCart } from "@/hooks/cart-provider";
 
 export function Navbar() {
     const { toggleTheme } = useTheme();
@@ -38,6 +39,8 @@ export function Navbar() {
         .map((match) => match.handle!.breadcrumb!(match));
     if (location.state?.breadcrumbs?.length) breadcrumbs.slice(1);
     breadcrumbs = [...(location.state?.breadcrumbs || []), ...breadcrumbs];
+
+    const { cart } = useCart();
 
     return (
         <NavigationMenu className="max-w-full grid w-full grid-cols-3 items-center gap-x-2 px-4 py-2 sticky top-0">
@@ -147,17 +150,22 @@ export function Navbar() {
                             <div className="relative flex items-center">
                                 <ShoppingCart />
                                 <Badge className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 h-5 min-w-5 p-0 px-0.5 rounded-full empty:h-2.5 empty:min-w-2.5">
-                                    3
+                                    {cart.size}
                                 </Badge>
                             </div>
-                            <span className="text-xs font-medium text-muted-foreground mt-1">$123.45</span>
+                            <span className="text-xs font-medium text-muted-foreground mt-1">
+                                $
+                                {[...cart.values()]
+                                    .reduce((total, item) => total + item.p.price * item.q, 0)
+                                    .toFixed(2)}
+                            </span>
                         </div>
                     </NavigationMenuTrigger>
                     <NavigationMenuContent>
                         <div className="w-65 p-4 space-y-3 text-sm">
                             <p className="font-medium">Your cart</p>
                             <p className="text-muted-foreground">
-                                You have 3 items in your cart. Proceed to checkout to complete your order.
+                                You have {cart.size} items in your cart. Proceed to checkout to complete your order.
                             </p>
                             <div className="flex justify-end gap-2">
                                 <Button variant="outline" size="sm">
