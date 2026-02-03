@@ -12,10 +12,10 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import type { Route } from "./+types/p.$productId";
 import { ShoppingCartIcon } from "lucide-react";
 import { fetchProduct } from "@/lib/api";
-import { useFetcher, useLocation, type Location, type UIMatch } from "react-router";
+import { useFetcher, useLocation, type Location } from "react-router";
 import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { LocationState, PageHandle } from "@/types";
+import type { LocationState, PageHandle, Product } from "@/types";
 
 export async function clientAction({ params }: Route.ClientActionArgs) {
     // add delay to simulate network latency
@@ -24,25 +24,25 @@ export async function clientAction({ params }: Route.ClientActionArgs) {
 }
 
 export default function ({ params }: Route.ComponentProps) {
-    const fetcher = useFetcher();
+    const productFetcher = useFetcher<Product>();
     const location: Location<LocationState> = useLocation();
-    const dollars = Math.floor(fetcher.data?.price);
-    const cents = Math.round((fetcher.data?.price - dollars) * 100)
+    const dollars = Math.floor(productFetcher.data?.price || 0);
+    const cents = Math.round(((productFetcher.data?.price || 0) - dollars) * 100)
         .toString()
         .padStart(2, "0");
 
     useEffect(() => {
         if (location.state?.product && location.state.product.id === params.productId) {
-            fetcher.data = location.state.product;
+            productFetcher.data = location.state.product;
             return;
         }
-        if (fetcher.state === "idle" && !fetcher.data) {
-            fetcher.submit({}, { method: "post" });
+        if (productFetcher.state === "idle" && !productFetcher.data) {
+            productFetcher.submit({}, { method: "post" });
         }
-        if (fetcher.data) {
-            location.state = { product: fetcher.data };
+        if (productFetcher.data) {
+            location.state = { product: productFetcher.data };
         }
-    }, [fetcher]);
+    }, [productFetcher]);
 
     return (
         <>
@@ -55,10 +55,10 @@ export default function ({ params }: Route.ComponentProps) {
                                     <div className="h-full">
                                         <Card className="h-full p-3">
                                             <CardContent className="h-full flex items-center justify-center p-0 overflow-hidden rounded-xl">
-                                                {fetcher.data ? (
+                                                {productFetcher.data ? (
                                                     <img
-                                                        src={`https://avatar.vercel.sh/shadcn${fetcher.data.id}${index}`}
-                                                        alt={`Product ${fetcher.data.id}`}
+                                                        src={`https://avatar.vercel.sh/shadcn${productFetcher.data.id}${index}`}
+                                                        alt={`Product ${productFetcher.data.id}`}
                                                         className="h-full w-full object-cover pointer-events-none select-none"
                                                     />
                                                 ) : (
@@ -76,11 +76,11 @@ export default function ({ params }: Route.ComponentProps) {
                     <div className="p-6 px-3 h-full w-full relative min-h-fit min-w-fit flex flex-col">
                         <CardHeader>
                             <CardTitle className="text-5xl font-bold mb-2">
-                                {fetcher.data ? fetcher.data.name : <Skeleton className="h-9 w-52" />}
+                                {productFetcher.data ? productFetcher.data.name : <Skeleton className="h-9 w-52" />}
                             </CardTitle>
                             <CardDescription className="mb-4">
-                                {fetcher.data ? (
-                                    fetcher.data.desc
+                                {productFetcher.data ? (
+                                    productFetcher.data.desc
                                 ) : (
                                     <div className="space-y-2">
                                         <Skeleton className="h-6 w-64" />
@@ -91,14 +91,14 @@ export default function ({ params }: Route.ComponentProps) {
                             <CardAction className="px-3 py-1 rounded-full items-stretch inline-block">
                                 <span className="text-4xl font-semibold leading-none">
                                     $
-                                    {fetcher.data ? (
+                                    {productFetcher.data ? (
                                         `${dollars}`
                                     ) : (
                                         <Skeleton className="h-10 w-11 inline-block align-bottom" />
                                     )}
                                 </span>
                                 <span className="align-top text-xl leading-none">
-                                    .{fetcher.data ? cents : <Skeleton className="h-6 w-5 inline-block" />}
+                                    .{productFetcher.data ? cents : <Skeleton className="h-6 w-5 inline-block" />}
                                 </span>
                             </CardAction>
                         </CardHeader>

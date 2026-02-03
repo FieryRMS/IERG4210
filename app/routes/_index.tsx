@@ -2,7 +2,7 @@ import { HomeIcon } from "lucide-react";
 import type { Route } from "./+types/_index";
 import { Category } from "@/components/category";
 import { fetchProducts } from "@/lib/api";
-import type { PageHandle, Product } from "@/types";
+import type { Product } from "@/types";
 
 export function meta({}: Route.MetaArgs) {
     return [
