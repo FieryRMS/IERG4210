@@ -3,7 +3,7 @@ import { Card, CardAction, CardHeader, CardTitle } from "@/components/ui/card";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Button } from "@/components/ui/button";
 import { Badge } from "../ui/badge";
-import { Link } from "react-router";
+import { Link } from "@/components/link-wrapper";
 import type { Product } from "@/types";
 
 export function ProductCard({ product }: { product: Product }) {

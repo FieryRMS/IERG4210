@@ -1,7 +1,13 @@
 import type { UIMatch } from "react-router";
 
+interface Breadcrumb {
+    name: string;
+    pathname: string;
+    id: string;
+}
+
 interface PageHandle {
-    breadcrumb?: (match: UIMatch<unknown, PageHandle>) => React.ReactNode;
+    breadcrumb?: (match: UIMatch<unknown, PageHandle>) => Breadcrumb;
 }
 
 interface Product {
@@ -14,4 +20,5 @@ interface Product {
 
 interface LocationState {
     product?: Product;
+    breadcrumbs?: Breadcrumb[];
 }

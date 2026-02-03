@@ -5,6 +5,7 @@ import type { Route } from "./+types/root";
 import "./app.css";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
+import type { PageHandle } from "./types";
 
 export const links: Route.LinksFunction = () => [
     { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -79,3 +80,11 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
         </main>
     );
 }
+
+export const handle: PageHandle = {
+    breadcrumb: ({ pathname }) => ({
+        id: "root",
+        name: "Home",
+        pathname,
+    }),
+};

@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Link, useMatches, type UIMatch } from "react-router";
+import { useLocation, useMatches, type Location, type UIMatch } from "react-router";
+import { Link } from "@/components/link-wrapper";
 import {
     NavigationMenu,
     NavigationMenuContent,
@@ -20,27 +21,36 @@ import {
     BreadcrumbPage,
     BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Moon, ShoppingCart, Sun, UserRound, ChevronsRightIcon, SearchIcon } from "lucide-react";
+import { Moon, ShoppingCart, Sun, UserRound, ChevronsRightIcon, SearchIcon, HomeIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "@/components/theme-provider";
 import { LoginForm } from "./login-form";
 import { Badge } from "@/components/ui/badge";
 import { ButtonGroup } from "@/components/ui/button-group";
-import type { PageHandle } from "@/types";
+import type { LocationState, PageHandle } from "@/types";
 
 export function Navbar() {
     const { toggleTheme } = useTheme();
-    const matches = (useMatches() as UIMatch<unknown, PageHandle>[]).filter(
-        (match) => match.handle && match.handle.breadcrumb,
-    );
+    const location: Location<LocationState> = useLocation();
+    let breadcrumbs = (useMatches() as UIMatch<unknown, PageHandle>[])
+        .filter((match) => match.handle && match.handle.breadcrumb)
+        .map((match) => match.handle!.breadcrumb!(match));
+    if (location.state?.breadcrumbs?.length) breadcrumbs.slice(1);
+    breadcrumbs = [...(location.state?.breadcrumbs || []), ...breadcrumbs];
+
     return (
         <NavigationMenu className="max-w-full grid w-full grid-cols-3 items-center gap-x-2 px-4 py-2 sticky top-0">
             <NavigationMenuList className="flex justify-start items-center h-full">
                 <NavigationMenuItem className="h-full">
                     <NavigationMenuLink
                         render={
-                            <Link to="/" className="flex items-center gap-2 h-full justify-center" viewTransition>
+                            <Link
+                                to="/"
+                                className="flex items-center gap-2 h-full justify-center"
+                                viewTransition
+                                state={{ breadcrumbs: [] }}
+                            >
                                 <div className="flex items-center justify-center rounded-full p-2 bg-primary text-primary-foreground font-bold">
                                     LOGO
                                 </div>
@@ -168,31 +178,47 @@ export function Navbar() {
             <NavigationMenuPositioner>
                 <NavigationMenuPopup />
             </NavigationMenuPositioner>
-            {matches.length > 0 && (
+            {breadcrumbs.length > 0 && (
                 <div className="flex flex-col gap-8 col-span-3 justify-center items-center">
                     <Breadcrumb>
                         <BreadcrumbList>
-                            {matches.map((match, index, array) => (
-                                <React.Fragment key={index}>
-                                    {index < array.length - 1 ? (
-                                        <BreadcrumbItem>
-                                            <BreadcrumbLink
-                                                render={
-                                                    <Link to={match.pathname} viewTransition>
-                                                        {match.handle.breadcrumb!(match)}
-                                                    </Link>
-                                                }
-                                            />
-                                        </BreadcrumbItem>
+                            {breadcrumbs.map((breadcrumb, i) => (
+                                <React.Fragment key={i}>
+                                    {i < breadcrumbs.length - 1 ? (
+                                        <>
+                                            <BreadcrumbItem>
+                                                <BreadcrumbLink
+                                                    render={
+                                                        <Link
+                                                            to={breadcrumb.pathname}
+                                                            viewTransition
+                                                            state={{
+                                                                breadcrumbs: breadcrumbs.slice(0, i),
+                                                            }}
+                                                        >
+                                                            {breadcrumb.id === "root" ? (
+                                                                <HomeIcon className="size-4" />
+                                                            ) : (
+                                                                breadcrumb.name
+                                                            )}
+                                                        </Link>
+                                                    }
+                                                />
+                                            </BreadcrumbItem>
+                                            <BreadcrumbSeparator>
+                                                <ChevronsRightIcon />
+                                            </BreadcrumbSeparator>
+                                        </>
                                     ) : (
                                         <BreadcrumbItem>
-                                            <BreadcrumbPage>{match.handle.breadcrumb!(match)}</BreadcrumbPage>
+                                            <BreadcrumbPage>
+                                                {breadcrumb.id === "root" ? (
+                                                    <HomeIcon className="size-4" />
+                                                ) : (
+                                                    breadcrumb.name
+                                                )}
+                                            </BreadcrumbPage>
                                         </BreadcrumbItem>
-                                    )}
-                                    {index < array.length - 1 && (
-                                        <BreadcrumbSeparator>
-                                            <ChevronsRightIcon />
-                                        </BreadcrumbSeparator>
                                     )}
                                 </React.Fragment>
                             ))}

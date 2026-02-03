@@ -115,5 +115,9 @@ export default function ({ params }: Route.ComponentProps) {
 }
 
 export const handle: PageHandle = {
-    breadcrumb: ({ params }: UIMatch<unknown, PageHandle>) => params.productId,
+    breadcrumb: ({ params, id, pathname }) => ({
+        id,
+        name: `Product ${params.productId}`,
+        pathname,
+    }),
 };

@@ -1,5 +1,5 @@
 import { Separator } from "@/components/ui/separator";
-import { Link } from "react-router";
+import { Link } from "@/components/link-wrapper";
 
 export function Footer() {
     return (

@@ -22,7 +22,3 @@ export default function MainPage({ loaderData }: Route.ComponentProps) {
         </>
     );
 }
-
-export const handle: PageHandle = {
-    breadcrumb: () => <HomeIcon className="size-4" />,
-};
