@@ -1,6 +1,7 @@
 import type { Route } from "./+types/_index";
 import { Category } from "@/components/category";
 import { fetchProducts } from "@/lib/api";
+import { PascalCase } from "@/lib/utils";
 import type { PageHandle, Product } from "@/types";
 import type { UIMatch } from "react-router";
 
@@ -30,7 +31,7 @@ export default function MainPage({ loaderData }: Route.ComponentProps) {
 export const handle: PageHandle = {
     breadcrumb: ({ params, id, pathname }) => ({
         id,
-        name: `Category ${params.categoryId}`,
+        name: params.categoryId ? PascalCase(params.categoryId.replace(/[^a-zA-Z0-9]+/g, " ")) : "Unknown Category",
         pathname,
     }),
 };
