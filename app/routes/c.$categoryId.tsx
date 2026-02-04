@@ -1,10 +1,10 @@
 import { PascalCase } from "@/lib/utils";
 import type { PageHandle } from "@/types";
 
-import { clientLoader, meta } from "./_index";
+import { clientAction, meta } from "./_index";
 import MainPage from "./_index";
 
-export { clientLoader, meta };
+export { clientAction, meta };
 export default MainPage;
 
 export const handle: PageHandle = {
