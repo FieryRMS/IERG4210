@@ -62,20 +62,20 @@ export function Navbar() {
             <NavigationMenuList className="flex justify-start items-center h-full">
                 <NavigationMenuItem className="h-full">
                     <Logo className="hidden md:flex" />
-                    <NavigationMenuItem className="h-full md:hidden">
-                        <NavigationMenuTrigger className="h-full px-2 flex hide-lucide-chevron-down">
-                            <SearchIcon />
-                        </NavigationMenuTrigger>
-                        <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
-                            <SearchBar />
-                        </NavigationMenuContent>
-                    </NavigationMenuItem>
+                </NavigationMenuItem>
+                <NavigationMenuItem className="h-full md:hidden">
+                    <NavigationMenuTrigger className="h-full px-2 flex hide-lucide-chevron-down">
+                        <SearchIcon />
+                    </NavigationMenuTrigger>
+                    <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
+                        <SearchBar />
+                    </NavigationMenuContent>
                 </NavigationMenuItem>
                 <NavigationMenuItem className="h-full">
                     <NavigationMenuTrigger className="h-full px-2">Shop</NavigationMenuTrigger>
                     <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
                         <ul className="grid gap-3 p-1 md:w-100 md:grid-cols-2 list-none w-full">
-                            <ListItem title="New Arrivals" href="/c/new" >
+                            <ListItem title="New Arrivals" href="/c/new">
                                 Fresh drops and the latest products.
                             </ListItem>
                             <ListItem title="Best Sellers" href="/c/best-sellers">
