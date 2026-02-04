@@ -42,6 +42,7 @@ import type { LocationState, PageHandle } from "@/types";
 import { useCart } from "@/hooks/cart-provider";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../ui/item";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/img-wrapper";
 
 export function Navbar() {
     const { toggleTheme } = useTheme();
@@ -61,20 +62,20 @@ export function Navbar() {
             <NavigationMenuList className="flex justify-start items-center h-full">
                 <NavigationMenuItem className="h-full">
                     <Logo className="hidden md:flex" />
-                    <NavigationMenuItem className="h-full md:hidden">
-                        <NavigationMenuTrigger className="h-full px-2 flex hide-lucide-chevron-down">
-                            <SearchIcon />
-                        </NavigationMenuTrigger>
-                        <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
-                            <SearchBar />
-                        </NavigationMenuContent>
-                    </NavigationMenuItem>
+                </NavigationMenuItem>
+                <NavigationMenuItem className="h-full md:hidden">
+                    <NavigationMenuTrigger className="h-full px-2 flex hide-lucide-chevron-down">
+                        <SearchIcon />
+                    </NavigationMenuTrigger>
+                    <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
+                        <SearchBar />
+                    </NavigationMenuContent>
                 </NavigationMenuItem>
                 <NavigationMenuItem className="h-full">
                     <NavigationMenuTrigger className="h-full px-2">Shop</NavigationMenuTrigger>
                     <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
                         <ul className="grid gap-3 p-1 md:w-100 md:grid-cols-2 list-none w-full">
-                            <ListItem title="New Arrivals" href="/c/new" >
+                            <ListItem title="New Arrivals" href="/c/new">
                                 Fresh drops and the latest products.
                             </ListItem>
                             <ListItem title="Best Sellers" href="/c/best-sellers">
@@ -167,8 +168,8 @@ export function Navbar() {
                                 {[...cart.values()].map(({ p, q }) => (
                                     <Item key={p.id} variant="outline" role="listitem">
                                         <ItemMedia variant="image">
-                                            <img
-                                                src={p.imageUrl}
+                                            <Img
+                                                src={p.imageUrls[0]}
                                                 alt={p.name}
                                                 className="w-16 h-16 object-cover pointer-events-none select-none"
                                                 draggable={false}

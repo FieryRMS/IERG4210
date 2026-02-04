@@ -27,13 +27,23 @@ function saveTheme(storageKey: string, theme: Theme) {
     localStorage.setItem(storageKey, theme);
 }
 
+function getSavedTheme(storageKey: string): Theme {
+    const savedTheme = localStorage.getItem(storageKey) as Theme | null;
+    return savedTheme || "system";
+}
+
 export function ThemeProvider({
     children,
     defaultTheme = "system",
     storageKey = "theme",
     ...props
 }: ThemeProviderProps) {
-    const [theme, setTheme] = useState<Theme>(() => defaultTheme);
+    const [theme, setTheme] = useState<Theme>(() => {
+        if (typeof window !== "undefined") {
+            return getSavedTheme(storageKey);
+        }
+        return defaultTheme;
+    });
 
     useEffect(() => {
         const root = window.document.documentElement;

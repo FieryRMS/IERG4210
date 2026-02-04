@@ -2,7 +2,8 @@ import type { Route } from "./+types/_index";
 import { Category } from "@/components/category";
 import { fetchProducts } from "@/lib/api";
 import type { PageHandle, Product } from "@/types";
-import type { UIMatch } from "react-router";
+import { useEffect } from "react";
+import { useFetcher, type UIMatch } from "react-router";
 
 export function meta({ matches }: Route.MetaArgs) {
     const breadcrumbs = (matches as UIMatch<unknown, PageHandle>[])
@@ -15,14 +16,28 @@ export function meta({ matches }: Route.MetaArgs) {
     ];
 }
 
-export async function clientLoader(): Promise<Product[]> {
-    return await fetchProducts(0, 100);
+export async function clientAction(): Promise<Product[]> {
+    await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate network delay
+    return await fetchProducts(0, 30);
 }
 
-export default function MainPage({ loaderData }: Route.ComponentProps) {
-    return (
-        <>
-            <Category products={loaderData} />
-        </>
-    );
+export default function MainPage() {
+    const productsFetcher = useFetcher<Product[]>();
+    useEffect(() => {
+        if (productsFetcher.state === "idle" && !productsFetcher.data) {
+            productsFetcher.submit({}, { method: "post" });
+        }
+    }, [productsFetcher]);
+
+    const products: Product[] =
+        productsFetcher.data ||
+        Array(10).fill({
+            id: "",
+            name: "",
+            imageUrls: [""],
+            desc: "",
+            price: 0,
+        });
+
+    return <Category products={products} />;
 }

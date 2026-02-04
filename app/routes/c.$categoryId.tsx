@@ -1,32 +1,11 @@
-import type { Route } from "./+types/_index";
-import { Category } from "@/components/category";
-import { fetchProducts } from "@/lib/api";
 import { PascalCase } from "@/lib/utils";
-import type { PageHandle, Product } from "@/types";
-import type { UIMatch } from "react-router";
+import type { PageHandle } from "@/types";
 
-export function meta({ matches }: Route.MetaArgs) {
-    const breadcrumbs = (matches as UIMatch<unknown, PageHandle>[])
-        .filter((match) => match.handle && match.handle.breadcrumb)
-        .map((match) => match.handle!.breadcrumb!(match));
-    const name = breadcrumbs.length ? breadcrumbs.at(-1)!.name : null;
-    return [
-        { title: `${name ? `${name} | ` : ""}The Generic Company` },
-        { name: "description", content: "A generic company that sells generic products" },
-    ];
-}
+import { clientAction, meta } from "./_index";
+import MainPage from "./_index";
 
-export async function clientLoader(): Promise<Product[]> {
-    return await fetchProducts(0, 100);
-}
-
-export default function MainPage({ loaderData }: Route.ComponentProps) {
-    return (
-        <>
-            <Category products={loaderData} />
-        </>
-    );
-}
+export { clientAction, meta };
+export default MainPage;
 
 export const handle: PageHandle = {
     breadcrumb: ({ params, id, pathname }) => ({

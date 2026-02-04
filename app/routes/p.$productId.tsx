@@ -17,8 +17,10 @@ import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { LocationState, PageHandle, Product } from "@/types";
 import { useCart } from "@/hooks/cart-provider";
+import { Img } from "@/components/img-wrapper";
 
 export async function clientAction({ params }: Route.ClientActionArgs) {
+    await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate network delay
     return fetchProduct(params.productId);
 }
 
@@ -45,47 +47,48 @@ export default function ({ params }: Route.ComponentProps) {
 
     const { addQuantity: addToCart } = useCart();
 
+    const p: Product =
+        productFetcher.data?.id === params.productId
+            ? productFetcher.data
+            : { id: "", name: "", imageUrls: [""], desc: "", price: 0 };
+
     return (
         <>
-            <div className="items-center justify-center flex-1 flex">
-                <Card className="p-0 flex-col max-w-7xl h-full w-full gap-0 lg:aspect-4/3 lg:flex-row mx-4">
+            <div className="flex items-center justify-center h-full">
+                <Card className="p-0 flex-col max-w-3xl lg:max-w-7xl w-full gap-0 lg:aspect-4/3 lg:flex-row mx-4">
                     <Carousel className="aspect-3/4 h-full">
                         <CarouselContent className="h-full">
-                            {Array.from({ length: 5 }).map((_, index) => (
+                            {p.imageUrls.map((src, index) => (
                                 <CarouselItem key={index}>
                                     <div className="h-full">
                                         <Card className="h-full p-3">
                                             <CardContent className="h-full flex items-center justify-center p-0 overflow-hidden rounded-xl">
-                                                {productFetcher.data?.id === params.productId ? (
-                                                    <img
-                                                        src={`https://avatar.vercel.sh/shadcn${productFetcher.data.id}${index}`}
-                                                        alt={`Product ${productFetcher.data.id}`}
-                                                        className="h-full w-full object-cover pointer-events-none select-none"
-                                                    />
-                                                ) : (
-                                                    <Skeleton className="h-full w-full" />
-                                                )}
+                                                <Img
+                                                    src={src}
+                                                    alt={`Product ${p.id}`}
+                                                    className="h-full w-full object-cover pointer-events-none select-none"
+                                                />
                                             </CardContent>
                                         </Card>
                                     </div>
                                 </CarouselItem>
                             ))}
                         </CarouselContent>
-                        <CarouselPrevious className="left-6" size="lg" />
-                        <CarouselNext className="right-6" size="lg" />
+                        {p.imageUrls.length > 1 && (
+                            <>
+                                <CarouselPrevious className="left-6" size="lg" />
+                                <CarouselNext className="right-6" size="lg" />
+                            </>
+                        )}
                     </Carousel>
                     <div className="p-6 px-3 h-full w-full relative min-h-fit min-w-fit flex flex-col">
                         <CardHeader>
                             <CardTitle className="text-5xl font-bold mb-2">
-                                {productFetcher.data?.id === params.productId ? (
-                                    productFetcher.data.name
-                                ) : (
-                                    <Skeleton className="h-9 w-52" />
-                                )}
+                                {p.id ? p.name : <Skeleton className="h-9 w-52" />}
                             </CardTitle>
                             <CardDescription className="mb-4">
-                                {productFetcher.data?.id === params.productId ? (
-                                    productFetcher.data.desc
+                                {p.id ? (
+                                    p.desc
                                 ) : (
                                     <div className="space-y-2">
                                         <Skeleton className="h-6 w-64" />
@@ -96,19 +99,10 @@ export default function ({ params }: Route.ComponentProps) {
                             <CardAction className="px-3 py-1 rounded-full items-stretch inline-block">
                                 <span className="text-4xl font-semibold leading-none">
                                     $
-                                    {productFetcher.data?.id === params.productId ? (
-                                        `${dollars}`
-                                    ) : (
-                                        <Skeleton className="h-10 w-11 inline-block align-bottom" />
-                                    )}
+                                    {p.id ? `${dollars}` : <Skeleton className="h-10 w-11 inline-block align-bottom" />}
                                 </span>
                                 <span className="align-top text-xl leading-none">
-                                    .
-                                    {productFetcher.data?.id === params.productId ? (
-                                        cents
-                                    ) : (
-                                        <Skeleton className="h-6 w-5 inline-block" />
-                                    )}
+                                    .{p.id ? cents : <Skeleton className="h-6 w-5 inline-block" />}
                                 </span>
                             </CardAction>
                         </CardHeader>
@@ -117,9 +111,7 @@ export default function ({ params }: Route.ComponentProps) {
                                 size="lg"
                                 className="w-full mb-2"
                                 onClick={() => {
-                                    if (productFetcher.data?.id === params.productId) {
-                                        addToCart(productFetcher.data);
-                                    }
+                                    if (p.id) addToCart(p);
                                 }}
                             >
                                 <ShoppingCartIcon className="mr-2" />
