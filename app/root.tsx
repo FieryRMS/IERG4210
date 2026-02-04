@@ -74,11 +74,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </head>
             <ThemeProvider>
                 <CartProvider>
-                    <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden flex flex-col">
+                    <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden grid grid-rows-[auto_1fr_auto]">
                         <header className="sticky top-0 z-50 w-full bg-background pb-2">
                             <Navbar />
                         </header>
-                        <main className="py-4 w-full h-full flex-1 flex flex-col">{children}</main>
+                        <main className="py-4 w-full h-full">{children}</main>
                         <footer className="w-full py-6">
                             <Footer />
                         </footer>

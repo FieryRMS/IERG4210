@@ -17,10 +17,9 @@ export function ProductCard({ product }: { product: Product }) {
     const { addQuantity: addToCart } = useCart();
 
     return (
-        <Card className="w-full max-w-sm p-0 relative overflow-hidden flex">
+        <Card className="w-full max-w-sm p-0 relative overflow-hidden flex max-h-fit">
             <Link
                 to={`/p/${product.id}`}
-                className="block w-full h-full"
                 viewTransition
                 state={{
                     product,

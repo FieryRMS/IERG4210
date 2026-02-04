@@ -54,8 +54,8 @@ export default function ({ params }: Route.ComponentProps) {
 
     return (
         <>
-            <div className="items-center justify-center flex-1 flex">
-                <Card className="p-0 flex-col max-w-7xl h-full w-full gap-0 lg:aspect-4/3 lg:flex-row mx-4">
+            <div className="flex items-center justify-center h-full">
+                <Card className="p-0 flex-col max-w-3xl lg:max-w-7xl w-full gap-0 lg:aspect-4/3 lg:flex-row mx-4">
                     <Carousel className="aspect-3/4 h-full">
                         <CarouselContent className="h-full">
                             {p.imageUrls.map((src, index) => (
