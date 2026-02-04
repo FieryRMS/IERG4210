@@ -41,11 +41,11 @@ import { ButtonGroup } from "@/components/ui/button-group";
 import type { LocationState, PageHandle } from "@/types";
 import { useCart } from "@/hooks/cart-provider";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../ui/item";
+import { cn } from "@/lib/utils";
 
 export function Navbar() {
     const { toggleTheme } = useTheme();
     const location: Location<LocationState> = useLocation();
-    const navigate = useNavigate();
     let breadcrumbs = (useMatches() as UIMatch<unknown, PageHandle>[])
         .filter((match) => match.handle && match.handle.breadcrumb)
         .map((match) => match.handle!.breadcrumb!(match));
@@ -60,26 +60,21 @@ export function Navbar() {
         <NavigationMenu className="max-w-full grid w-full grid-cols-3 items-center gap-x-2 px-4 py-2 sticky top-0">
             <NavigationMenuList className="flex justify-start items-center h-full">
                 <NavigationMenuItem className="h-full">
-                    <NavigationMenuLink
-                        render={
-                            <Link
-                                to="/"
-                                className="flex items-center gap-2 h-full justify-center"
-                                viewTransition
-                                state={{ breadcrumbs: [] }}
-                            >
-                                <div className="flex items-center justify-center rounded-full p-2 bg-primary text-primary-foreground font-bold">
-                                    LOGO
-                                </div>
-                            </Link>
-                        }
-                    />
+                    <Logo className="hidden md:flex" />
+                    <NavigationMenuItem className="h-full md:hidden">
+                        <NavigationMenuTrigger className="h-full px-2 flex hide-lucide-chevron-down">
+                            <SearchIcon />
+                        </NavigationMenuTrigger>
+                        <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
+                            <SearchBar />
+                        </NavigationMenuContent>
+                    </NavigationMenuItem>
                 </NavigationMenuItem>
                 <NavigationMenuItem className="h-full">
                     <NavigationMenuTrigger className="h-full px-2">Shop</NavigationMenuTrigger>
-                    <NavigationMenuContent>
-                        <ul className="grid w-75 gap-3 p-4 md:w-100 md:grid-cols-2 list-none">
-                            <ListItem title="New Arrivals" href="/c/new">
+                    <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
+                        <ul className="grid gap-3 p-1 md:w-100 md:grid-cols-2 list-none w-full">
+                            <ListItem title="New Arrivals" href="/c/new" >
                                 Fresh drops and the latest products.
                             </ListItem>
                             <ListItem title="Best Sellers" href="/c/best-sellers">
@@ -90,6 +85,12 @@ export function Navbar() {
                             </ListItem>
                             <ListItem title="Women" href="/c/women">
                                 Styles, outfits, and essentials for women.
+                            </ListItem>
+                            <ListItem title="Deals" href="/c/deals" className="md:hidden">
+                                Exclusive offers and discounts.
+                            </ListItem>
+                            <ListItem title="Collections" href="/c/collections" className="md:hidden">
+                                Curated selections and themed products.
                             </ListItem>
                         </ul>
                     </NavigationMenuContent>
@@ -121,26 +122,8 @@ export function Navbar() {
             </NavigationMenuList>
 
             <NavigationMenuList className="flex flex-col gap-2 justify-center items-center h-full">
-                <NavigationMenuItem className="w-full max-w-md">
-                    <form
-                        className="flex w-full items-center gap-2 justify-center "
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            const formData = new FormData(e.currentTarget);
-                            const query = formData.get("search")?.toString().trim();
-                            if (query) {
-                                navigate(`/p/${query}`, { viewTransition: true });
-                            }
-                        }}
-                    >
-                        <ButtonGroup className="flex-1">
-                            <Input name="search" placeholder="Search..." />
-                            <Button variant="outline" aria-label="Search" type="submit">
-                                <SearchIcon />
-                            </Button>
-                        </ButtonGroup>
-                    </form>
-                </NavigationMenuItem>
+                <SearchBar className="hidden md:flex" />
+                <Logo className="md:hidden" />
             </NavigationMenuList>
 
             <NavigationMenuList className="flex justify-end items-center h-full">
@@ -152,11 +135,11 @@ export function Navbar() {
                     </Button>
                 </NavigationMenuItem>
 
-                <NavigationMenuItem className="hidden md:flex h-full">
+                <NavigationMenuItem className="flex h-full">
                     <NavigationMenuTrigger className="hide-lucide-chevron-down min-w-fit h-full flex flex-col items-center justify-center px-2">
                         <UserRound />
                     </NavigationMenuTrigger>
-                    <NavigationMenuContent>
+                    <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
                         <LoginForm />
                     </NavigationMenuContent>
                 </NavigationMenuItem>
@@ -317,5 +300,48 @@ function ListItem({ title, children, href, ...props }: React.ComponentPropsWitho
                 }
             />
         </li>
+    );
+}
+
+function SearchBar({ className }: { className?: string }) {
+    const navigate = useNavigate();
+    return (
+        <form
+            className={cn("flex w-full items-center gap-2 justify-center max-w-md", className)}
+            onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                const query = formData.get("search")?.toString().trim();
+                if (query) {
+                    navigate(`/p/${query}`, { viewTransition: true });
+                }
+            }}
+        >
+            <ButtonGroup className="flex-1 flex items-center justify-center">
+                <Input name="search" placeholder="Search..." className="block" />
+                <Button variant="outline" aria-label="Search" type="submit">
+                    <SearchIcon />
+                </Button>
+            </ButtonGroup>
+        </form>
+    );
+}
+
+function Logo({ className }: { className?: string }) {
+    return (
+        <NavigationMenuLink
+            render={
+                <Link
+                    to="/"
+                    className={cn("flex items-center gap-2 h-full justify-center", className)}
+                    viewTransition
+                    state={{ breadcrumbs: [] }}
+                >
+                    <div className="flex items-center justify-center rounded-full p-2 bg-primary text-primary-foreground font-bold">
+                        LOGO
+                    </div>
+                </Link>
+            }
+        />
     );
 }
