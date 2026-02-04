@@ -1,3 +1,4 @@
+
 # This workflow will build and push a new container image to Amazon ECR,
 # and then will deploy a new task definition to Amazon ECS, when there is a push to the $default-branch branch.
 #
@@ -45,6 +46,20 @@ permissions:
   contents: read
 
 jobs:
+  generate-task-definition:
+    name: Generate ECS Task Definition Skeleton
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Generate ECS task definition skeleton and echo
+        run: |
+          aws ecs register-task-definition --generate-cli-skeleton > skeleton.json
+          cat skeleton.json
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
@@ -69,8 +84,7 @@ jobs:
       id: build-image
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        # IMAGE_TAG: ${{ github.sha }}
-        IMAGE_TAG: latest
+        IMAGE_TAG: ${{ github.sha }}
       run: |
         # Build a docker container and
         # push it to ECR so that it can
