@@ -65,7 +65,7 @@ export default function ({ params }: Route.ComponentProps) {
                                             <CardContent className="h-full flex items-center justify-center p-0 overflow-hidden rounded-xl">
                                                 <Img
                                                     src={src}
-                                                    alt={`Product ${p.id}`}
+                                                    alt={p.desc}
                                                     className="h-full w-full object-cover pointer-events-none select-none"
                                                 />
                                             </CardContent>
