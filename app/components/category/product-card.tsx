@@ -2,10 +2,11 @@ import { ShoppingCartIcon } from "lucide-react";
 import { Card, CardAction, CardHeader, CardTitle } from "@/components/ui/card";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Button } from "@/components/ui/button";
-import { Badge } from "../ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { Link } from "@/components/link-wrapper";
 import type { Product } from "@/types";
 import { useCart } from "@/hooks/cart-provider";
+import { Img } from "@/components/img-wrapper";
 
 export function ProductCard({ product }: { product: Product }) {
     const dollars = Math.floor(product.price);
@@ -25,8 +26,8 @@ export function ProductCard({ product }: { product: Product }) {
                 }}
             >
                 <AspectRatio ratio={3 / 4}>
-                    <img
-                        src={product.imageUrl}
+                    <Img
+                        src={product.imageUrls[0]}
                         alt={product.name}
                         className="w-full h-full object-cover pointer-events-none select-none"
                         draggable={false}

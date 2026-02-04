@@ -17,7 +17,7 @@ import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { LocationState, PageHandle, Product } from "@/types";
 import { useCart } from "@/hooks/cart-provider";
-import { Img } from "@/components/img-wrapper/img";
+import { Img } from "@/components/img-wrapper";
 
 export async function clientAction({ params }: Route.ClientActionArgs) {
     await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate network delay

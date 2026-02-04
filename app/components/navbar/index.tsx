@@ -42,6 +42,7 @@ import type { LocationState, PageHandle } from "@/types";
 import { useCart } from "@/hooks/cart-provider";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../ui/item";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/img-wrapper";
 
 export function Navbar() {
     const { toggleTheme } = useTheme();
@@ -167,7 +168,7 @@ export function Navbar() {
                                 {[...cart.values()].map(({ p, q }) => (
                                     <Item key={p.id} variant="outline" role="listitem">
                                         <ItemMedia variant="image">
-                                            <img
+                                            <Img
                                                 src={p.imageUrls[0]}
                                                 alt={p.name}
                                                 className="w-16 h-16 object-cover pointer-events-none select-none"
