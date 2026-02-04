@@ -168,7 +168,7 @@ export function Navbar() {
                                     <Item key={p.id} variant="outline" role="listitem">
                                         <ItemMedia variant="image">
                                             <img
-                                                src={p.imageUrl}
+                                                src={p.imageUrls[0]}
                                                 alt={p.name}
                                                 className="w-16 h-16 object-cover pointer-events-none select-none"
                                                 draggable={false}

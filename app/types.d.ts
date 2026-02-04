@@ -13,7 +13,7 @@ interface PageHandle {
 interface Product {
     id: string;
     name: string;
-    imageUrl: string;
+    imageUrls: string[];
     desc: string;
     price: number;
 }
