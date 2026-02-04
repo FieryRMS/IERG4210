@@ -37,7 +37,7 @@ const schema = z.discriminatedUnion("type", [
 
 export function LoginForm() {
     return (
-        <Tabs defaultValue="Login" className="w-80">
+        <Tabs defaultValue="Login">
             <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="Login">Login</TabsTrigger>
                 <TabsTrigger value="Register">Register</TabsTrigger>
