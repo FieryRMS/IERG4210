@@ -19,8 +19,6 @@ import type { LocationState, PageHandle, Product } from "@/types";
 import { useCart } from "@/hooks/cart-provider";
 
 export async function clientAction({ params }: Route.ClientActionArgs) {
-    // add delay to simulate network latency
-    await new Promise((resolve) => setTimeout(resolve, 5000));
     return fetchProduct(params.productId);
 }
 
@@ -33,9 +31,9 @@ export default function ({ params }: Route.ComponentProps) {
         .padStart(2, "0");
 
     useEffect(() => {
-        if (location.state?.product && location.state.product.id === params.productId) {
+        if (location.state?.product?.id === params.productId) {
+            productFetcher.reset();
             productFetcher.data = location.state.product;
-            return;
         }
         if (productFetcher.state === "idle" && productFetcher.data?.id !== params.productId) {
             productFetcher.submit({}, { method: "post" });
