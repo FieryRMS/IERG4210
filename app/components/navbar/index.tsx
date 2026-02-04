@@ -178,8 +178,8 @@ export function Navbar() {
                             </span>
                         </div>
                     </NavigationMenuTrigger>
-                    <NavigationMenuContent>
-                        <div className="flex w-sm flex-col gap-6">
+                    <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
+                        <div className="flex w-full flex-col gap-6">
                             <ItemGroup className="gap-2">
                                 {[...cart.values()].map(({ p, q }) => (
                                     <Item key={p.id} variant="outline" role="listitem">
@@ -243,8 +243,8 @@ export function Navbar() {
                                     </Item>
                                 )}
                             </ItemGroup>
+                            <Button className="w-full mt-4">Checkout</Button>
                         </div>
-                        <Button className="w-full mt-4">Checkout</Button>
                     </NavigationMenuContent>
                 </NavigationMenuItem>
             </NavigationMenuList>
