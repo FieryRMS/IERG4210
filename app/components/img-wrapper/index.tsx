@@ -1,19 +1,19 @@
-import React from "react";
+import React, { useState } from "react";
 import { Skeleton } from "../ui/skeleton";
-import { useState } from "react";
 export function Img({ onLoad, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) {
-    const [loaded, setLoaded] = useState(false);
     if (props.src === "") props.src = undefined;
+    const [src, setSrc] = useState<string | undefined>(undefined);
+    const showSkeleton = props.src === undefined || props.src !== src;
     return (
         <>
-            {!loaded && <Skeleton {...props} />}
+            {showSkeleton && <Skeleton {...props} />}
             <img
                 {...props}
                 onLoad={(e) => {
-                    setLoaded(true);
+                    setSrc(props.src);
                     onLoad?.(e);
                 }}
-                style={loaded ? {} : { display: "none" }}
+                style={!showSkeleton ? {} : { display: "none" }}
             />
         </>
     );
