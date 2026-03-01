@@ -1,16 +1,63 @@
-from fastapi import FastAPI
+import logging
+import os
+from collections.abc import Callable
 from contextlib import asynccontextmanager
+from typing import Any, TypedDict
+
+import dotenv
+from fastapi import FastAPI, Request, Response
 from pydantic import BaseModel
+from sqlalchemy import Engine, create_engine
+
+dotenv.load_dotenv()  # Load environment variables from .env file
+
+
+class State(TypedDict):
+    logger: logging.Logger
+    engine: Engine
+    debug: bool
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Starting up...")
+    app.state.debug = os.getenv("MODE", "prod") == "dev"
+
+    logging.basicConfig(
+        format="[%(asctime)s][%(levelname)s][%(name)s] %(message)s",
+        level=logging.DEBUG if app.state.debug else logging.INFO,
+    )
+    state: State = app.state  # pyright: ignore[reportAssignmentType]
+    state["logger"] = logging.getLogger("IERG4210-API")
+    state["logger"].info(
+        "Starting API in %s mode", "debug" if app.state.debug else "production"
+    )
+
+    state["engine"] = create_engine(
+        f"postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}"
+        f"@{os.getenv('POSTGRES_HOST')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DB')}",
+        echo=state["debug"],
+    )
     yield
-    print("Shutting down...")
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.middleware("http")
+async def log_requests(
+    request: Request[State], call_next: Callable[..., Any]
+) -> Response:
+    appstate: State = request.app.state
+    logger = appstate["logger"].getChild(f"{request.url.path}")
+
+    request.state["logger"] = logger
+    request.state["debug"] = appstate["debug"]
+    request.state["engine"] = appstate["engine"]
+
+    logger.debug(f"Request: {request.method} {request.url.path}")
+    response: Response = await call_next(request)
+    logger.debug(f"Response: {response.status_code} {request.url.path}")
+    return response
 
 
 class Health(BaseModel):
@@ -18,5 +65,8 @@ class Health(BaseModel):
 
 
 @app.get("/health")
-async def health_check() -> Health:
+async def health_check(request: Request) -> Health:
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    logger = state["logger"]
+    logger.debug("Received health check request")
     return Health(status="ok")
