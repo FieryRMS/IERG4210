@@ -11,7 +11,6 @@ import {
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import type { Route } from "./+types/p.$productId";
 import { ShoppingCartIcon } from "lucide-react";
-import { fetchProduct } from "@/lib/api";
 import { useFetcher, useLocation, type Location } from "react-router";
 import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,7 +20,7 @@ import { Img } from "@/components/img-wrapper";
 
 export async function clientAction({ params }: Route.ClientActionArgs) {
     await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate network delay
-    return fetchProduct(params.productId);
+    return;
 }
 
 export default function ({ params }: Route.ComponentProps) {

@@ -6,6 +6,7 @@ from typing import Any
 
 import dotenv
 from fastapi import FastAPI, Request, Response
+from fastapi.routing import APIRoute
 from sqlalchemy import create_engine
 from sqlmodel import Session, SQLModel
 
@@ -106,7 +107,13 @@ async def lifespan(app: FastAPI):
     state["engine"].dispose()
 
 
-app = FastAPI(lifespan=lifespan, debug=DEBUG)
+def custom_generate_unique_id(route: APIRoute):
+    return f"{route.tags[0]}-{route.name}"
+
+
+app = FastAPI(
+    lifespan=lifespan, debug=DEBUG, generate_unique_id=custom_generate_unique_id
+)
 
 
 @app.middleware("http")

@@ -15,7 +15,11 @@ async def get_categories(request: Request) -> list[Category]:
         return list(session.exec(select(Category)).all())
 
 
-@router.get("/{category_id}")
+@router.get(
+    "/{category_id}",
+    status_code=status.HTTP_200_OK,
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Category not found"}},
+)
 async def get_category(request: Request, category_id: int) -> Category:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:

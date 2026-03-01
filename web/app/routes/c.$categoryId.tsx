@@ -3,11 +3,12 @@ import type { PageHandle, Product } from "@/types";
 import { useEffect } from "react";
 
 import type { Route } from "./+types/c.$categoryId";
-import { fetchProducts } from "@/lib/api";
 import { useFetcher, type UIMatch } from "react-router";
 import { Category } from "@/components/category";
+import createClient from "openapi-fetch";
+import type { paths } from "@/lib/api";
 
-
+const client = createClient<paths>({ baseUrl: import.meta.env.VITE_API_URL });
 export function meta({ matches }: Route.MetaArgs) {
     const breadcrumbs = (matches as UIMatch<unknown, PageHandle>[])
         .filter((match) => match.handle && match.handle.breadcrumb)
@@ -20,33 +21,36 @@ export function meta({ matches }: Route.MetaArgs) {
 }
 
 
-export async function clientAction(): Promise<Product[]> {
-    await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate network delay
-    return await fetchProducts(0, 30);
-}
+// export async function clientAction(): Promise<Product[]> {
+//     await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate network delay
+//     // return await fetchProducts(0, 30);
+// }
 
 export async function loader({ params }: Route.LoaderArgs) {
-};
-
-export default function MainPage() {
-    const productsFetcher = useFetcher<Product[]>();
-    useEffect(() => {
-        if (productsFetcher.state === "idle" && !productsFetcher.data) {
-            productsFetcher.submit({}, { method: "post" });
-        }
-    }, [productsFetcher]);
-
-    const products: Product[] =
-        productsFetcher.data ||
-        Array(10).fill({
-            id: "",
-            name: "",
-            imageUrls: [""],
-            desc: "",
-            price: 0,
+    if (Number.isInteger(parseInt(params.categoryId))) {
+        const { data, error } = await client.GET(`/products/category/{category_id}`, {
+            params: {
+                path: {
+                    category_id: parseInt(params.categoryId),
+                },
+            },
         });
+        if (error) {
+            throw new Response("Not Found", { status: 404 });
+        }
+        return data;
+    }
+    else {
+        const { data, error } = await client.GET(`/products/`);
+        if (error) {
+            throw new Response("Not Found", { status: 404 });
+        }
+        return data;
+    }
+}
 
-    return <Category products={products} />;
+export default function MainPage({ loaderData }: Route.ComponentProps) {
+    return <Category products={loaderData} />;
 }
 
 

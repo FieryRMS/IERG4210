@@ -1,4 +1,4 @@
-import { ShoppingCartIcon } from "lucide-react";
+import { ConstructionIcon, ShoppingCartIcon } from "lucide-react";
 import { Card, CardAction, CardHeader, CardTitle } from "@/components/ui/card";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Button } from "@/components/ui/button";
@@ -9,13 +9,12 @@ import { useCart } from "@/hooks/cart-provider";
 import { Img } from "@/components/img-wrapper";
 import { Skeleton } from "../ui/skeleton";
 
-export function ProductCard({ product }: { product: Product }) {
+export function ProductCard({ product }: { product: Product; }) {
     const dollars = Math.floor(product.price);
     const cents = Math.round((product.price - dollars) * 100)
         .toString()
         .padStart(2, "0");
     const { addQuantity: addToCart } = useCart();
-
     return (
         <Card className="w-full max-w-sm p-0 relative overflow-hidden flex max-h-fit">
             <Link
@@ -28,7 +27,7 @@ export function ProductCard({ product }: { product: Product }) {
             >
                 <AspectRatio ratio={3 / 4}>
                     <Img
-                        src={product.imageUrls[0]}
+                        src={product?.images?.[0]}
                         alt={product.name}
                         className="w-full h-full object-cover pointer-events-none select-none"
                         draggable={false}

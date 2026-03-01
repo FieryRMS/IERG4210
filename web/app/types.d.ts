@@ -1,5 +1,5 @@
 import type { UIMatch } from "react-router";
-
+import type { components } from "@/lib/api";
 interface Breadcrumb {
     name: string;
     pathname: string;
@@ -10,13 +10,7 @@ interface PageHandle {
     breadcrumb?: (match: UIMatch<unknown, PageHandle>) => Breadcrumb;
 }
 
-interface Product {
-    id: string;
-    name: string;
-    imageUrls: string[];
-    desc: string;
-    price: number;
-}
+type Product = components["schemas"]["Product"];
 
 interface LocationState {
     product?: Product;

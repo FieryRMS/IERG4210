@@ -1,4 +1,4 @@
-import MainPage, { clientAction, meta } from "./c.$categoryId";
+import MainPage, { loader, meta } from "./c.$categoryId";
 
-export { clientAction, meta };
+export { loader, meta };
 export default MainPage;
