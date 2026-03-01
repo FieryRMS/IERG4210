@@ -3,6 +3,7 @@ import { useAppForm } from "@/components/ui/form-tanstack";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { onChangeAsync } from "@/lib/utils";
 
 // TODO: add descriptions "input-group"
 const temp = z.object({
@@ -51,27 +52,14 @@ export function LoginForm() {
     );
 }
 
-function Form({ type }: { type: string }) {
+function Form({ type }: { type: string; }) {
     const fields = schema.options.find((opt) => opt.shape.type.value === type)!.shape;
     const form = useAppForm({
         defaultValues: Object.fromEntries(
             Object.keys(fields).map((key) => (key === "type" ? [key, type] : [key, ""])),
         ) as z.infer<typeof schema>,
         validators: {
-            onChangeAsync: ({ formApi }) => {
-                const errors = formApi.parseValuesWithSchema(schema);
-                if (!errors) return errors;
-
-                const dirtyFields = Object.keys(formApi.fieldInfo).filter(
-                    (key) => formApi.getFieldMeta(key as keyof typeof formApi.fieldInfo)!.isDirty,
-                );
-                return {
-                    form: Object.fromEntries(Object.entries(errors.form).filter(([key]) => dirtyFields.includes(key))),
-                    fields: Object.fromEntries(
-                        Object.entries(errors.fields).filter(([key]) => dirtyFields.includes(key)),
-                    ),
-                };
-            },
+            onChangeAsync: onChangeAsync(schema),
             onChangeAsyncDebounceMs: 300,
             onSubmit: schema,
         },

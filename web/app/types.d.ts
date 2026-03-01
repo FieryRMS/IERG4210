@@ -11,6 +11,7 @@ interface PageHandle {
 }
 
 type Product = components["schemas"]["Product"];
+type Category = components["schemas"]["Category"];
 
 interface LocationState {
     product?: Product;
