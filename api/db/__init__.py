@@ -1,4 +1,3 @@
-from db.categories import Category
-from db.products import Product
+from .shop import Category, CategoryBase, Product, ProductBase
 
 __all__ = ["Category", "Product"]

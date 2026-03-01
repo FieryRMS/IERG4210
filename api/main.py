@@ -5,11 +5,12 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import dotenv
+import routes
+import routes.categories
 from fastapi import FastAPI, Request, Response
 from models.app import State
-from routes import root
-from sqlalchemy import MetaData, create_engine
-from sqlmodel import SQLModel
+from sqlalchemy import create_engine
+from sqlmodel import Session, SQLModel
 
 dotenv.load_dotenv()  # Load environment variables from .env file
 
@@ -44,48 +45,42 @@ async def lifespan(app: FastAPI):
 
     if state["debug"]:
         cats = [
-            Category(id=1, name="Electronics", description="Devices and gadgets"),
-            Category(id=2, name="Books", description="Printed and digital books"),
-            Category(id=3, name="Clothing", description="Apparel and accessories"),
+            Category(name="Electronics", description="Devices and gadgets"),
+            Category(name="Books", description="Printed and digital books"),
+            Category(name="Clothing", description="Apparel and accessories"),
         ]
         prods = [
             Product(
-                id=1,
                 catid=1,
                 name="Smartphone",
                 price=699.99,
                 description="Latest model smartphone with advanced features",
             ),
             Product(
-                id=2,
                 catid=1,
                 name="Laptop",
                 price=1299.99,
                 description="High-performance laptop for work and gaming",
             ),
             Product(
-                id=3,
                 catid=2,
                 name="Novel",
                 price=19.99,
                 description="Bestselling fiction novel",
             ),
             Product(
-                id=4,
                 catid=2,
                 name="Textbook",
                 price=89.99,
                 description="Comprehensive textbook for students",
             ),
             Product(
-                id=5,
                 catid=3,
                 name="T-shirt",
                 price=12.99,
                 description="Comfortable cotton t-shirt",
             ),
             Product(
-                id=6,
                 catid=3,
                 name="Jeans",
                 price=49.99,
@@ -98,11 +93,12 @@ async def lifespan(app: FastAPI):
             ),
         ]
 
-        with state["engine"].begin() as conn:
+        with Session(state["engine"]) as session:
             for cat in cats:
-                conn.execute(cat.upsert())
+                session.add(cat)
             for prod in prods:
-                conn.execute(prod.upsert())
+                session.add(prod)
+            session.commit()
 
     yield
 
@@ -129,4 +125,6 @@ async def log_requests(
     return response
 
 
-app.include_router(root.router)
+app.include_router(routes.root.router)
+app.include_router(routes.categories.router)
+app.include_router(routes.products.router)
