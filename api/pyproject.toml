@@ -1,0 +1,9 @@
+[project]
+name = "IERG4210-API"
+version = "0.1.0"
+description = "API for IERG4210 project"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi[standard-no-fastapi-cloud-cli]>=0.134.0",
+    "pydantic>=2.12.5",
+]

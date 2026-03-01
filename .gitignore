@@ -7,3 +7,6 @@ node_modules/
 build/
 
 *.zip
+
+.venv/
+__pycache__/
