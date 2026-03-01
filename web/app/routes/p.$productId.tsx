@@ -17,11 +17,27 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { LocationState, PageHandle, Product } from "@/types";
 import { useCart } from "@/hooks/cart-provider";
 import { Img } from "@/components/img-wrapper";
+import type { paths } from "@/lib/api";
+import createClient from "openapi-fetch";
 
-export async function clientAction({ params }: Route.ClientActionArgs) {
-    await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate network delay
-    return;
-}
+const client = createClient<paths>({ baseUrl: import.meta.env.VITE_API_URL });
+
+export async function loader({ params }: Route.LoaderArgs) {
+    if (Number.isInteger(parseInt(params.productId))) {
+        const { data, error } = await client.GET(`/products/{product_id}`, {
+            params: {
+                path: {
+                    product_id: parseInt(params.productId),
+                },
+            },
+        });
+        if (error) {
+            throw new Response("Not Found", { status: 404 });
+        }
+        return data;
+    }
+    throw new Response("Not Found", { status: 404 });
+};
 
 export default function ({ params }: Route.ComponentProps) {
     const productFetcher = useFetcher<Product>();
@@ -30,26 +46,27 @@ export default function ({ params }: Route.ComponentProps) {
     const cents = Math.round(((productFetcher.data?.price || 0) - dollars) * 100)
         .toString()
         .padStart(2, "0");
+    const pid = parseInt(params.productId);
 
     useEffect(() => {
-        if (location.state?.product?.id === params.productId) {
+        if (location.state?.product?.id === pid) {
             productFetcher.reset();
             productFetcher.data = location.state.product;
         }
-        if (productFetcher.state === "idle" && productFetcher.data?.id !== params.productId) {
+        if (productFetcher.state === "idle" && productFetcher.data?.id !== pid) {
             productFetcher.submit({}, { method: "post" });
         }
-        if (productFetcher.data?.id === params.productId) {
+        if (productFetcher.data?.id === pid) {
             location.state = { ...location.state, product: productFetcher.data };
         }
-    }, [location, params.productId, productFetcher]);
+    }, [location, pid, productFetcher]);
 
     const { addQuantity: addToCart } = useCart();
 
     const p: Product =
-        productFetcher.data?.id === params.productId
+        productFetcher.data?.id === pid
             ? productFetcher.data
-            : { id: "", name: "", imageUrls: [""], desc: "", price: 0 };
+            : { id: 0, name: "", images: [""], description: "", price: 0, catid: 0, created_at: "", updated_at: "" };
 
     return (
         <>
@@ -57,14 +74,14 @@ export default function ({ params }: Route.ComponentProps) {
                 <Card className="p-0 flex-col max-w-3xl lg:max-w-7xl w-full gap-0 lg:aspect-4/3 lg:flex-row mx-4">
                     <Carousel className="aspect-3/4 h-full">
                         <CarouselContent className="h-full">
-                            {p.imageUrls.map((src, index) => (
+                            {p.images?.map((src, index) => (
                                 <CarouselItem key={index}>
                                     <div className="h-full">
                                         <Card className="h-full p-3">
                                             <CardContent className="h-full flex items-center justify-center p-0 overflow-hidden rounded-xl">
                                                 <Img
                                                     src={src}
-                                                    alt={p.desc}
+                                                    alt={p.description || p.name}
                                                     className="h-full w-full object-cover pointer-events-none select-none"
                                                 />
                                             </CardContent>
@@ -73,7 +90,7 @@ export default function ({ params }: Route.ComponentProps) {
                                 </CarouselItem>
                             ))}
                         </CarouselContent>
-                        {p.imageUrls.length > 1 && (
+                        {p.images && p.images.length > 1 && (
                             <>
                                 <CarouselPrevious className="left-6" size="lg" />
                                 <CarouselNext className="right-6" size="lg" />
@@ -87,7 +104,7 @@ export default function ({ params }: Route.ComponentProps) {
                             </CardTitle>
                             <CardDescription className="mb-4">
                                 {p.id ? (
-                                    p.desc
+                                    p.description
                                 ) : (
                                     <div className="space-y-2">
                                         <Skeleton className="h-6 w-64" />
