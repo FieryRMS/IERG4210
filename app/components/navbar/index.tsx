@@ -31,10 +31,11 @@ import {
     HomeIcon,
     PlusIcon,
     MinusIcon,
+    Contrast,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useTheme } from "@/hooks/theme-provider";
+import { Theme, useTheme } from "@/hooks/theme-provider";
 import { LoginForm } from "./login-form";
 import { Badge } from "@/components/ui/badge";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -45,7 +46,7 @@ import { cn } from "@/lib/utils";
 import { Img } from "@/components/img-wrapper";
 
 export function Navbar() {
-    const { toggleTheme } = useTheme();
+    const { theme, toggleTheme } = useTheme();
     const location: Location<LocationState> = useLocation();
     let breadcrumbs = (useMatches() as UIMatch<unknown, PageHandle>[])
         .filter((match) => match.handle && match.handle.breadcrumb)
@@ -130,8 +131,9 @@ export function Navbar() {
             <NavigationMenuList className="flex justify-end items-center h-full">
                 <NavigationMenuItem className=" min-w-fit h-full flex flex-col items-center justify-center">
                     <Button variant="outline" size="icon-lg" onClick={toggleTheme} className="relative">
-                        <Sun className="scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
-                        <Moon className="absolute scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
+                        <Sun className={"transition-all " + (theme == Theme.Light ? "scale-100 rotate-0" : "scale-0 -rotate-90")} />
+                        <Moon className={"transition-all absolute " + (theme == Theme.Dark ? "scale-100 rotate-0" : "scale-0 rotate-90")} />
+                        <Contrast className={"transition-all absolute " + (theme == Theme.System ? "scale-100 rotate-0" : "scale-0 rotate-90")} />
                         <span className="sr-only">Toggle theme</span>
                     </Button>
                 </NavigationMenuItem>
@@ -287,7 +289,7 @@ export function Navbar() {
     );
 }
 
-function ListItem({ title, children, href, ...props }: React.ComponentPropsWithoutRef<"li"> & { href: string }) {
+function ListItem({ title, children, href, ...props }: React.ComponentPropsWithoutRef<"li"> & { href: string; }) {
     return (
         <li {...props}>
             <NavigationMenuLink
@@ -304,7 +306,7 @@ function ListItem({ title, children, href, ...props }: React.ComponentPropsWitho
     );
 }
 
-function SearchBar({ className }: { className?: string }) {
+function SearchBar({ className }: { className?: string; }) {
     const navigate = useNavigate();
     return (
         <form
@@ -328,7 +330,7 @@ function SearchBar({ className }: { className?: string }) {
     );
 }
 
-function Logo({ className }: { className?: string }) {
+function Logo({ className }: { className?: string; }) {
     return (
         <NavigationMenuLink
             render={

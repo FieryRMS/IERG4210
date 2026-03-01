@@ -1,12 +1,17 @@
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
+import { prefsCookie } from "@/cookies";
+import { EnumX } from "@/lib/utils";
 
-type Theme = "dark" | "light" | "system";
+export enum Theme {
+    Dark = "dark",
+    Light = "light",
+    System = "system",
+};
 
 type ThemeProviderProps = {
     children: React.ReactNode;
-    defaultTheme?: Theme;
-    storageKey?: string;
+    defaultTheme: Theme;
 };
 
 type ThemeProviderState = {
@@ -16,61 +21,50 @@ type ThemeProviderState = {
 };
 
 const initialState: ThemeProviderState = {
-    theme: "system",
+    theme: Theme.Dark,
     setTheme: () => null,
     toggleTheme: () => null,
 };
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
-function saveTheme(storageKey: string, theme: Theme) {
-    localStorage.setItem(storageKey, theme);
+async function saveTheme(theme: Theme) {
+    document.cookie = await prefsCookie.serialize({ theme });
 }
 
-function getSavedTheme(storageKey: string): Theme {
-    const savedTheme = localStorage.getItem(storageKey) as Theme | null;
-    return savedTheme || "system";
+function getPrefersColorScheme(): Theme.Dark | Theme.Light {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? Theme.Dark : Theme.Light;
 }
 
 export function ThemeProvider({
     children,
-    defaultTheme = "system",
-    storageKey = "theme",
+    defaultTheme,
     ...props
 }: ThemeProviderProps) {
-    const [theme, setTheme] = useState<Theme>(() => {
-        if (typeof window !== "undefined") {
-            return getSavedTheme(storageKey);
-        }
-        return defaultTheme;
-    });
+    const [theme, setTheme] = useState<Theme>(defaultTheme);
 
     useEffect(() => {
         const root = window.document.documentElement;
-
-        root.classList.remove("light", "dark");
-
-        if (theme === "system") {
-            const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-
-            root.classList.add(systemTheme);
-            return;
-        }
-
+        root.classList.remove(Theme.Dark, Theme.Light, Theme.System);
         root.classList.add(theme);
+        if (theme === Theme.System) {
+            root.classList.add(getPrefersColorScheme());
+        }
     }, [theme]);
 
     const value = {
         theme,
         setTheme: (theme: Theme) => {
-            saveTheme(storageKey, theme);
+            saveTheme(theme);
             setTheme(theme);
         },
         toggleTheme: () => {
             setTheme((prevTheme) => {
-                const newTheme = prevTheme === "light" ? "dark" : "light";
-                saveTheme(storageKey, newTheme);
-                return newTheme;
+                const isDark = getPrefersColorScheme() === Theme.Dark;
+                const themeEnum = EnumX.of(Theme);
+                const nextTheme = !isDark ? themeEnum.next(prevTheme) : themeEnum.prev(prevTheme);
+                saveTheme(nextTheme);
+                return nextTheme;
             });
         },
     };

@@ -11,8 +11,9 @@ import {
     useMatches,
     type Location,
     type UIMatch,
+    useRouteLoaderData,
 } from "react-router";
-import { ThemeProvider } from "@/hooks/theme-provider";
+import { ThemeProvider, Theme } from "@/hooks/theme-provider";
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -20,7 +21,8 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import type { LocationState, PageHandle } from "./types";
 import { CartProvider } from "./hooks/cart-provider";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
+import { prefsCookie, type Prefs } from "./cookies";
 
 export const links: Route.LinksFunction = () => [
     { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -35,7 +37,16 @@ export const links: Route.LinksFunction = () => [
     },
 ];
 
-export function Layout({ children }: { children: React.ReactNode }) {
+export async function loader({ request }: Route.LoaderArgs): Promise<Prefs> {
+    const cookieHeader = request.headers.get("Cookie");
+    const prefs = await prefsCookie.parse(cookieHeader) || {};
+    return {
+        theme: prefs.theme || Theme.System,
+    };
+};
+
+export function Layout({ children }: { children: React.ReactNode; }) {
+    const { theme } = useRouteLoaderData("root") as Prefs;
     const location: Location<LocationState> = useLocation();
     const matches = useMatches();
     const breadcrumbs = (matches as UIMatch<unknown, PageHandle>[])
@@ -60,19 +71,28 @@ export function Layout({ children }: { children: React.ReactNode }) {
         [location, breadcrumbs],
     );
     useBlocker(shouldBlock);
+
     return (
-        <html lang="en">
+        <html lang="en" className={theme}>
             <head>
                 <meta charSet="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <Meta />
                 <Links />
                 <script>
-                    {`document.documentElement.classList.toggle("dark", localStorage.theme === "dark" ||
-                        (!("theme" in localStorage) && window.matchMedia("(prefers-color-scheme: dark)").matches));`}
+                    {`
+                    const classList = document.documentElement.classList;
+                    const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: ${Theme.Dark})");
+                    function setSystemTheme() {
+                        classList.contains("${Theme.System}") &&
+                            classList.toggle("${Theme.Dark}", prefersDarkScheme.matches);
+                    }
+                    prefersDarkScheme.addEventListener("change", setSystemTheme);
+                    setSystemTheme();
+                    `}
                 </script>
             </head>
-            <ThemeProvider>
+            <ThemeProvider defaultTheme={theme}>
                 <CartProvider>
                     <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden grid grid-rows-[auto_1fr_auto]">
                         <header className="sticky top-0 z-50 w-full bg-background pb-2">
