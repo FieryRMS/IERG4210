@@ -125,8 +125,12 @@ function RowGenerator({
                                     }
                                 />
                             </Button>
-                            <Button className="p-2 mx-1" variant="outline" type="submit">
-                                <Trash className="w-7" />
+                            <Button className="p-2 mx-1 relative overflow-hidden group" variant="outline" type="submit">
+                                <span
+                                    className="absolute left-0 top-0 h-full w-0 bg-red-500 transition-all duration-2000 group-active:w-full"
+                                    aria-hidden="true"
+                                ></span>
+                                <Trash className="w-7 relative z-10" />
                             </Button>
                         </>
                     )}
