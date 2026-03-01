@@ -9,14 +9,14 @@ router = APIRouter(prefix="/categories", tags=["Categories"])
 
 
 @router.get("/", status_code=status.HTTP_200_OK)
-async def get_categories(request: Request):
+async def get_categories(request: Request) -> list[Category]:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
-        return session.exec(select(Category)).all()
+        return list(session.exec(select(Category)).all())
 
 
 @router.get("/{category_id}")
-async def get_category(request: Request, category_id: int):
+async def get_category(request: Request, category_id: int) -> Category:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         category = session.get(Category, category_id)
@@ -26,7 +26,7 @@ async def get_category(request: Request, category_id: int):
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-async def new_category(request: Request, category: CategoryBase):
+async def new_category(request: Request, category: CategoryBase) -> Category:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         db_category = Category.model_validate(category)
@@ -37,7 +37,9 @@ async def new_category(request: Request, category: CategoryBase):
 
 
 @router.put("/{category_id}", status_code=status.HTTP_200_OK)
-async def update_category(request: Request, category_id: int, category: CategoryBase):
+async def update_category(
+    request: Request, category_id: int, category: CategoryBase
+) -> Category:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         db_category = session.get(Category, category_id)
@@ -52,7 +54,7 @@ async def update_category(request: Request, category_id: int, category: Category
 
 
 @router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_category(request: Request, category_id: int):
+async def delete_category(request: Request, category_id: int) -> None:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         category = session.get(Category, category_id)
