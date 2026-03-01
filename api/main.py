@@ -2,20 +2,15 @@ import logging
 import os
 from collections.abc import Callable
 from contextlib import asynccontextmanager
-from typing import Any, TypedDict
+from typing import Any
 
 import dotenv
 from fastapi import FastAPI, Request, Response
-from pydantic import BaseModel
-from sqlalchemy import Engine, create_engine
+from models.app import State
+from routes import root
+from sqlalchemy import create_engine
 
 dotenv.load_dotenv()  # Load environment variables from .env file
-
-
-class State(TypedDict):
-    logger: logging.Logger
-    engine: Engine
-    debug: bool
 
 
 @asynccontextmanager
@@ -28,10 +23,6 @@ async def lifespan(app: FastAPI):
     )
     state: State = app.state  # pyright: ignore[reportAssignmentType]
     state["logger"] = logging.getLogger("IERG4210-API")
-    state["logger"].info(
-        "Starting API in %s mode", "debug" if app.state.debug else "production"
-    )
-
     state["engine"] = create_engine(
         f"postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}"
         f"@{os.getenv('POSTGRES_HOST')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DB')}",
@@ -60,13 +51,4 @@ async def log_requests(
     return response
 
 
-class Health(BaseModel):
-    status: str
-
-
-@app.get("/health")
-async def health_check(request: Request) -> Health:
-    state: State = request.state  # pyright: ignore[reportAssignmentType]
-    logger = state["logger"]
-    logger.debug("Received health check request")
-    return Health(status="ok")
+app.include_router(root.router)
