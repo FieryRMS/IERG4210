@@ -1,9 +1,8 @@
 import { PascalCase } from "@/lib/utils";
-import type { PageHandle, Product } from "@/types";
-import { useEffect } from "react";
+import type { PageHandle } from "@/types";
 
 import type { Route } from "./+types/c.$categoryId";
-import { useFetcher, type UIMatch } from "react-router";
+import { type UIMatch } from "react-router";
 import { Category } from "@/components/category";
 import createClient from "openapi-fetch";
 import type { paths } from "@/lib/api";
@@ -20,12 +19,6 @@ export function meta({ matches }: Route.MetaArgs) {
     ];
 }
 
-
-// export async function clientAction(): Promise<Product[]> {
-//     await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate network delay
-//     // return await fetchProducts(0, 30);
-// }
-
 export async function loader({ params }: Route.LoaderArgs) {
     if (Number.isInteger(parseInt(params.categoryId))) {
         const { data, error } = await client.GET(`/products/category/{category_id}`, {
@@ -39,8 +32,7 @@ export async function loader({ params }: Route.LoaderArgs) {
             throw new Response("Not Found", { status: 404 });
         }
         return data;
-    }
-    else {
+    } else {
         const { data, error } = await client.GET(`/products/`);
         if (error) {
             throw new Response("Not Found", { status: 404 });
@@ -52,7 +44,6 @@ export async function loader({ params }: Route.LoaderArgs) {
 export default function MainPage({ loaderData }: Route.ComponentProps) {
     return <Category products={loaderData} />;
 }
-
 
 export const handle: PageHandle = {
     breadcrumb: ({ params, id, pathname }) => ({

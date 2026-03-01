@@ -37,7 +37,7 @@ export async function loader({ params }: Route.LoaderArgs) {
         return data;
     }
     throw new Response("Not Found", { status: 404 });
-};
+}
 
 export default function ({ params }: Route.ComponentProps) {
     const productFetcher = useFetcher<Product>();

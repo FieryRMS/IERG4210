@@ -2,28 +2,35 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import type { paths } from "@/lib/api";
 import createClient from "openapi-fetch";
 import type { Route } from "./+types/admin";
-import { Pencil, Plus, Trash } from "lucide-react";
+import { Check, Pencil, Plus, Trash } from "lucide-react";
 import type { Product, Category } from "@/types";
 import { z } from "zod";
 import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
 import { onChangeAsync } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
 
 const client = createClient<paths>({ baseUrl: import.meta.env.VITE_API_URL });
 
 export async function action({ request }: { request: Request }) {}
 
 const baseSchema = z.object({
-    id: z.coerce.number<number>(),
+    id: z.coerce.number<number>().min(1).optional(),
     name: z.string(),
     description: z.string().nullable(),
-    created_at: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}$/, "Invalid date format"),
-    updated_at: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}$/, "Invalid date format"),
+    created_at: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}$/, "Invalid date format")
+        .optional(),
+    updated_at: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}$/, "Invalid date format")
+        .optional(),
 });
 const productSchema = baseSchema.extend({
-    price: z.coerce.number<number>(),
-    catid: z.coerce.number<number>(),
+    price: z.coerce.number<number>().min(0.01),
+    catid: z.coerce.number<number>().min(1),
 });
 
 const categorySchema = baseSchema.extend({
@@ -46,8 +53,9 @@ function RowGenerator({
     columns: (keyof Product | keyof Category)[];
     disabled: (keyof Product | keyof Category)[];
 }) {
+    const [edit, setEdit] = useState(false);
     const form = useAppForm({
-        defaultValues: (!item.id ? {} : { ...item, type }) as z.infer<typeof schema>,
+        defaultValues: (!item.id ? { type } : { ...item, type }) as z.infer<typeof schema>,
         validators: {
             onChangeAsync: onChangeAsync(schema),
             onChangeAsyncDebounceMs: 300,
@@ -75,11 +83,14 @@ function RowGenerator({
                                         <Input
                                             type="text"
                                             inputMode="numeric"
-                                            value={field.state.value as string}
+                                            value={field.state.value ?? ""}
                                             onChange={(e) => field.handleChange(e.target.value)}
                                             onBlur={field.handleBlur}
                                             className="text-center disabled:opacity-100! border-primary/50 disabled:border-primary/10"
-                                            disabled={disabled.includes(key as keyof (Product | Category))}
+                                            disabled={
+                                                disabled.includes(key as keyof (Product | Category)) ||
+                                                (!edit && item.id !== undefined)
+                                            }
                                         />
                                     </field.Control>
                                     <field.Message />
@@ -95,8 +106,24 @@ function RowGenerator({
                         </Button>
                     ) : (
                         <>
-                            <Button className="p-2 mx-1" variant="outline" type="submit">
-                                <Pencil className="w-7" />
+                            <Button
+                                className="p-2 mx-1"
+                                variant="outline"
+                                type={edit ? "submit" : "button"}
+                                onClick={() => {
+                                    setEdit((prev) => !prev);
+                                }}
+                            >
+                                <Pencil
+                                    className={
+                                        "transition-all " + (!edit ? "scale-100 rotate-0" : "scale-0 -rotate-90")
+                                    }
+                                />
+                                <Check
+                                    className={
+                                        "transition-all absolute " + (edit ? "scale-100 rotate-0" : "scale-0 rotate-90")
+                                    }
+                                />
                             </Button>
                             <Button className="p-2 mx-1" variant="outline" type="submit">
                                 <Trash className="w-7" />

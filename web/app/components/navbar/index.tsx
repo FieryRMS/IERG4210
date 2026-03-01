@@ -54,7 +54,7 @@ export function Navbar() {
 
     const root = breadcrumbs.shift();
     breadcrumbs = [...(location.state?.breadcrumbs || []), ...breadcrumbs];
-    if (!location.state?.breadcrumbs?.length || location.state.breadcrumbs[0].id !== "root") breadcrumbs.unshift(root!);
+    if (!location.state?.breadcrumbs?.length || location.state.breadcrumbs[0]?.id !== "root") breadcrumbs.unshift(root!);
 
     const { cart, addQuantity, removeQuantity, setQuantity } = useCart();
 
@@ -171,7 +171,7 @@ export function Navbar() {
                                     <Item key={p.id} variant="outline" role="listitem">
                                         <ItemMedia variant="image">
                                             <Img
-                                                src={p.imageUrls[0]}
+                                                src={p.images?.[0]}
                                                 alt={p.name}
                                                 className="w-16 h-16 object-cover pointer-events-none select-none"
                                                 draggable={false}

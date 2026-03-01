@@ -21,7 +21,7 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import type { LocationState, PageHandle } from "./types";
 import { CartProvider } from "./hooks/cart-provider";
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { prefsCookie, type Prefs } from "./cookies";
 
 export const links: Route.LinksFunction = () => [
@@ -39,13 +39,13 @@ export const links: Route.LinksFunction = () => [
 
 export async function loader({ request }: Route.LoaderArgs): Promise<Prefs> {
     const cookieHeader = request.headers.get("Cookie");
-    const prefs = await prefsCookie.parse(cookieHeader) || {};
+    const prefs = (await prefsCookie.parse(cookieHeader)) || {};
     return {
         theme: prefs.theme || Theme.System,
     };
-};
+}
 
-export function Layout({ children }: { children: React.ReactNode; }) {
+export function Layout({ children }: { children: React.ReactNode }) {
     const { theme } = useRouteLoaderData("root") as Prefs;
     const location: Location<LocationState> = useLocation();
     const matches = useMatches();
@@ -59,7 +59,7 @@ export function Layout({ children }: { children: React.ReactNode; }) {
                 currentLocation.pathname === location.pathname &&
                 nextLocation.pathname !== currentLocation.pathname
             ) {
-                if (location.state?.breadcrumbs?.length && location.state.breadcrumbs[0].id === "root")
+                if (location.state?.breadcrumbs?.length && location.state.breadcrumbs[0]?.id === "root")
                     breadcrumbs.shift();
                 nextLocation.state = {
                     breadcrumbs: [...(location.state?.breadcrumbs || []), ...breadcrumbs],
