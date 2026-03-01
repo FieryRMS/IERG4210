@@ -2,12 +2,13 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import type { paths } from "@/lib/api";
 import createClient from "openapi-fetch";
 import type { Route } from "./+types/admin";
-import { Pencil, Trash } from "lucide-react";
+import { Pencil, Plus, Trash } from "lucide-react";
 import type { Product, Category } from "@/types";
 import { z } from "zod";
 import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
 import { onChangeAsync } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const client = createClient<paths>({ baseUrl: import.meta.env.VITE_API_URL });
 
@@ -39,11 +40,14 @@ function RowGenerator({
     item,
     columns,
     disabled,
-}:
-    | { type: "Product"; item: Product; columns: (keyof Product)[]; disabled: (keyof Product)[] }
-    | { type: "Category"; item: Category; columns: (keyof Category)[]; disabled: (keyof Category)[] }) {
+}: {
+    type: "Product" | "Category";
+    item: Product | Category;
+    columns: (keyof Product | keyof Category)[];
+    disabled: (keyof Product | keyof Category)[];
+}) {
     const form = useAppForm({
-        defaultValues: { ...item, type } as z.infer<typeof schema>,
+        defaultValues: (!item.id ? {} : { ...item, type }) as z.infer<typeof schema>,
         validators: {
             onChangeAsync: onChangeAsync(schema),
             onChangeAsyncDebounceMs: 300,
@@ -69,8 +73,9 @@ function RowGenerator({
                                 <form.Item>
                                     <field.Control>
                                         <Input
-                                            type={key === "price" ? "number" : "text"}
-                                            value={field.state.value || ""}
+                                            type="text"
+                                            inputMode="numeric"
+                                            value={field.state.value as string}
                                             onChange={(e) => field.handleChange(e.target.value)}
                                             onBlur={field.handleBlur}
                                             className="text-center disabled:opacity-100! border-primary/50 disabled:border-primary/10"
@@ -83,13 +88,21 @@ function RowGenerator({
                         )}
                     </form.AppField>
                 ))}
-                <TableCell className="text-center">
-                    <button className="p-2 rounded hover:bg-muted">
-                        <Pencil className="w-7" />
-                    </button>
-                    <button className="p-2 rounded hover:bg-muted">
-                        <Trash className="w-7" />
-                    </button>
+                <TableCell className="text-center items-center justify-center flex">
+                    {!item.id ? (
+                        <Button className="p-2 mx-1" variant="outline" type="submit">
+                            <Plus className="w-7" />
+                        </Button>
+                    ) : (
+                        <>
+                            <Button className="p-2 mx-1" variant="outline" type="submit">
+                                <Pencil className="w-7" />
+                            </Button>
+                            <Button className="p-2 mx-1" variant="outline" type="submit">
+                                <Trash className="w-7" />
+                            </Button>
+                        </>
+                    )}
                 </TableCell>
             </form>
         </form.AppForm>
@@ -117,8 +130,8 @@ function TableGenerator({
     ] as (keyof Row)[];
     const disabled: (keyof Row)[] = ["id", "created_at", "updated_at"];
     return (
-        <Table>
-            <TableCaption>{type} CRUD table</TableCaption>
+        <Table className="px-10">
+            <TableCaption className="text-center">{type} CRUD table</TableCaption>
             <TableHeader>
                 <TableRow>
                     {columns.map((col) => (
@@ -130,31 +143,20 @@ function TableGenerator({
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {type === "Product" ? (
-                    <>
-                        {(data as Product[]).map((item) => (
-                            <RowGenerator
-                                type="Product"
-                                key={item.id}
-                                item={item} // item is Product
-                                columns={columns as (keyof Product)[]}
-                                disabled={disabled}
-                            />
-                        ))}
-                    </>
-                ) : (
-                    <>
-                        {(data as Category[]).map((item) => (
-                            <RowGenerator
-                                type="Category"
-                                key={item.id}
-                                item={item} // item is Category
-                                columns={columns as (keyof Category)[]}
-                                disabled={disabled}
-                            />
-                        ))}
-                    </>
-                )}
+                {data.map((item) => (
+                    <RowGenerator type={type} key={item.id} item={item} columns={columns} disabled={disabled} />
+                ))}
+                <RowGenerator
+                    type={type}
+                    key="new"
+                    item={{
+                        name: "",
+                        price: 0,
+                        catid: 0,
+                    }}
+                    columns={columns}
+                    disabled={disabled}
+                />
             </TableBody>
         </Table>
     );
