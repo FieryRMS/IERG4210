@@ -1,5 +1,5 @@
 from db.base import SQLModel
-from sqlmodel import Field
+from sqlmodel import JSON, Column, Field
 
 
 class Product(SQLModel, table=True):
@@ -9,3 +9,4 @@ class Product(SQLModel, table=True):
     name: str
     price: float
     description: str | None = None
+    images: list[str] | None = Field(default=None, sa_column=Column(JSON))

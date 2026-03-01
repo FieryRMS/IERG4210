@@ -8,7 +8,7 @@ import dotenv
 from fastapi import FastAPI, Request, Response
 from models.app import State
 from routes import root
-from sqlalchemy import create_engine
+from sqlalchemy import MetaData, create_engine
 from sqlmodel import SQLModel
 
 dotenv.load_dotenv()  # Load environment variables from .env file
@@ -35,6 +35,11 @@ async def lifespan(app: FastAPI):
         f"postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}"
         f"@{os.getenv('POSTGRES_HOST')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DB')}",
     )
+
+    if state["debug"]:
+        # so edits to the models will be reflected immediately without needing to restart the server
+        SQLModel.metadata.drop_all(state["engine"])
+
     SQLModel.metadata.create_all(state["engine"])
 
     if state["debug"]:
@@ -85,6 +90,11 @@ async def lifespan(app: FastAPI):
                 name="Jeans",
                 price=49.99,
                 description="Stylish denim jeans",
+                images=[
+                    "https://avatar.vercel.sh/0x0",
+                    "https://avatar.vercel.sh/0x1",
+                    "https://avatar.vercel.sh/0x2",
+                ],
             ),
         ]
 
