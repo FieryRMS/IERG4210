@@ -8,4 +8,5 @@ dependencies = [
     "psycopg2>=2.9.11",
     "pydantic>=2.12.5",
     "sqlalchemy>=2.0.47",
+    "sqlmodel>=0.0.37",
 ]

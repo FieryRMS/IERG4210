@@ -9,29 +9,97 @@ from fastapi import FastAPI, Request, Response
 from models.app import State
 from routes import root
 from sqlalchemy import create_engine
+from sqlmodel import SQLModel
 
 dotenv.load_dotenv()  # Load environment variables from .env file
+
+from db import *
+
+DEBUG = os.getenv("MODE", "prod") == "dev"
+
+logging.basicConfig(
+    format="[%(asctime)s][%(levelname)s][%(name)s] %(message)s",
+    level=logging.DEBUG if DEBUG else logging.INFO,
+)
+logging.getLogger("sqlalchemy.engine").setLevel(
+    logging.DEBUG if DEBUG else logging.INFO
+)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.debug = os.getenv("MODE", "prod") == "dev"
-
-    logging.basicConfig(
-        format="[%(asctime)s][%(levelname)s][%(name)s] %(message)s",
-        level=logging.DEBUG if app.state.debug else logging.INFO,
-    )
+    app.state.debug = DEBUG
     state: State = app.state  # pyright: ignore[reportAssignmentType]
     state["logger"] = logging.getLogger("IERG4210-API")
     state["engine"] = create_engine(
         f"postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}"
         f"@{os.getenv('POSTGRES_HOST')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DB')}",
-        echo=state["debug"],
     )
+    SQLModel.metadata.create_all(state["engine"])
+
+    if state["debug"]:
+        cats = [
+            Category(id=1, name="Electronics", description="Devices and gadgets"),
+            Category(id=2, name="Books", description="Printed and digital books"),
+            Category(id=3, name="Clothing", description="Apparel and accessories"),
+        ]
+        prods = [
+            Product(
+                id=1,
+                catid=1,
+                name="Smartphone",
+                price=699.99,
+                description="Latest model smartphone with advanced features",
+            ),
+            Product(
+                id=2,
+                catid=1,
+                name="Laptop",
+                price=1299.99,
+                description="High-performance laptop for work and gaming",
+            ),
+            Product(
+                id=3,
+                catid=2,
+                name="Novel",
+                price=19.99,
+                description="Bestselling fiction novel",
+            ),
+            Product(
+                id=4,
+                catid=2,
+                name="Textbook",
+                price=89.99,
+                description="Comprehensive textbook for students",
+            ),
+            Product(
+                id=5,
+                catid=3,
+                name="T-shirt",
+                price=12.99,
+                description="Comfortable cotton t-shirt",
+            ),
+            Product(
+                id=6,
+                catid=3,
+                name="Jeans",
+                price=49.99,
+                description="Stylish denim jeans",
+            ),
+        ]
+
+        with state["engine"].begin() as conn:
+            for cat in cats:
+                conn.execute(cat.upsert())
+            for prod in prods:
+                conn.execute(prod.upsert())
+
     yield
 
+    state["engine"].dispose()
 
-app = FastAPI(lifespan=lifespan)
+
+app = FastAPI(lifespan=lifespan, debug=DEBUG)
 
 
 @app.middleware("http")
