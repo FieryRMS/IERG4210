@@ -1,13 +1,15 @@
 import datetime
 from typing import ClassVar
 
-from sqlalchemy.dialects.postgresql import insert
+# from sqlalchemy.dialects.postgresql import insert
 from sqlmodel import Field
 from sqlmodel import SQLModel as _SQLModel
 
+from models import BaseModel
+
 
 # https://github.com/fastapi/sqlmodel/issues/59#issuecomment-2085514089
-class SQLModel(_SQLModel):
+class SQLModel(BaseModel, _SQLModel):
     """Represents the base class for all models."""
 
     # Specifies the set of index elements which represent the ON CONFLICT target
@@ -25,24 +27,32 @@ class SQLModel(_SQLModel):
         default_factory=lambda: datetime.datetime.now(datetime.timezone.utc),
     )
 
-    def upsert(self):
-        """Returns an UPSERT statement"""
-        exclude_fields = self.UPSERT_EXCLUDE_FIELDS.copy()
+    # unused for now
+    # def upsert(self):
+    #     """Returns an UPSERT statement"""
+    #     exclude_fields = self.UPSERT_EXCLUDE_FIELDS.copy()
 
-        # Common fields which we should exclude when updating.
-        exclude_fields.add("id")
-        exclude_fields.add("created_at")
+    #     # Common fields which we should exclude when updating.
+    #     exclude_fields.add("id")
+    #     exclude_fields.add("created_at")
 
-        # Dump the model and exclude the specified fields during update.
-        obj_dict = self.model_dump()
-        to_update = obj_dict.copy()
-        for field in exclude_fields:
-            _ = to_update.pop(field, None)
+    #     # Dump the model and exclude the specified fields during update.
+    #     obj_dict = self.model_dump()
+    #     to_update = obj_dict.copy()
+    #     for field in exclude_fields:
+    #         _ = to_update.pop(field, None)
 
-        stmt = insert(self.__class__).values(obj_dict)
-        stmt = stmt.on_conflict_do_update(
-            index_elements=self.UPSERT_INDEX_ELEMENTS,
-            set_=to_update,
-        )
+    #     stmt = insert(self.__class__).values(obj_dict)
+    #     stmt = stmt.on_conflict_do_update(
+    #         index_elements=self.UPSERT_INDEX_ELEMENTS,
+    #         set_=to_update,
+    #     )
 
-        return stmt
+    #     return stmt
+
+    def update_model(self, model: BaseModel):
+        update = self.model_copy(update=model.model_dump(exclude_unset=True))
+        for field in model.model_fields_set:
+            if hasattr(self, field):
+                setattr(self, field, getattr(update, field))
+        self.updated_at = datetime.datetime.now(datetime.timezone.utc)

@@ -5,12 +5,13 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import dotenv
-import routes
-import routes.categories
 from fastapi import FastAPI, Request, Response
-from models.app import State
 from sqlalchemy import create_engine
 from sqlmodel import Session, SQLModel
+
+import routes
+import routes.categories
+from models.app import State
 
 dotenv.load_dotenv()  # Load environment variables from .env file
 

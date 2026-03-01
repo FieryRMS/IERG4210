@@ -1,10 +1,16 @@
+from sqlmodel import JSON, Column, Field, Relationship
+
 from db.base import SQLModel
 from models import BaseModel
-from sqlmodel import JSON, Column, Field, Relationship
 
 
 class CategoryBase(BaseModel):
     name: str
+    description: str | None = None
+
+
+class CategoryUpdate(BaseModel):
+    name: str | None = None
     description: str | None = None
 
 
@@ -24,7 +30,14 @@ class ProductBase(BaseModel):
     images: list[str] | None = Field(default=None, sa_column=Column(JSON))
 
 
+class ProductUpdate(BaseModel):
+    name: str | None = None
+    price: float | None = None
+    description: str | None = None
+    images: list[str] | None = None
+
+
 class Product(ProductBase, SQLModel, table=True):
     __tablename__ = "products"  # pyright: ignore[reportAssignmentType]
 
-    category: Category | None = Relationship(back_populates="products")
+    category: Category = Relationship(back_populates="products")

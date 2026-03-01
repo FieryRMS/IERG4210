@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, status
 from sqlmodel import Session, select
 
-from db import Category, CategoryBase
+from db import Category, CategoryBase, CategoryUpdate
 from models.app import State
 from models.errors import NotFoundException
 
@@ -38,15 +38,14 @@ async def new_category(request: Request, category: CategoryBase) -> Category:
 
 @router.put("/{category_id}", status_code=status.HTTP_200_OK)
 async def update_category(
-    request: Request, category_id: int, category: CategoryBase
+    request: Request, category_id: int, category: CategoryUpdate
 ) -> Category:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         db_category = session.get(Category, category_id)
         if not db_category:
             raise NotFoundException
-        db_category.name = category.name
-        db_category.description = category.description
+        db_category.update_model(category)
         session.add(db_category)
         session.commit()
         session.refresh(db_category)
@@ -62,4 +61,3 @@ async def delete_category(request: Request, category_id: int) -> None:
             raise NotFoundException
         session.delete(category)
         session.commit()
-        return
