@@ -1,0 +1,41 @@
+name: Deploy to Azure Container Apps
+
+on:
+  push:
+    branches: azure/deploy
+  
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    environment: IERG4210
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6.0.2
+
+    - name: Azure Login
+      uses: Azure/login@v2.3.0
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    - name: ACR authentication
+      run: az acr login --name ${{ vars.REGISTRY_URL }}
+    - name: Build Web Image
+      run: |
+        docker build web -t ${{ vars.REGISTRY_URL }}/web:${{ github.sha }}
+        docker push ${{ vars.REGISTRY_URL }}/web:${{ github.sha }}
+    - name: Build API Image
+      run: |
+        docker build api -t ${{ vars.REGISTRY_URL }}/api:${{ github.sha }}
+        docker push ${{ vars.REGISTRY_URL }}/api:${{ github.sha }}
+    - name: Deploy to Azure Container Apps
+      uses: Azure/webapps-deploy@v3.0.7
+      with:
+        app-name: ${{ vars.CONTAINER_APP_NAME }}
+        images: |
+          ${{ vars.REGISTRY_URL }}/web:${{ github.sha }}
+          ${{ vars.REGISTRY_URL }}/api:${{ github.sha }}
+        configuration-file: docker-compose.yml
+        
