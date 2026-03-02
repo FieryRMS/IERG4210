@@ -7,9 +7,10 @@ import type { Product, Category } from "@/types";
 import { z } from "zod";
 import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
-import { onChangeAsync } from "@/lib/utils";
+import { cn, onChangeAsync } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { useFetcher } from "react-router";
 
 const client = createClient<paths>({ baseUrl: import.meta.env.VITE_API_URL });
 
@@ -42,6 +43,40 @@ const schema = z.discriminatedUnion("type", [
     categorySchema.extend({ type: z.literal("Category") }),
 ]);
 
+function ConfirmAnim({
+    onStart,
+    onConfirm,
+    onCancel,
+    className,
+    ...props
+}: {
+    onStart?: () => void;
+    onConfirm?: () => void;
+    onCancel?: () => void;
+} & React.HTMLAttributes<HTMLSpanElement>) {
+    return (
+        <>
+            <span
+                className={cn(
+                    "absolute left-0 top-0 h-full w-0 bg-red-500 group-active:transition-all duration-1800 group-active:w-full",
+                    className,
+                )}
+                aria-hidden="true"
+                onTransitionStart={() => {
+                    onStart?.();
+                }}
+                onTransitionEnd={(e) => {
+                    if (getComputedStyle(e.target as Element, e.pseudoElement).width !== "0px") onConfirm?.();
+                }}
+                onTransitionCancel={() => {
+                    onCancel?.();
+                }}
+                {...props}
+            />
+        </>
+    );
+}
+
 function RowGenerator({
     type,
     item,
@@ -53,7 +88,9 @@ function RowGenerator({
     columns: (keyof Product | keyof Category)[];
     disabled: (keyof Product | keyof Category)[];
 }) {
-    const [edit, setEdit] = useState(false);
+    const productFetcher = useFetcher<Product>();
+    const categoryFetcher = useFetcher<Category>();
+    const fetcher = type === "Product" ? productFetcher : categoryFetcher;
     const form = useAppForm({
         defaultValues: (!item.id ? { type } : { ...item, type }) as z.infer<typeof schema>,
         validators: {
@@ -65,15 +102,11 @@ function RowGenerator({
             console.log(values);
         },
     });
+    const [bState, setBState] = useState<"idle" | "edit" | "save" | "delete">("idle");
+    console.log(bState);
     return (
         <form.AppForm>
-            <form
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    form.handleSubmit();
-                }}
-                className={TableRow({}).props.className}
-            >
+            <form onSubmit={(e) => e.preventDefault()} className={TableRow({}).props.className}>
                 {columns.map((key) => (
                     <form.AppField name={key as keyof (Product | Category)} key={key}>
                         {(field) => (
@@ -89,7 +122,7 @@ function RowGenerator({
                                             className="text-center disabled:opacity-100! border-primary/50 disabled:border-primary/10"
                                             disabled={
                                                 disabled.includes(key as keyof (Product | Category)) ||
-                                                (!edit && item.id !== undefined)
+                                                (!["edit", "save"].includes(bState) && item.id !== undefined)
                                             }
                                         />
                                     </field.Control>
@@ -107,29 +140,63 @@ function RowGenerator({
                     ) : (
                         <>
                             <Button
-                                className="p-2 mx-1"
+                                className="p-2 mx-1 relative overflow-hidden group"
                                 variant="outline"
-                                type={edit ? "submit" : "button"}
+                                type="button"
                                 onClick={() => {
-                                    setEdit((prev) => !prev);
+                                    if (fetcher.state === "idle") {
+                                        if (bState === "save") {
+                                            form.handleSubmit();
+                                        }
+                                        setBState((prev) => {
+                                            if (prev === "idle") return "edit";
+                                            if (prev === "save") return "idle";
+                                            return prev;
+                                        });
+                                    }
                                 }}
                             >
+                                {["edit", "save"].includes(bState) && (
+                                    <ConfirmAnim
+                                        className="bg-blue-500"
+                                        onConfirm={() => setBState((prev) => (prev === "edit" ? "save" : prev))}
+                                        onStart={() => setBState((prev) => (prev === "save" ? "edit" : prev))}
+                                    />
+                                )}
                                 <Pencil
                                     className={
-                                        "transition-all " + (!edit ? "scale-100 rotate-0" : "scale-0 -rotate-90")
+                                        "transition-all " +
+                                        (!["edit", "save"].includes(bState)
+                                            ? "scale-100 rotate-0"
+                                            : "scale-0 -rotate-90")
                                     }
                                 />
                                 <Check
                                     className={
-                                        "transition-all absolute " + (edit ? "scale-100 rotate-0" : "scale-0 rotate-90")
+                                        "transition-all absolute " +
+                                        (["edit", "save"].includes(bState) ? "scale-100 rotate-0" : "scale-0 rotate-90")
                                     }
                                 />
                             </Button>
-                            <Button className="p-2 mx-1 relative overflow-hidden group" variant="outline" type="submit">
-                                <span
-                                    className="absolute left-0 top-0 h-full w-0 bg-red-500 transition-all duration-2000 group-active:w-full"
-                                    aria-hidden="true"
-                                ></span>
+                            <Button
+                                className="p-2 mx-1 relative overflow-hidden group"
+                                variant="outline"
+                                type="button"
+                                onClick={() => {
+                                    if (fetcher.state === "idle" && bState === "delete") {
+                                        form.handleSubmit();
+                                    }
+                                }}
+                            >
+                                {["idle", "delete"].includes(bState) && (
+                                    <ConfirmAnim
+                                        className="bg-red-500"
+                                        onConfirm={() => {
+                                            setBState((prev) => (prev === "idle" ? "delete" : prev));
+                                        }}
+                                        onStart={() => setBState((prev) => (prev === "delete" ? "idle" : prev))}
+                                    />
+                                )}
                                 <Trash className="w-7 relative z-10" />
                             </Button>
                         </>
