@@ -56,16 +56,16 @@ jobs:
       if: steps.changes.outputs.WEB == 'true'
       run: |
         az containerapp update \
-          --name ${{ vars.WEB_APP_NAME }} \
+          --name ${{ vars.APP_NAME }} \
           --resource-group ${{ vars.RESOURCE_GROUP }} \
           --container-name web \
-          --image ${{ vars.REGISTRY_URL }}/web:${{ github.sha }}\
+          --image ${{ vars.REGISTRY_URL }}/web:${{ github.sha }} \
           > /dev/null
     - name: Deploy to API Container App
       if: steps.changes.outputs.API == 'true'
       run: |
         az containerapp update \
-          --name ${{ vars.API_APP_NAME }} \
+          --name ${{ vars.APP_NAME }} \
           --resource-group ${{ vars.RESOURCE_GROUP }} \
           --container-name api \
           --image ${{ vars.REGISTRY_URL }}/api:${{ github.sha }} \
