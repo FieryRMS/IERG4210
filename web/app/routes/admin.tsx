@@ -48,20 +48,24 @@ export async function action({ request }: { request: Request }) {
 
     const data: z.infer<typeof schema> = await request.json();
 
-    if (data.type === "Product" && request.method === "POST") return await client.POST("/products/", { body: data });
+    if (data.type === "Product" && request.method === "POST")
+        return (await client.POST("/products/", { body: data })).data;
     else if (data.type === "Product" && request.method === "PUT")
-        return await client.PUT(`/products/{product_id}`, { params: { path: { product_id: data.id! } }, body: data });
+        return (await client.PUT(`/products/{product_id}`, { params: { path: { product_id: data.id! } }, body: data }))
+            .data;
     else if (data.type === "Product" && request.method === "DELETE")
-        return await client.DELETE(`/products/{product_id}`, { params: { path: { product_id: data.id! } } });
+        return (await client.DELETE(`/products/{product_id}`, { params: { path: { product_id: data.id! } } })).data;
     else if (data.type === "Category" && request.method === "POST")
-        return await client.POST("/categories/", { body: data });
+        return (await client.POST("/categories/", { body: data })).data;
     else if (data.type === "Category" && request.method === "PUT")
-        return await client.PUT(`/categories/{category_id}`, {
-            params: { path: { category_id: data.id! } },
-            body: data,
-        });
+        return (
+            await client.PUT(`/categories/{category_id}`, {
+                params: { path: { category_id: data.id! } },
+                body: data,
+            })
+        ).data;
     else if (data.type === "Category" && request.method === "DELETE")
-        return await client.DELETE(`/categories/{category_id}`, { params: { path: { category_id: data.id! } } });
+        return (await client.DELETE(`/categories/{category_id}`, { params: { path: { category_id: data.id! } } })).data;
 }
 
 function ConfirmAnim({
@@ -100,19 +104,20 @@ function ConfirmAnim({
 
 function RowGenerator({
     type,
-    item,
+    data,
     columns,
     disabled,
 }: {
     type: "Product" | "Category";
-    item: Product | Category;
+    data: Product | Category;
     columns: (keyof Product | keyof Category)[];
     disabled: (keyof Product | keyof Category)[];
 }) {
-    const defaultValues = useMemo(
-        () => (!item.id ? { type } : { ...item, type }) as z.infer<typeof schema>,
-        [item, type],
-    );
+    const [row, setRow] = useState(data);
+    useEffect(() => {
+        setRow(data);
+    }, [data]);
+    const defaultValues = useMemo(() => (!row.id ? { type } : { ...row, type }) as z.infer<typeof schema>, [row, type]);
     const [bState, setBState] = useState<
         "idle" | "edit" | "save" | "delete" | "create" | "ssubmit" | "dsubmit" | "csubmit"
     >("idle");
@@ -143,12 +148,12 @@ function RowGenerator({
     const isSubmitted = useStore(form.store, (state) => state.isSubmitted);
 
     useEffect(() => {
-        if (isSubmitted && bState.includes("submit")) {
+        if (isSubmitted && bState.includes("submit") && fetcher.state === "idle") {
             setBState("idle");
             form.reset(defaultValues);
+            setRow(fetcher.data ?? row);
         }
-    }, [bState, defaultValues, form, isSubmitted]);
-
+    }, [bState, defaultValues, fetcher.data, fetcher.state, form, isSubmitted, row]);
     return (
         <form.AppForm>
             <form onSubmit={(e) => e.preventDefault()} className={TableRow({}).props.className}>
@@ -167,7 +172,7 @@ function RowGenerator({
                                             className="text-center disabled:opacity-100! border-primary/50 disabled:border-primary/10"
                                             disabled={
                                                 disabled.includes(key as keyof (Product | Category)) ||
-                                                (!["edit", "save"].includes(bState) && item.id !== undefined) ||
+                                                (!["edit", "save"].includes(bState) && row.id !== undefined) ||
                                                 bState.includes("submit")
                                             }
                                         />
@@ -182,7 +187,7 @@ function RowGenerator({
                     <form.Subscribe selector={(state) => state.canSubmit}>
                         {(canSubmit) => (
                             <>
-                                {!item.id ? (
+                                {!row.id ? (
                                     <Button
                                         className="p-2 mx-1 relative overflow-hidden group"
                                         variant="outline"
@@ -290,19 +295,8 @@ function RowGenerator({
     );
 }
 
-function TableGenerator({
-    data,
-    type,
-}:
-    | {
-          data: Product[];
-          type: "Product";
-      }
-    | {
-          data: Category[];
-          type: "Category";
-      }) {
-    type Row = (typeof data)[0];
+function TableGenerator({ data, type }: { data: Product[] | Category[]; type: "Product" | "Category" }) {
+    type Row = Product | Category;
     const fixed: (keyof Row)[] = ["id", "name", "description", "created_at", "updated_at"];
     const columns: (keyof Row)[] = [
         ...["id", "name", "description"],
@@ -325,12 +319,12 @@ function TableGenerator({
             </TableHeader>
             <TableBody>
                 {data.map((item) => (
-                    <RowGenerator type={type} key={item.id + type} item={item} columns={columns} disabled={disabled} />
+                    <RowGenerator type={type} key={item.id + type} data={item} columns={columns} disabled={disabled} />
                 ))}
                 <RowGenerator
                     type={type}
                     key="new"
-                    item={{
+                    data={{
                         name: "",
                         price: 0,
                         catid: 0,
