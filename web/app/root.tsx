@@ -23,6 +23,7 @@ import type { LocationState, PageHandle } from "./types";
 import { CartProvider } from "./hooks/cart-provider";
 import { useCallback } from "react";
 import { prefsCookie, type Prefs } from "./cookies";
+import { Toaster } from "@/components/ui/sonner";
 
 export const links: Route.LinksFunction = () => [
     { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -104,6 +105,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         </footer>
                         <ScrollRestoration />
                         <Scripts />
+                        <Toaster theme={theme} />
                     </body>
                 </CartProvider>
             </ThemeProvider>
