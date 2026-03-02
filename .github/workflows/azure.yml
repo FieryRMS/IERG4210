@@ -18,28 +18,54 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v6.0.2
 
+    - name: Check changed files
+      id: changes
+      run: |
+        if git diff --name-only HEAD^ HEAD | grep -q '^web/'; then
+          echo "WEB=true" >> $GITHUB_OUTPUT
+        fi
+        if git diff --name-only HEAD^ HEAD | grep -q '^api/'; then
+          echo "API=true" >> $GITHUB_OUTPUT
+        fi
+
     - name: Azure Login
       uses: Azure/login@v2.3.0
+      if: steps.changes.outputs.WEB == 'true' || steps.changes.outputs.API == 'true'
       with:
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
     - name: ACR authentication
+      if: steps.changes.outputs.WEB == 'true' || steps.changes.outputs.API == 'true'
       run: az acr login --name ${{ vars.REGISTRY_URL }}
-    - name: Build Web Image
+
+    - name: Build and Push Web Image
+      if: steps.changes.outputs.WEB == 'true'
       run: |
         docker build web -t ${{ vars.REGISTRY_URL }}/web:${{ github.sha }}
         docker push ${{ vars.REGISTRY_URL }}/web:${{ github.sha }}
-    - name: Build API Image
+    - name: Build and Push API Image
+      if: steps.changes.outputs.API == 'true'
       run: |
         docker build api -t ${{ vars.REGISTRY_URL }}/api:${{ github.sha }}
         docker push ${{ vars.REGISTRY_URL }}/api:${{ github.sha }}
-    - name: Deploy to Azure Container Apps
-      uses: Azure/webapps-deploy@v3.0.7
-      with:
-        app-name: ${{ vars.CONTAINER_APP_NAME }}
-        images: |
-          ${{ vars.REGISTRY_URL }}/web:${{ github.sha }}
-          ${{ vars.REGISTRY_URL }}/api:${{ github.sha }}
-        configuration-file: docker-compose.yml
-        
+
+    - name: Deploy to Web Container App
+      if: steps.changes.outputs.WEB == 'true'
+      run: |
+        az containerapp update \
+          --name ${{ vars.WEB_APP_NAME }} \
+          --resource-group ${{ vars.RESOURCE_GROUP }} \
+          --container-name web \
+          --image ${{ vars.REGISTRY_URL }}/web:${{ github.sha }}\
+          > /dev/null
+    - name: Deploy to API Container App
+      if: steps.changes.outputs.API == 'true'
+      run: |
+        az containerapp update \
+          --name ${{ vars.API_APP_NAME }} \
+          --resource-group ${{ vars.RESOURCE_GROUP }} \
+          --container-name api \
+          --image ${{ vars.REGISTRY_URL }}/api:${{ github.sha }} \
+          > /dev/null
+
