@@ -9,14 +9,12 @@ import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
 import { cn, onChangeAsync } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
-import { useFetcher } from "react-router";
+import { useEffect, useState, useMemo } from "react";
+import { useFetcher, type HTMLFormMethod } from "react-router";
 import { Spinner } from "@/components/ui/spinner";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useStore } from "@tanstack/react-form";
 
 const client = createClient<paths>({ baseUrl: import.meta.env.VITE_API_URL });
-
-export async function action({ request }: { request: Request }) {}
 
 const baseSchema = z.object({
     id: z.coerce.number<number>().min(1).optional(),
@@ -44,6 +42,27 @@ const schema = z.discriminatedUnion("type", [
     productSchema.extend({ type: z.literal("Product") }),
     categorySchema.extend({ type: z.literal("Category") }),
 ]);
+
+export async function action({ request }: { request: Request }) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    const data: z.infer<typeof schema> = await request.json();
+
+    if (data.type === "Product" && request.method === "POST") return await client.POST("/products/", { body: data });
+    else if (data.type === "Product" && request.method === "PUT")
+        return await client.PUT(`/products/{product_id}`, { params: { path: { product_id: data.id! } }, body: data });
+    else if (data.type === "Product" && request.method === "DELETE")
+        return await client.DELETE(`/products/{product_id}`, { params: { path: { product_id: data.id! } } });
+    else if (data.type === "Category" && request.method === "POST")
+        return await client.POST("/categories/", { body: data });
+    else if (data.type === "Category" && request.method === "PUT")
+        return await client.PUT(`/categories/{category_id}`, {
+            params: { path: { category_id: data.id! } },
+            body: data,
+        });
+    else if (data.type === "Category" && request.method === "DELETE")
+        return await client.DELETE(`/categories/{category_id}`, { params: { path: { category_id: data.id! } } });
+}
 
 function ConfirmAnim({
     onStart,
@@ -90,14 +109,16 @@ function RowGenerator({
     columns: (keyof Product | keyof Category)[];
     disabled: (keyof Product | keyof Category)[];
 }) {
+    const defaultValues = useMemo(
+        () => (!item.id ? { type } : { ...item, type }) as z.infer<typeof schema>,
+        [item, type],
+    );
     const [bState, setBState] = useState<
         "idle" | "edit" | "save" | "delete" | "create" | "ssubmit" | "dsubmit" | "csubmit"
     >("idle");
-    const productFetcher = useFetcher<Product>();
-    const categoryFetcher = useFetcher<Category>();
-    const fetcher = type === "Product" ? productFetcher : categoryFetcher;
+    const fetcher = useFetcher<z.infer<typeof schema>>();
     const form = useAppForm({
-        defaultValues: (!item.id ? { type } : { ...item, type }) as z.infer<typeof schema>,
+        defaultValues,
         validators: {
             onChangeAsync: onChangeAsync(schema),
             onChangeAsyncDebounceMs: 300,
@@ -108,61 +129,68 @@ function RowGenerator({
                 return errors;
             },
         },
-        onSubmit: async (values) => {
-            console.log(values);
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-            console.log("Submitted values:", values);
-            setBState("idle");
+        onSubmit: async ({ value }) => {
+            console.log(value);
+            const methodMap: Partial<Record<typeof bState, HTMLFormMethod>> = {
+                csubmit: "post",
+                ssubmit: "put",
+                dsubmit: "delete",
+            };
+            const method = methodMap[bState];
+            await fetcher.submit(value, { method, encType: "application/json" });
         },
     });
+    const isSubmitted = useStore(form.store, (state) => state.isSubmitted);
+
+    useEffect(() => {
+        if (isSubmitted && bState.includes("submit")) {
+            setBState("idle");
+            form.reset(defaultValues);
+        }
+    }, [bState, defaultValues, form, isSubmitted]);
+
     return (
         <form.AppForm>
             <form onSubmit={(e) => e.preventDefault()} className={TableRow({}).props.className}>
-                <form.Subscribe selector={(state) => state.canSubmit}>
-                    {(canSubmit) => (
-                        <>
-                            {columns.map((key) => (
-                                <form.AppField name={key as keyof (Product | Category)} key={key}>
-                                    {(field) => (
-                                        <TableCell className="text-center">
-                                            <form.Item>
-                                                <field.Control>
-                                                    <Input
-                                                        type="text"
-                                                        inputMode="numeric"
-                                                        value={field.state.value ?? ""}
-                                                        onChange={(e) => field.handleChange(e.target.value)}
-                                                        onBlur={field.handleBlur}
-                                                        className="text-center disabled:opacity-100! border-primary/50 disabled:border-primary/10"
-                                                        disabled={
-                                                            disabled.includes(key as keyof (Product | Category)) ||
-                                                            (!["edit", "save"].includes(bState) &&
-                                                                item.id !== undefined) ||
-                                                            bState.includes("submit")
-                                                        }
-                                                    />
-                                                </field.Control>
-                                                <field.Message className="text-wrap text-center" />
-                                            </form.Item>
-                                        </TableCell>
-                                    )}
-                                </form.AppField>
-                            ))}
-                            <TableCell className="text-center items-center justify-center">
+                {columns.map((key) => (
+                    <form.AppField name={key as keyof (Product | Category)} key={key}>
+                        {(field) => (
+                            <TableCell className="text-center">
+                                <form.Item>
+                                    <field.Control>
+                                        <Input
+                                            type="text"
+                                            inputMode="numeric"
+                                            value={field.state.value ?? ""}
+                                            onChange={(e) => field.handleChange(e.target.value)}
+                                            onBlur={field.handleBlur}
+                                            className="text-center disabled:opacity-100! border-primary/50 disabled:border-primary/10"
+                                            disabled={
+                                                disabled.includes(key as keyof (Product | Category)) ||
+                                                (!["edit", "save"].includes(bState) && item.id !== undefined) ||
+                                                bState.includes("submit")
+                                            }
+                                        />
+                                    </field.Control>
+                                    <field.Message className="text-wrap text-center" />
+                                </form.Item>
+                            </TableCell>
+                        )}
+                    </form.AppField>
+                ))}
+                <TableCell className="text-center items-center justify-center">
+                    <form.Subscribe selector={(state) => state.canSubmit}>
+                        {(canSubmit) => (
+                            <>
                                 {!item.id ? (
                                     <Button
                                         className="p-2 mx-1 relative overflow-hidden group"
                                         variant="outline"
                                         type="button"
                                         onClick={() => {
-                                            if (fetcher.state === "idle") {
-                                                setBState((prev) => {
-                                                    if (prev === "create" && canSubmit) {
-                                                        form.handleSubmit();
-                                                        return "csubmit";
-                                                    }
-                                                    return prev;
-                                                });
+                                            if (fetcher.state === "idle" && bState === "create" && canSubmit) {
+                                                form.handleSubmit();
+                                                setBState("csubmit");
                                             }
                                         }}
                                         disabled={bState.includes("submit")}
@@ -185,16 +213,11 @@ function RowGenerator({
                                             variant="outline"
                                             type="button"
                                             onClick={() => {
-                                                if (fetcher.state === "idle") {
-                                                    setBState((prev) => {
-                                                        if (prev === "idle") return "edit";
-                                                        if (prev === "save" && canSubmit) {
-                                                            form.handleSubmit();
-                                                            return "ssubmit";
-                                                        }
-                                                        return prev;
-                                                    });
+                                                if (fetcher.state === "idle" && bState === "save" && canSubmit) {
+                                                    form.handleSubmit();
+                                                    setBState("ssubmit");
                                                 }
+                                                setBState((prev) => (prev === "idle" ? "edit" : prev));
                                             }}
                                             disabled={bState.includes("submit")}
                                         >
@@ -232,14 +255,9 @@ function RowGenerator({
                                             variant="outline"
                                             type="button"
                                             onClick={() => {
-                                                if (fetcher.state === "idle") {
-                                                    setBState((prev) => {
-                                                        if (prev === "delete" && canSubmit) {
-                                                            form.handleSubmit();
-                                                            return "dsubmit";
-                                                        }
-                                                        return prev;
-                                                    });
+                                                if (fetcher.state === "idle" && bState === "delete" && canSubmit) {
+                                                    form.handleSubmit();
+                                                    setBState("dsubmit");
                                                 }
                                             }}
                                             disabled={bState.includes("submit")}
@@ -263,10 +281,10 @@ function RowGenerator({
                                         </Button>
                                     </>
                                 )}
-                            </TableCell>
-                        </>
-                    )}
-                </form.Subscribe>
+                            </>
+                        )}
+                    </form.Subscribe>
+                </TableCell>
             </form>
         </form.AppForm>
     );
@@ -307,7 +325,7 @@ function TableGenerator({
             </TableHeader>
             <TableBody>
                 {data.map((item) => (
-                    <RowGenerator type={type} key={item.id} item={item} columns={columns} disabled={disabled} />
+                    <RowGenerator type={type} key={item.id + type} item={item} columns={columns} disabled={disabled} />
                 ))}
                 <RowGenerator
                     type={type}

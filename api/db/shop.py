@@ -1,7 +1,6 @@
-from sqlmodel import JSON, Column, Field, Relationship
-
 from db.base import SQLModel
 from models import BaseModel
+from sqlmodel import JSON, Column, Field, Relationship
 
 
 class CategoryBase(BaseModel):
