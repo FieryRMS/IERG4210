@@ -27,6 +27,8 @@ jobs:
         if git diff --name-only HEAD^ HEAD | grep -q '^api/'; then
           echo "API=true" >> $GITHUB_OUTPUT
         fi
+        echo "WEB=true" >> $GITHUB_OUTPUT
+        echo "API=true" >> $GITHUB_OUTPUT
 
     - name: Azure Login
       uses: Azure/login@v2.3.0
