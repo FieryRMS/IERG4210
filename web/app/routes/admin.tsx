@@ -11,6 +11,8 @@ import { cn, onChangeAsync } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useFetcher } from "react-router";
+import { Spinner } from "@/components/ui/spinner";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const client = createClient<paths>({ baseUrl: import.meta.env.VITE_API_URL });
 
@@ -58,7 +60,7 @@ function ConfirmAnim({
         <>
             <span
                 className={cn(
-                    "absolute left-0 top-0 h-full w-0 bg-red-500 group-active:transition-all duration-1800 group-active:w-full",
+                    "absolute left-0 top-0 h-full w-0 bg-red-500 group-active:transition-all duration-500 group-active:w-full",
                     className,
                 )}
                 aria-hidden="true"
@@ -88,6 +90,9 @@ function RowGenerator({
     columns: (keyof Product | keyof Category)[];
     disabled: (keyof Product | keyof Category)[];
 }) {
+    const [bState, setBState] = useState<
+        "idle" | "edit" | "save" | "delete" | "create" | "ssubmit" | "dsubmit" | "csubmit"
+    >("idle");
     const productFetcher = useFetcher<Product>();
     const categoryFetcher = useFetcher<Category>();
     const fetcher = type === "Product" ? productFetcher : categoryFetcher;
@@ -96,112 +101,172 @@ function RowGenerator({
         validators: {
             onChangeAsync: onChangeAsync(schema),
             onChangeAsyncDebounceMs: 300,
-            onSubmit: schema,
+            onSubmit: ({ formApi }) => {
+                const errors = formApi.parseValuesWithSchema(schema);
+                if (!errors) return errors;
+                setBState((prev) => (prev.includes("submit") ? "idle" : prev));
+                return errors;
+            },
         },
         onSubmit: async (values) => {
             console.log(values);
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            console.log("Submitted values:", values);
+            setBState("idle");
         },
     });
-    const [bState, setBState] = useState<"idle" | "edit" | "save" | "delete">("idle");
-    console.log(bState);
     return (
         <form.AppForm>
             <form onSubmit={(e) => e.preventDefault()} className={TableRow({}).props.className}>
-                {columns.map((key) => (
-                    <form.AppField name={key as keyof (Product | Category)} key={key}>
-                        {(field) => (
-                            <TableCell className="text-center">
-                                <form.Item>
-                                    <field.Control>
-                                        <Input
-                                            type="text"
-                                            inputMode="numeric"
-                                            value={field.state.value ?? ""}
-                                            onChange={(e) => field.handleChange(e.target.value)}
-                                            onBlur={field.handleBlur}
-                                            className="text-center disabled:opacity-100! border-primary/50 disabled:border-primary/10"
-                                            disabled={
-                                                disabled.includes(key as keyof (Product | Category)) ||
-                                                (!["edit", "save"].includes(bState) && item.id !== undefined)
-                                            }
-                                        />
-                                    </field.Control>
-                                    <field.Message />
-                                </form.Item>
-                            </TableCell>
-                        )}
-                    </form.AppField>
-                ))}
-                <TableCell className="text-center items-center justify-center flex">
-                    {!item.id ? (
-                        <Button className="p-2 mx-1" variant="outline" type="submit">
-                            <Plus className="w-7" />
-                        </Button>
-                    ) : (
+                <form.Subscribe selector={(state) => state.canSubmit}>
+                    {(canSubmit) => (
                         <>
-                            <Button
-                                className="p-2 mx-1 relative overflow-hidden group"
-                                variant="outline"
-                                type="button"
-                                onClick={() => {
-                                    if (fetcher.state === "idle") {
-                                        if (bState === "save") {
-                                            form.handleSubmit();
-                                        }
-                                        setBState((prev) => {
-                                            if (prev === "idle") return "edit";
-                                            if (prev === "save") return "idle";
-                                            return prev;
-                                        });
-                                    }
-                                }}
-                            >
-                                {["edit", "save"].includes(bState) && (
-                                    <ConfirmAnim
-                                        className="bg-blue-500"
-                                        onConfirm={() => setBState((prev) => (prev === "edit" ? "save" : prev))}
-                                        onStart={() => setBState((prev) => (prev === "save" ? "edit" : prev))}
-                                    />
-                                )}
-                                <Pencil
-                                    className={
-                                        "transition-all " +
-                                        (!["edit", "save"].includes(bState)
-                                            ? "scale-100 rotate-0"
-                                            : "scale-0 -rotate-90")
-                                    }
-                                />
-                                <Check
-                                    className={
-                                        "transition-all absolute " +
-                                        (["edit", "save"].includes(bState) ? "scale-100 rotate-0" : "scale-0 rotate-90")
-                                    }
-                                />
-                            </Button>
-                            <Button
-                                className="p-2 mx-1 relative overflow-hidden group"
-                                variant="outline"
-                                type="button"
-                                onClick={() => {
-                                    if (fetcher.state === "idle" && bState === "delete") {
-                                        form.handleSubmit();
-                                    }
-                                }}
-                            >
-                                {["idle", "delete"].includes(bState) && (
-                                    <ConfirmAnim
-                                        className="bg-red-500"
-                                        onConfirm={() => {
-                                            setBState((prev) => (prev === "idle" ? "delete" : prev));
+                            {columns.map((key) => (
+                                <form.AppField name={key as keyof (Product | Category)} key={key}>
+                                    {(field) => (
+                                        <TableCell className="text-center">
+                                            <form.Item>
+                                                <field.Control>
+                                                    <Input
+                                                        type="text"
+                                                        inputMode="numeric"
+                                                        value={field.state.value ?? ""}
+                                                        onChange={(e) => field.handleChange(e.target.value)}
+                                                        onBlur={field.handleBlur}
+                                                        className="text-center disabled:opacity-100! border-primary/50 disabled:border-primary/10"
+                                                        disabled={
+                                                            disabled.includes(key as keyof (Product | Category)) ||
+                                                            (!["edit", "save"].includes(bState) &&
+                                                                item.id !== undefined) ||
+                                                            bState.includes("submit")
+                                                        }
+                                                    />
+                                                </field.Control>
+                                                <field.Message className="text-wrap text-center" />
+                                            </form.Item>
+                                        </TableCell>
+                                    )}
+                                </form.AppField>
+                            ))}
+                            <TableCell className="text-center items-center justify-center">
+                                {!item.id ? (
+                                    <Button
+                                        className="p-2 mx-1 relative overflow-hidden group"
+                                        variant="outline"
+                                        type="button"
+                                        onClick={() => {
+                                            if (fetcher.state === "idle") {
+                                                setBState((prev) => {
+                                                    if (prev === "create" && canSubmit) {
+                                                        form.handleSubmit();
+                                                        return "csubmit";
+                                                    }
+                                                    return prev;
+                                                });
+                                            }
                                         }}
-                                        onStart={() => setBState((prev) => (prev === "delete" ? "idle" : prev))}
-                                    />
+                                        disabled={bState.includes("submit")}
+                                    >
+                                        {["idle", "create"].includes(bState) && (
+                                            <ConfirmAnim
+                                                className="bg-green-700 duration-500"
+                                                onConfirm={() => {
+                                                    setBState((prev) => (prev === "idle" ? "create" : prev));
+                                                }}
+                                                onStart={() => setBState((prev) => (prev === "create" ? "idle" : prev))}
+                                            />
+                                        )}
+                                        {bState === "csubmit" ? <Spinner /> : <Plus className="w-7 relative z-10" />}
+                                    </Button>
+                                ) : (
+                                    <>
+                                        <Button
+                                            className="p-2 mx-1 relative overflow-hidden group"
+                                            variant="outline"
+                                            type="button"
+                                            onClick={() => {
+                                                if (fetcher.state === "idle") {
+                                                    setBState((prev) => {
+                                                        if (prev === "idle") return "edit";
+                                                        if (prev === "save" && canSubmit) {
+                                                            form.handleSubmit();
+                                                            return "ssubmit";
+                                                        }
+                                                        return prev;
+                                                    });
+                                                }
+                                            }}
+                                            disabled={bState.includes("submit")}
+                                        >
+                                            {["edit", "save"].includes(bState) && (
+                                                <ConfirmAnim
+                                                    className="bg-blue-500"
+                                                    onConfirm={() =>
+                                                        setBState((prev) => (prev === "edit" ? "save" : prev))
+                                                    }
+                                                    onStart={() =>
+                                                        setBState((prev) => (prev === "save" ? "edit" : prev))
+                                                    }
+                                                />
+                                            )}
+                                            <Pencil
+                                                className={
+                                                    "transition-all " +
+                                                    (!["edit", "save", "ssubmit"].includes(bState)
+                                                        ? "scale-100 rotate-0"
+                                                        : "scale-0 -rotate-90")
+                                                }
+                                            />
+                                            <Check
+                                                className={
+                                                    "transition-all absolute " +
+                                                    (["edit", "save"].includes(bState)
+                                                        ? "scale-100 rotate-0"
+                                                        : "scale-0 rotate-90")
+                                                }
+                                            />
+                                            {bState === "ssubmit" && <Spinner className="absolute inset-0 m-auto" />}
+                                        </Button>
+                                        <Button
+                                            className="p-2 mx-1 relative overflow-hidden group"
+                                            variant="outline"
+                                            type="button"
+                                            onClick={() => {
+                                                if (fetcher.state === "idle") {
+                                                    setBState((prev) => {
+                                                        if (prev === "delete" && canSubmit) {
+                                                            form.handleSubmit();
+                                                            return "dsubmit";
+                                                        }
+                                                        return prev;
+                                                    });
+                                                }
+                                            }}
+                                            disabled={bState.includes("submit")}
+                                        >
+                                            {["idle", "delete"].includes(bState) && (
+                                                <ConfirmAnim
+                                                    className="bg-red-500"
+                                                    onConfirm={() => {
+                                                        setBState((prev) => (prev === "idle" ? "delete" : prev));
+                                                    }}
+                                                    onStart={() =>
+                                                        setBState((prev) => (prev === "delete" ? "idle" : prev))
+                                                    }
+                                                />
+                                            )}
+                                            {bState === "dsubmit" ? (
+                                                <Spinner />
+                                            ) : (
+                                                <Trash className="w-7 relative z-10" />
+                                            )}
+                                        </Button>
+                                    </>
                                 )}
-                                <Trash className="w-7 relative z-10" />
-                            </Button>
+                            </TableCell>
                         </>
                     )}
-                </TableCell>
+                </form.Subscribe>
             </form>
         </form.AppForm>
     );
