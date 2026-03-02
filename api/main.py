@@ -5,20 +5,19 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import dotenv
-from fastapi import FastAPI, Request, Response
-from fastapi.routing import APIRoute
-from sqlalchemy import create_engine
-from sqlmodel import Session, SQLModel
-
 import routes
 import routes.categories
+from fastapi import FastAPI, Request, Response
+from fastapi.routing import APIRoute
 from models.app import State
+from sqlalchemy import create_engine
+from sqlmodel import Session, SQLModel
 
 dotenv.load_dotenv()  # Load environment variables from .env file
 
 from db import *
 
-DEBUG = os.getenv("MODE", "prod") == "dev"
+DEBUG = os.getenv("API_MODE", "prod") == "dev"
 
 logging.basicConfig(
     format="[%(asctime)s][%(levelname)s][%(name)s] %(message)s",

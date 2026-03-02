@@ -7,7 +7,6 @@ import { Category } from "@/components/category";
 import createClient from "openapi-fetch";
 import type { paths } from "@/lib/api";
 
-const client = createClient<paths>({ baseUrl: import.meta.env.VITE_API_URL });
 export function meta({ matches }: Route.MetaArgs) {
     const breadcrumbs = (matches as UIMatch<unknown, PageHandle>[])
         .filter((match) => match.handle && match.handle.breadcrumb)
@@ -20,6 +19,7 @@ export function meta({ matches }: Route.MetaArgs) {
 }
 
 export async function loader({ params }: Route.LoaderArgs) {
+    const client = createClient<paths>({ baseUrl: process.env.API_URL });
     if (Number.isInteger(parseInt(params.categoryId))) {
         const { data, error } = await client.GET(`/products/category/{category_id}`, {
             params: {

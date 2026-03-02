@@ -5,7 +5,7 @@ description = "API for IERG4210 project"
 requires-python = ">=3.14"
 dependencies = [
     "fastapi[standard-no-fastapi-cloud-cli]>=0.134.0",
-    "psycopg2>=2.9.11",
+    "psycopg2-binary>=2.9.11",
     "pydantic>=2.12.5",
     "sqlalchemy>=2.0.47",
     "sqlmodel>=0.0.37",

@@ -14,7 +14,6 @@ import { useFetcher, type HTMLFormMethod } from "react-router";
 import { Spinner } from "@/components/ui/spinner";
 import { useStore } from "@tanstack/react-form";
 
-const client = createClient<paths>({ baseUrl: import.meta.env.VITE_API_URL });
 
 const baseSchema = z.object({
     id: z.coerce.number<number>().min(1).optional(),
@@ -44,6 +43,7 @@ const schema = z.discriminatedUnion("type", [
 ]);
 
 export async function action({ request }: { request: Request }) {
+    const client = createClient<paths>({ baseUrl: process.env.API_URL });
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     const data: z.infer<typeof schema> = await request.json();
@@ -338,6 +338,7 @@ function TableGenerator({ data, type }: { data: Product[] | Category[]; type: "P
 }
 
 export async function loader() {
+    const client = createClient<paths>({ baseUrl: process.env.API_URL });
     const { data: products, error: perror } = await client.GET("/products/");
     const { data: categories, error: cerror } = await client.GET("/categories/");
     if (perror || cerror) {

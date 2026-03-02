@@ -20,9 +20,8 @@ import { Img } from "@/components/img-wrapper";
 import type { paths } from "@/lib/api";
 import createClient from "openapi-fetch";
 
-const client = createClient<paths>({ baseUrl: import.meta.env.VITE_API_URL });
-
 export async function loader({ params }: Route.LoaderArgs) {
+    const client = createClient<paths>({ baseUrl: process.env.API_URL });
     if (Number.isInteger(parseInt(params.productId))) {
         const { data, error } = await client.GET(`/products/{product_id}`, {
             params: {
