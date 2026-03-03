@@ -45,7 +45,8 @@ import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } f
 import { cn } from "@/lib/utils";
 import { Img } from "@/components/img-wrapper";
 
-export function Navbar({ categories }: { categories: Category[] }) {
+export function Navbar({ categories }: { categories: Category[]; }) {
+    // temp
     const { theme, toggleTheme } = useTheme();
     const location: Location<LocationState> = useLocation();
     let breadcrumbs = (useMatches() as UIMatch<unknown, PageHandle>[])
