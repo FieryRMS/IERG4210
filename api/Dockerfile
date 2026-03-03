@@ -1,7 +1,7 @@
-FROM ghcr.io/astral-sh/uv:latest AS UV
+FROM ghcr.io/astral-sh/uv:latest AS uv
 
 FROM node:20-alpine AS base
-COPY --from=UV /uv /uvx /bin/
+COPY --from=uv /uv /uvx /bin/
 
 FROM base AS env
 WORKDIR /app
