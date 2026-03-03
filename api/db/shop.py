@@ -26,7 +26,7 @@ class ProductBase(BaseModel):
     name: str
     price: float
     description: str | None = None
-    images: list[str] | None = Field(default=None, sa_column=Column(JSON))
+    images: list[str] = Field(default=[], sa_column=Column(JSON))
 
 
 class ProductUpdate(BaseModel):

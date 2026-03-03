@@ -42,24 +42,23 @@ const baseSchema = z.object({
 const productSchema = baseSchema.extend({
     price: z.coerce.number<number>().min(0.01),
     catid: z.coerce.number<number>().min(1),
-    images: z.array(z.string()).nullable(),
+    images: z.array(z.string()),
+    type: z.literal("Product"),
 });
 
-const categorySchema = baseSchema.extend({});
+const categorySchema = baseSchema.extend({ type: z.literal("Category") });
 
-const schema = z.discriminatedUnion("type", [
-    productSchema.extend({ type: z.literal("Product") }),
-    categorySchema.extend({ type: z.literal("Category") }),
-]);
+type TableType = Product | Category;
+type TableTypeNames = "Product" | "Category";
 
 export async function action({ request }: { request: Request }) {
     const client = createClient<paths>({ baseUrl: process.env.API_URL });
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    const data: z.infer<typeof schema> = await request.json();
+    const data: TableType & { type: TableTypeNames } = await request.json();
 
     if (data.type === "Product" && request.method === "POST")
-        return (await client.POST("/products/", { body: data })).data;
+        return (await client.POST("/products/", { body: data as Product })).data;
     else if (data.type === "Product" && request.method === "PUT")
         return (await client.PUT(`/products/{product_id}`, { params: { path: { product_id: data.id! } }, body: data }))
             .data;
@@ -111,19 +110,21 @@ function ConfirmAnim({
         </>
     );
 }
-
+type TRowData = { id?: number } & Record<string | number, string | number | null | Array<string | number | boolean>>;
 function RowGenerator({
     type,
     data,
     columns,
     disabled,
+    schema,
 }: {
-    type: "Product" | "Category";
-    data: Product | Category;
-    columns: (keyof Product | keyof Category)[];
-    disabled: (keyof Product | keyof Category)[];
+    type: TableTypeNames;
+    data: TRowData;
+    columns: (keyof TRowData)[];
+    disabled: (keyof TRowData)[];
+    schema: z.ZodType<TRowData & { type: TableTypeNames }, TRowData & { type: TableTypeNames }>;
 }) {
-    const [row, setRow] = useState(data);
+    const [row, setRow] = useState<TRowData>(data);
     useEffect(() => {
         setRow(data);
     }, [data]);
@@ -131,7 +132,7 @@ function RowGenerator({
     const [bState, setBState] = useState<
         "idle" | "edit" | "save" | "delete" | "create" | "ssubmit" | "dsubmit" | "csubmit"
     >("idle");
-    const fetcher = useFetcher<z.infer<typeof schema>>();
+    const fetcher = useFetcher<TRowData>();
     const form = useAppForm({
         defaultValues,
         validators: {
@@ -161,7 +162,7 @@ function RowGenerator({
         if (isSubmitted && bState.includes("submit") && fetcher.state === "idle") {
             setBState("idle");
             form.reset(defaultValues);
-            setRow(fetcher.data ?? row);
+            setRow((fetcher.data as TRowData) ?? row);
         }
     }, [bState, defaultValues, fetcher.data, fetcher.state, form, isSubmitted, row]);
     return (
@@ -173,7 +174,7 @@ function RowGenerator({
                             {(field) => (
                                 <form.Item>
                                     <field.Control>
-                                        {field.name != "images" ? (
+                                        {!Array.isArray(field.state.value) ? (
                                             <Input
                                                 type="text"
                                                 inputMode="numeric"
@@ -182,7 +183,7 @@ function RowGenerator({
                                                 onBlur={field.handleBlur}
                                                 className="text-center disabled:opacity-100! border-primary/50 disabled:border-primary/10"
                                                 disabled={
-                                                    disabled.includes(col as keyof (Product | Category)) ||
+                                                    disabled.includes(col as keyof TableType) ||
                                                     (!["edit", "save"].includes(bState) && row.id !== undefined) ||
                                                     bState.includes("submit")
                                                 }
@@ -378,15 +379,19 @@ function RowGenerator({
     );
 }
 
-function TableGenerator({ data, type }: { data: Product[] | Category[]; type: "Product" | "Category" }) {
-    type Row = Product | Category;
-    const fixed: (keyof Row)[] = ["id", "name", "description", "created_at", "updated_at"];
-    const columns: (keyof Row)[] = [
-        ...["id", "name", "description"],
-        ...(Object.keys(data[0] || {}) as (keyof Row)[]).filter((col) => ![...fixed].includes(col)),
-        ...["created_at", "updated_at"],
-    ] as (keyof Row)[];
-    const disabled: (keyof Row)[] = ["id", "created_at", "updated_at"];
+function TableGenerator({
+    data,
+    type,
+    schema,
+    columns,
+    disabled,
+}: {
+    data: TRowData[];
+    type: TableTypeNames;
+    schema: z.ZodType<TRowData & { type: TableTypeNames }, TRowData & { type: TableTypeNames }>;
+    columns: (keyof TRowData)[];
+    disabled: (keyof TableType)[];
+}) {
     return (
         <Table className="px-10">
             <TableCaption className="text-center">{type} CRUD table</TableCaption>
@@ -402,7 +407,14 @@ function TableGenerator({ data, type }: { data: Product[] | Category[]; type: "P
             </TableHeader>
             <TableBody>
                 {data.map((item) => (
-                    <RowGenerator type={type} key={item.id} data={item} columns={columns} disabled={disabled} />
+                    <RowGenerator
+                        type={type}
+                        key={item.id}
+                        data={item}
+                        columns={columns}
+                        disabled={disabled}
+                        schema={schema}
+                    />
                 ))}
                 <RowGenerator
                     type={type}
@@ -414,6 +426,7 @@ function TableGenerator({ data, type }: { data: Product[] | Category[]; type: "P
                     }}
                     columns={columns}
                     disabled={disabled}
+                    schema={schema}
                 />
             </TableBody>
         </Table>
@@ -431,17 +444,45 @@ export async function loader() {
 }
 
 export default function Admin({ loaderData }: Route.ComponentProps) {
+    const fixed: (keyof TableType)[] = ["id", "name", "description", "created_at", "updated_at"];
+    const Pcolumns: (keyof TableType)[] = [
+        ...["id", "name", "description"],
+        ...(Object.keys(loaderData.products[0] || {}) as (keyof TableType)[]).filter(
+            (col) => ![...fixed].includes(col),
+        ),
+        ...["created_at", "updated_at"],
+    ] as (keyof TableType)[];
+    const Ccolumns: (keyof TableType)[] = [
+        ...["id", "name", "description"],
+        ...(Object.keys(loaderData.categories[0] || {}) as (keyof TableType)[]).filter(
+            (col) => ![...fixed].includes(col),
+        ),
+        ...["created_at", "updated_at"],
+    ] as (keyof TableType)[];
+    const disabled: (keyof TableType)[] = ["id", "created_at", "updated_at"];
     return (
         <div className="p-4">
             <h1 className="text-2xl font-bold mb-4">Admin Dashboard</h1>
             <div className="flex flex-col">
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2">Products</h2>
-                    <TableGenerator data={loaderData.products} type="Product" />
+                    <TableGenerator
+                        data={loaderData.products}
+                        type="Product"
+                        schema={productSchema}
+                        columns={Pcolumns}
+                        disabled={disabled}
+                    />
                 </div>
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2">Categories</h2>
-                    <TableGenerator data={loaderData.categories} type="Category" />
+                    <TableGenerator
+                        data={loaderData.categories}
+                        type="Category"
+                        schema={categorySchema}
+                        columns={Ccolumns}
+                        disabled={disabled}
+                    />
                 </div>
             </div>
         </div>
