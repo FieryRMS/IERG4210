@@ -14,7 +14,6 @@ import { useFetcher, type HTMLFormMethod } from "react-router";
 import { Spinner } from "@/components/ui/spinner";
 import { useStore } from "@tanstack/react-form";
 
-
 const baseSchema = z.object({
     id: z.coerce.number<number>().min(1).optional(),
     name: z.string(),
@@ -157,31 +156,42 @@ function RowGenerator({
     return (
         <form.AppForm>
             <form onSubmit={(e) => e.preventDefault()} className={TableRow({}).props.className}>
-                {columns.map((key) => (
-                    <form.AppField name={key as keyof (Product | Category)} key={key}>
-                        {(field) => (
-                            <TableCell className="text-center">
+                {columns.map((col) => (
+                    <TableCell className="text-center" key={col}>
+                        <form.AppField name={col as keyof (Product | Category)}>
+                            {(field) => (
                                 <form.Item>
                                     <field.Control>
-                                        <Input
-                                            type="text"
-                                            inputMode="numeric"
-                                            value={field.state.value ?? ""}
-                                            onChange={(e) => field.handleChange(e.target.value)}
-                                            onBlur={field.handleBlur}
-                                            className="text-center disabled:opacity-100! border-primary/50 disabled:border-primary/10"
-                                            disabled={
-                                                disabled.includes(key as keyof (Product | Category)) ||
-                                                (!["edit", "save"].includes(bState) && row.id !== undefined) ||
-                                                bState.includes("submit")
-                                            }
-                                        />
+                                        {!Array.isArray(row[col as keyof typeof row]) ? (
+                                            <Input
+                                                type="text"
+                                                inputMode="numeric"
+                                                value={field.state.value ?? ""}
+                                                onChange={(e) => field.handleChange(e.target.value)}
+                                                onBlur={field.handleBlur}
+                                                className="text-center disabled:opacity-100! border-primary/50 disabled:border-primary/10"
+                                                disabled={
+                                                    disabled.includes(col as keyof (Product | Category)) ||
+                                                    (!["edit", "save"].includes(bState) && row.id !== undefined) ||
+                                                    bState.includes("submit")
+                                                }
+                                            />
+                                        ) : (
+                                            <Input
+                                                type="file"
+                                                disabled={
+                                                    disabled.includes(col as keyof (Product | Category)) ||
+                                                    (!["edit", "save"].includes(bState) && row.id !== undefined) ||
+                                                    bState.includes("submit")
+                                                }
+                                            />
+                                        )}
                                     </field.Control>
                                     <field.Message className="text-wrap text-center" />
                                 </form.Item>
-                            </TableCell>
-                        )}
-                    </form.AppField>
+                            )}
+                        </form.AppField>
+                    </TableCell>
                 ))}
                 <TableCell className="text-center items-center justify-center">
                     <form.Subscribe selector={(state) => state.canSubmit}>
@@ -300,7 +310,7 @@ function TableGenerator({ data, type }: { data: Product[] | Category[]; type: "P
     const fixed: (keyof Row)[] = ["id", "name", "description", "created_at", "updated_at"];
     const columns: (keyof Row)[] = [
         ...["id", "name", "description"],
-        ...(Object.keys(data[0] || {}) as (keyof Row)[]).filter((col) => !["images", ...fixed].includes(col)),
+        ...(Object.keys(data[0] || {}) as (keyof Row)[]).filter((col) => ![...fixed].includes(col)),
         ...["created_at", "updated_at"],
     ] as (keyof Row)[];
     const disabled: (keyof Row)[] = ["id", "created_at", "updated_at"];
@@ -319,7 +329,7 @@ function TableGenerator({ data, type }: { data: Product[] | Category[]; type: "P
             </TableHeader>
             <TableBody>
                 {data.map((item) => (
-                    <RowGenerator type={type} key={item.id + type} data={item} columns={columns} disabled={disabled} />
+                    <RowGenerator type={type} key={item.id} data={item} columns={columns} disabled={disabled} />
                 ))}
                 <RowGenerator
                     type={type}
