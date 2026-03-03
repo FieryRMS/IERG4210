@@ -149,12 +149,12 @@ export function Navbar({ categories }: { categories: Category[] }) {
                             <div className="relative flex items-center">
                                 <ShoppingCart />
                                 <Badge className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 h-5 min-w-5 p-0 px-0.5 rounded-full empty:h-2.5 empty:min-w-2.5">
-                                    {cart.size}
+                                    {Object.keys(cart).length}
                                 </Badge>
                             </div>
                             <span className="text-xs font-medium text-muted-foreground mt-1">
                                 $
-                                {[...cart.values()]
+                                {Object.values(cart)
                                     .reduce((total, item) => total + item.p.price * item.q, 0)
                                     .toFixed(2)}
                             </span>
@@ -163,7 +163,7 @@ export function Navbar({ categories }: { categories: Category[] }) {
                     <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
                         <div className="flex w-full flex-col gap-6">
                             <ItemGroup className="gap-2">
-                                {[...cart.values()].map(({ p, q }) => (
+                                {Object.values(cart).map(({ p, q }) => (
                                     <Item key={p.id} variant="outline" role="listitem">
                                         <ItemMedia variant="image">
                                             <Img
@@ -216,7 +216,7 @@ export function Navbar({ categories }: { categories: Category[] }) {
                                         </ItemContent>
                                     </Item>
                                 ))}
-                                {cart.size === 0 && (
+                                {Object.keys(cart).length === 0 && (
                                     <Item
                                         variant="outline"
                                         className="text-center flex justify-center items-center text-muted-foreground"

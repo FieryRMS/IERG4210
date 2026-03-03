@@ -1,47 +1,76 @@
 "use client";
 import type { Product } from "@/types";
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
 type CartProviderState = {
-    cart: Map<string, { p: Product; q: number }>;
+    cart: Record<number | string, { p: Product; q: number }>;
     addQuantity: (product: Product, quantity?: number) => void;
     removeQuantity: (product: Product, quantity?: number) => void;
     setQuantity: (product: Product, quantity: number) => void;
 };
 
 const CartProviderContext = createContext<CartProviderState>({
-    cart: new Map(),
+    cart: {},
     addQuantity: () => null,
     removeQuantity: () => null,
     setQuantity: () => null,
 });
 
+function saveCartToLocalStorage(cart: CartProviderState["cart"]) {
+    localStorage.setItem("cart", JSON.stringify(cart));
+}
+
+function loadCartFromLocalStorage(): CartProviderState["cart"] {
+    const cartData = localStorage.getItem("cart");
+    if (cartData) {
+        try {
+            const parsedCart = JSON.parse(cartData);
+            return parsedCart;
+        } catch {
+            //
+        }
+    }
+    return {};
+}
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
-    const [cart, setCart] = useState<CartProviderState["cart"]>(new Map());
+    const [cart, setCart] = useState<CartProviderState["cart"]>({});
+
+    useEffect(() => {
+        const storedCart = loadCartFromLocalStorage();
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setCart(storedCart);
+    }, []);
+
+    useEffect(() => {
+        saveCartToLocalStorage(cart);
+    }, [cart]);
 
     const value: CartProviderState = {
         cart,
         addQuantity: (product: Product, quantity: number = 1) => {
             setCart((prevCart) => {
-                const newCart = new Map(prevCart);
-                const existingItem = newCart.get(product.id);
+                if (product.id === undefined) return prevCart;
+                const newCart = { ...prevCart };
+                const existingItem = newCart[product.id];
                 if (existingItem) {
-                    newCart.set(product.id, { p: existingItem.p, q: existingItem.q + quantity });
+                    newCart[product.id] = { p: existingItem.p, q: existingItem.q + quantity };
                 } else {
-                    newCart.set(product.id, { p: product, q: quantity });
+                    newCart[product.id] = { p: product, q: quantity };
                 }
                 return newCart;
             });
         },
         removeQuantity: (product: Product, quantity: number = 1) => {
             setCart((prevCart) => {
-                const newCart = new Map(prevCart);
-                const existingItem = newCart.get(product.id);
+                if (product.id === undefined) return prevCart;
+                const newCart = { ...prevCart };
+                const existingItem = newCart[product.id];
                 if (existingItem) {
                     if (existingItem.q - quantity <= 0) {
-                        newCart.delete(product.id);
+                        delete newCart[product.id];
                     } else {
-                        newCart.set(product.id, { p: existingItem.p, q: existingItem.q - quantity });
+                        newCart[product.id] = { p: existingItem.p, q: existingItem.q - quantity };
                     }
                 }
                 return newCart;
@@ -49,11 +78,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         },
         setQuantity: (product: Product, quantity: number) => {
             setCart((prevCart) => {
-                const newCart = new Map(prevCart);
+                if (product.id === undefined) return prevCart;
+                const newCart = { ...prevCart };
                 if (quantity <= 0) {
-                    newCart.delete(product.id);
+                    delete newCart[product.id];
                 } else {
-                    newCart.set(product.id, { p: product, q: quantity });
+                    newCart[product.id] = { p: product, q: quantity };
                 }
                 return newCart;
             });

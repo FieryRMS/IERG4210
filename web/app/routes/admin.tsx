@@ -146,7 +146,6 @@ function RowGenerator({
             },
         },
         onSubmit: async ({ value }) => {
-            console.log(value);
             const methodMap: Partial<Record<typeof bState, HTMLFormMethod>> = {
                 csubmit: "post",
                 ssubmit: "put",
