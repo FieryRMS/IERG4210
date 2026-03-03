@@ -45,6 +45,10 @@ class ProductBase(BaseModel):
     description: str | None = None
 
 
+class ProductUpdate(ProductBase):
+    images: list[uuid.UUID] = []
+
+
 class Product(ProductBase, SQLModel, table=True):
     __tablename__ = "products"  # pyright: ignore[reportAssignmentType]
 
@@ -53,7 +57,7 @@ class Product(ProductBase, SQLModel, table=True):
         back_populates="products", link_model=ImageProductLink
     )
 
-    @computed_field
+    @computed_field(alias="images")
     @property
-    def image_ids(self) -> list[uuid.UUID]:
-        return [image.id for image in self.images]
+    def _images(self) -> list[Image]:
+        return self.images
