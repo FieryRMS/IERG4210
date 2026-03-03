@@ -18,7 +18,6 @@ import {
     AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
-    AlertDialogDescription,
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
@@ -110,25 +109,27 @@ function ConfirmAnim({
         </>
     );
 }
-type TRowData = { id?: number } & Record<string | number, string | number | null | Array<string | number | boolean>>;
+type TRowData = Record<string, string | number | null | Array<string | number | boolean>>;
 function RowGenerator({
     type,
     data,
     columns,
     disabled,
     schema,
+    create,
 }: {
     type: TableTypeNames;
     data: TRowData;
     columns: (keyof TRowData)[];
     disabled: (keyof TRowData)[];
     schema: z.ZodType<TRowData & { type: TableTypeNames }, TRowData & { type: TableTypeNames }>;
+    create?: boolean;
 }) {
     const [row, setRow] = useState<TRowData>(data);
     useEffect(() => {
         setRow(data);
     }, [data]);
-    const defaultValues = useMemo(() => (!row.id ? { type } : { ...row, type }) as z.infer<typeof schema>, [row, type]);
+    const defaultValues = useMemo(() => ({ ...row, type }) as z.infer<typeof schema>, [row, type]);
     const [bState, setBState] = useState<
         "idle" | "edit" | "save" | "delete" | "create" | "ssubmit" | "dsubmit" | "csubmit"
     >("idle");
@@ -170,7 +171,7 @@ function RowGenerator({
             <form onSubmit={(e) => e.preventDefault()} className={TableRow({}).props.className}>
                 {columns.map((col) => (
                     <TableCell className="text-center" key={col}>
-                        <form.AppField name={col as keyof Product}>
+                        <form.AppField name={col}>
                             {(field) => (
                                 <form.Item>
                                     <field.Control>
@@ -184,7 +185,7 @@ function RowGenerator({
                                                 className="text-center disabled:opacity-100! border-primary/50 disabled:border-primary/10"
                                                 disabled={
                                                     disabled.includes(col as keyof TableType) ||
-                                                    (!["edit", "save"].includes(bState) && row.id !== undefined) ||
+                                                    (!["edit", "save"].includes(bState) && !create) ||
                                                     bState.includes("submit")
                                                 }
                                             />
@@ -202,11 +203,11 @@ function RowGenerator({
                                                     Edit
                                                 </AlertDialogTrigger>
                                                 <AlertDialogContent>
-                                                    <AlertDialogHeader className="flex flex-col gap-1">
+                                                    <AlertDialogHeader className="flex flex-col gap-1 items-center">
                                                         <AlertDialogTitle>
-                                                            Edit {col} for {row.name}
+                                                            Edit {col} for ID: {create ? "new" : row.id}
                                                         </AlertDialogTitle>
-                                                        <AlertDialogDescription className="flex w-full max-w-md flex-col gap-2">
+                                                        <div className="flex w-full max-w-md flex-col gap-2">
                                                             <ItemGroup className="gap-2" role="list">
                                                                 {(field.state.value as string[])?.map((image) => (
                                                                     <Item
@@ -251,7 +252,7 @@ function RowGenerator({
                                                                     </Item>
                                                                 ))}
                                                             </ItemGroup>
-                                                        </AlertDialogDescription>
+                                                        </div>
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter className="mt-2">
                                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -271,7 +272,7 @@ function RowGenerator({
                     <form.Subscribe selector={(state) => state.canSubmit}>
                         {(canSubmit) => (
                             <>
-                                {!row.id ? (
+                                {create ? (
                                     <Button
                                         className="p-2 mx-1 relative overflow-hidden group"
                                         variant="outline"
@@ -392,6 +393,11 @@ function TableGenerator({
     columns: (keyof TRowData)[];
     disabled: (keyof TableType)[];
 }) {
+    const arrayKeys = useMemo(() => {
+        if (data.length === 0) return [];
+        const sample = data[0]!;
+        return columns.filter((col) => Array.isArray(sample[col]));
+    }, [columns, data]);
     return (
         <Table className="px-10">
             <TableCaption className="text-center">{type} CRUD table</TableCaption>
@@ -406,10 +412,10 @@ function TableGenerator({
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {data.map((item) => (
+                {data.map((item, index) => (
                     <RowGenerator
                         type={type}
-                        key={item.id}
+                        key={index}
                         data={item}
                         columns={columns}
                         disabled={disabled}
@@ -419,14 +425,11 @@ function TableGenerator({
                 <RowGenerator
                     type={type}
                     key="new"
-                    data={{
-                        name: "",
-                        price: 0,
-                        catid: 0,
-                    }}
+                    data={Object.fromEntries(arrayKeys.map((col) => [col, []]))}
                     columns={columns}
                     disabled={disabled}
                     schema={schema}
+                    create
                 />
             </TableBody>
         </Table>
