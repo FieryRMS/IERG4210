@@ -21,10 +21,10 @@ jobs:
     - name: Check changed files
       id: changes
       run: |
-        if git diff HEAD^ HEAD --name-only | grep -q '^web/'; then
+        if git diff HEAD^ HEAD --name-only -- . | grep -q '^web/'; then
           echo "WEB=true" >> $GITHUB_OUTPUT
         fi
-        if git diff HEAD^ HEAD --name-only | grep -q '^api/'; then
+        if git diff HEAD^ HEAD --name-only -- . | grep -q '^api/'; then
           echo "API=true" >> $GITHUB_OUTPUT
         fi
 
