@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request
 from sqlmodel import Session, select
 
-from db import Category, ProductBase, ProductUpdate
+from db import Category, ProductBase
 from db.shop import Product
 from models import NotFoundException
 from models.app import State
@@ -49,7 +49,7 @@ async def new_product(request: Request, product: ProductBase) -> Product:
 
 @router.put("/{product_id}")
 async def update_product(
-    request: Request, product_id: int, product: ProductUpdate
+    request: Request, product_id: int, product: ProductBase
 ) -> Product:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
@@ -71,4 +71,5 @@ async def delete_product(request: Request, product_id: int) -> None:
         if not product:
             raise NotFoundException
         session.delete(product)
+        session.commit()
         session.commit()

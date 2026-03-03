@@ -1,11 +1,4 @@
 # pyright: reportUnusedImport=false
-from .shop import (
-    Category,
-    CategoryBase,
-    CategoryUpdate,
-    Product,
-    ProductBase,
-    ProductUpdate,
-)
+from .shop import Category, CategoryBase, Image, ImageBase, Product, ProductBase
 
-__all__ = ["Category", "Product"]
+__all__ = ["Category", "Product", "Image"]
