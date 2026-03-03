@@ -112,14 +112,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/images/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Images */
+        get: operations["get_images_images__get"];
+        put?: never;
+        /** New Image */
+        post: operations["new_image_images__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/images/{image_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Image */
+        get: operations["get_image_images__image_id__get"];
+        /** Update Image */
+        put: operations["update_image_images__image_id__put"];
+        post?: never;
+        /** Delete Image */
+        delete: operations["delete_image_images__image_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** Category */
         Category: {
-            /** Id */
-            id?: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id?: string;
             /** Created At */
             created_at?: string | null;
             /** Updated At */
@@ -136,13 +176,6 @@ export interface components {
             /** Description */
             description?: string | null;
         };
-        /** CategoryUpdate */
-        CategoryUpdate: {
-            /** Name */
-            name?: string | null;
-            /** Description */
-            description?: string | null;
-        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -153,48 +186,67 @@ export interface components {
             /** Status */
             status: string;
         };
-        /** Product */
-        Product: {
-            /** Id */
-            id?: number;
+        /** Image */
+        Image: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id?: string;
             /** Created At */
             created_at?: string | null;
             /** Updated At */
             updated_at?: string | null;
-            /** Catid */
-            catid: number;
+            /** Alt */
+            alt?: string | null;
+            /** Url */
+            url: string;
+        };
+        /** ImageBase */
+        ImageBase: {
+            /** Alt */
+            alt?: string | null;
+            /** Url */
+            url: string;
+        };
+        /** Product */
+        Product: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id?: string;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /**
+             * Catid
+             * Format: uuid
+             */
+            catid: string;
             /** Name */
             name: string;
             /** Price */
             price: number;
             /** Description */
             description?: string | null;
-            /** Images */
-            images?: string[] | null;
+            /** Image Ids */
+            readonly image_ids: string[];
         };
         /** ProductBase */
         ProductBase: {
-            /** Catid */
-            catid: number;
+            /**
+             * Catid
+             * Format: uuid
+             */
+            catid: string;
             /** Name */
             name: string;
             /** Price */
             price: number;
             /** Description */
             description?: string | null;
-            /** Images */
-            images?: string[] | null;
-        };
-        /** ProductUpdate */
-        ProductUpdate: {
-            /** Name */
-            name?: string | null;
-            /** Price */
-            price?: number | null;
-            /** Description */
-            description?: string | null;
-            /** Images */
-            images?: string[] | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -311,6 +363,13 @@ export interface operations {
                     "application/json": components["schemas"]["Category"];
                 };
             };
+            /** @description Category not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -333,7 +392,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CategoryUpdate"];
+                "application/json": components["schemas"]["CategoryBase"];
             };
         };
         responses: {
@@ -481,7 +540,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ProductUpdate"];
+                "application/json": components["schemas"]["ProductBase"];
             };
         };
         responses: {
@@ -554,6 +613,156 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Product"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_images_images__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Image"][];
+                };
+            };
+        };
+    };
+    new_image_images__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImageBase"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Image"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_image_images__image_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Image"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_image_images__image_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImageBase"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Image"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_image_images__image_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
