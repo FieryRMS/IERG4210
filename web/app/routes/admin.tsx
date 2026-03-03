@@ -2,7 +2,7 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import type { paths } from "@/lib/api";
 import createClient from "openapi-fetch";
 import type { Route } from "./+types/admin";
-import { Check, Pencil, Plus, Trash } from "lucide-react";
+import { Check, Pencil, Plus, Trash, X } from "lucide-react";
 import type { Product, Category } from "@/types";
 import { z } from "zod";
 import { useAppForm } from "@/components/ui/form-tanstack";
@@ -274,7 +274,7 @@ function RowGenerator({
                         </form.AppField>
                     </TableCell>
                 ))}
-                <TableCell className="text-center items-center justify-center">
+                <TableCell className="text-center items-center justify-center w-0">
                     <form.Subscribe selector={(state) => state.canSubmit}>
                         {(canSubmit) => (
                             <>
@@ -304,6 +304,18 @@ function RowGenerator({
                                     </Button>
                                 ) : (
                                     <>
+                                        <Button
+                                            className="p-2 mx-1 relative overflow-hidden group"
+                                            variant="outline"
+                                            type="button"
+                                            disabled={bState == "idle"}
+                                            onClick={() => {
+                                                form.reset();
+                                                setBState("idle");
+                                            }}
+                                        >
+                                            <X className="w-7 relative z-10" />
+                                        </Button>
                                         <Button
                                             className="p-2 mx-1 relative overflow-hidden group"
                                             variant="outline"
