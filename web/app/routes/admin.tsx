@@ -24,6 +24,7 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Img } from "@/components/img-wrapper";
 
 const baseSchema = z.object({
     id: z.coerce.number<number>().min(1).optional(),
@@ -217,7 +218,7 @@ function RowGenerator({
                                                                         className="w-full hover:bg-secondary"
                                                                     >
                                                                         <ItemMedia variant="image">
-                                                                            <img
+                                                                            <Img
                                                                                 src={image}
                                                                                 alt={image}
                                                                                 width={32}
@@ -251,7 +252,23 @@ function RowGenerator({
                                                                         </ItemActions>
                                                                     </Item>
                                                                 ))}
-                                                            </ItemGroup>
+                                                                <Item
+                                                                    variant="outline"
+                                                                    className="w-full hover:bg-secondary items-center justify-center"
+                                                                >
+                                                                    <ItemContent className="flex items-center justify-center">
+                                                                        <ItemTitle className="line-clamp-1">
+                                                                            <Button
+                                                                                className="p-2 mx-1 relative overflow-hidden group"
+                                                                                variant="outline"
+                                                                                type="button"
+                                                                            >
+                                                                                <Plus className="w-7" />
+                                                                            </Button>
+                                                                        </ItemTitle>
+                                                                    </ItemContent>
+                                                                </Item>
+                                                            </ItemGroup>    
                                                         </div>
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter className="mt-2">
