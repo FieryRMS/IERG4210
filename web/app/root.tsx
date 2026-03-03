@@ -56,6 +56,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     const breadcrumbs = (matches as UIMatch<unknown, PageHandle>[])
         .filter((match) => match.handle && match.handle.breadcrumb)
         .map((match) => match.handle.breadcrumb!(match));
+
     const shouldBlock = useCallback<BlockerFunction>(
         ({ currentLocation, nextLocation, historyAction }) => {
             // if pushing new entry
@@ -65,7 +66,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 nextLocation.pathname !== currentLocation.pathname
             ) {
                 // remove root breadcrumb if exists to avoid duplication
-                if (location.state.breadcrumbs?.[0]?.pathname === "/") breadcrumbs.shift();
+                if (location.state?.breadcrumbs?.[0]?.pathname === "/") breadcrumbs.shift();
                 nextLocation.state = {
                     breadcrumbs: [...(location.state?.breadcrumbs || []), ...breadcrumbs],
                     ...nextLocation.state,
@@ -151,5 +152,6 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
 export const handle: PageHandle = {
     breadcrumb: ({ pathname }) => ({
         pathname,
+        name: "Home",
     }),
 };
