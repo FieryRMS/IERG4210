@@ -1,4 +1,4 @@
- # pyright: ignore[reportUnusedImport]
+# pyright: reportUnusedImport=false
 from .shop import (
     Category,
     CategoryBase,

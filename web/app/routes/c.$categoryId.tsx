@@ -1,48 +1,51 @@
-import { PascalCase } from "@/lib/utils";
+import { getClient, PascalCase } from "@/lib/utils";
 import type { PageHandle } from "@/types";
 
 import type { Route } from "./+types/c.$categoryId";
-import { type UIMatch } from "react-router";
 import { Category } from "@/components/category";
-import createClient from "openapi-fetch";
-import type { paths } from "@/lib/api";
 
-export function meta({ matches }: Route.MetaArgs) {
-    const breadcrumbs = (matches as UIMatch<unknown, PageHandle>[])
-        .filter((match) => match.handle && match.handle.breadcrumb)
-        .map((match) => match.handle!.breadcrumb!(match));
-    const name = breadcrumbs.length ? breadcrumbs.at(-1)!.name : null;
+export function meta({ loaderData }: Route.MetaArgs) {
     return [
-        { title: `${name ? `${name} | ` : ""}The Generic Company` },
-        { name: "description", content: "A generic company that sells generic products" },
+        { title: `${loaderData.category?.name ? `${loaderData.category.name}` : "Home"} | The Generic Company` },
+        {
+            name: "description",
+            content: loaderData.category?.description ?? "Generic Product from a Generic Company",
+        },
     ];
 }
 
 export async function loader({ params }: Route.LoaderArgs) {
-    const client = createClient<paths>({ baseUrl: process.env.API_URL });
+    const client = getClient();
     if (Number.isInteger(parseInt(params.categoryId))) {
-        const { data, error } = await client.GET(`/products/category/{category_id}`, {
+        const { data: pdata, error: perror } = await client.GET(`/products/category/{category_id}`, {
             params: {
                 path: {
                     category_id: parseInt(params.categoryId),
                 },
             },
         });
-        if (error) {
+        const { data: cdata, error: cerror } = await client.GET(`/categories/{category_id}`, {
+            params: {
+                path: {
+                    category_id: parseInt(params.categoryId),
+                },
+            },
+        });
+        if (cerror || perror) {
             throw new Response("Not Found", { status: 404 });
         }
-        return data;
+        return { products: pdata, category: cdata };
     } else {
         const { data, error } = await client.GET(`/products/`);
         if (error) {
             throw new Response("Not Found", { status: 404 });
         }
-        return data;
+        return { products: data, category: null };
     }
 }
 
 export default function MainPage({ loaderData }: Route.ComponentProps) {
-    return <Category products={loaderData} />;
+    return <Category products={loaderData.products} />;
 }
 
 export const handle: PageHandle = {

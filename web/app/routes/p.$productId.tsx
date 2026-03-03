@@ -11,14 +11,19 @@ import {
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import type { Route } from "./+types/p.$productId";
 import { ShoppingCartIcon } from "lucide-react";
-import { useFetcher, useLocation, type Location } from "react-router";
-import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { LocationState, PageHandle, Product } from "@/types";
+import type { PageHandle, Product } from "@/types";
 import { useCart } from "@/hooks/cart-provider";
 import { Img } from "@/components/img-wrapper";
 import type { paths } from "@/lib/api";
 import createClient from "openapi-fetch";
+
+export function meta({ loaderData }: Route.MetaArgs) {
+    return [
+        { title: `${loaderData.name} | The Generic Company` },
+        { name: "description", content: loaderData.description ?? "A generic product from a generic company" },
+    ];
+}
 
 export async function loader({ params }: Route.LoaderArgs) {
     const client = createClient<paths>({ baseUrl: process.env.API_URL });
@@ -38,33 +43,18 @@ export async function loader({ params }: Route.LoaderArgs) {
     throw new Response("Not Found", { status: 404 });
 }
 
-export default function ({ params }: Route.ComponentProps) {
-    const productFetcher = useFetcher<Product>();
-    const location: Location<LocationState> = useLocation();
-    const dollars = Math.floor(productFetcher.data?.price || 0);
-    const cents = Math.round(((productFetcher.data?.price || 0) - dollars) * 100)
+export default function ({ params, loaderData }: Route.ComponentProps) {
+    const dollars = Math.floor(loaderData?.price || 0);
+    const cents = Math.round(((loaderData?.price || 0) - dollars) * 100)
         .toString()
         .padStart(2, "0");
     const pid = parseInt(params.productId);
 
-    useEffect(() => {
-        if (location.state?.product?.id === pid) {
-            productFetcher.reset();
-            productFetcher.data = location.state.product;
-        }
-        if (productFetcher.state === "idle" && productFetcher.data?.id !== pid) {
-            productFetcher.submit({}, { method: "post" });
-        }
-        if (productFetcher.data?.id === pid) {
-            location.state = { ...location.state, product: productFetcher.data };
-        }
-    }, [location, pid, productFetcher]);
-
     const { addQuantity: addToCart } = useCart();
 
     const p: Product =
-        productFetcher.data?.id === pid
-            ? productFetcher.data
+        loaderData?.id === pid
+            ? loaderData
             : { id: 0, name: "", images: [""], description: "", price: 0, catid: 0, created_at: "", updated_at: "" };
 
     return (
@@ -140,9 +130,7 @@ export default function ({ params }: Route.ComponentProps) {
 }
 
 export const handle: PageHandle = {
-    breadcrumb: ({ params, id, pathname }) => ({
-        id,
-        name: `Product ${params.productId}`,
+    breadcrumb: ({ pathname }) => ({
         pathname,
     }),
 };

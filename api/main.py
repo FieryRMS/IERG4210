@@ -18,6 +18,7 @@ dotenv.load_dotenv()  # Load environment variables from .env file
 from db import *
 
 DEBUG = os.getenv("API_MODE", "prod") == "dev"
+POSTGRES_URL = os.getenv("POSTGRES_URL")
 
 logging.basicConfig(
     format="[%(asctime)s][%(levelname)s][%(name)s] %(message)s",
@@ -33,10 +34,9 @@ async def lifespan(app: FastAPI):
     app.state.debug = DEBUG
     state: State = app.state  # pyright: ignore[reportAssignmentType]
     state["logger"] = logging.getLogger("IERG4210-API")
-    state["engine"] = create_engine(
-        f"postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}"
-        f"@{os.getenv('POSTGRES_HOST')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DB')}",
-    )
+
+    assert POSTGRES_URL is not None, "POSTGRES_URL environment variable must be set"
+    state["engine"] = create_engine(POSTGRES_URL)
 
     if state["debug"]:
         # so edits to the models will be reflected immediately without needing to restart the server
