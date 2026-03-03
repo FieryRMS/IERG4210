@@ -1,11 +1,9 @@
-import { PascalCase } from "@/lib/utils";
+import { getClient, PascalCase } from "@/lib/utils";
 import type { PageHandle } from "@/types";
 
 import type { Route } from "./+types/c.$categoryId";
 import { type UIMatch } from "react-router";
 import { Category } from "@/components/category";
-import createClient from "openapi-fetch";
-import type { paths } from "@/lib/api";
 
 export function meta({ matches }: Route.MetaArgs) {
     const breadcrumbs = (matches as UIMatch<unknown, PageHandle>[])
@@ -19,7 +17,7 @@ export function meta({ matches }: Route.MetaArgs) {
 }
 
 export async function loader({ params }: Route.LoaderArgs) {
-    const client = createClient<paths>({ baseUrl: process.env.API_URL });
+    const client = getClient();
     if (Number.isInteger(parseInt(params.categoryId))) {
         const { data, error } = await client.GET(`/products/category/{category_id}`, {
             params: {

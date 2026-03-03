@@ -39,13 +39,13 @@ import { Theme, useTheme } from "@/hooks/theme-provider";
 import { LoginForm } from "./login-form";
 import { Badge } from "@/components/ui/badge";
 import { ButtonGroup } from "@/components/ui/button-group";
-import type { LocationState, PageHandle } from "@/types";
+import type { Category, LocationState, PageHandle } from "@/types";
 import { useCart } from "@/hooks/cart-provider";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../ui/item";
 import { cn } from "@/lib/utils";
 import { Img } from "@/components/img-wrapper";
 
-export function Navbar() {
+export function Navbar({ categories }: { categories: Category[] }) {
     const { theme, toggleTheme } = useTheme();
     const location: Location<LocationState> = useLocation();
     let breadcrumbs = (useMatches() as UIMatch<unknown, PageHandle>[])
@@ -54,7 +54,8 @@ export function Navbar() {
 
     const root = breadcrumbs.shift();
     breadcrumbs = [...(location.state?.breadcrumbs || []), ...breadcrumbs];
-    if (!location.state?.breadcrumbs?.length || location.state.breadcrumbs[0]?.id !== "root") breadcrumbs.unshift(root!);
+    if (!location.state?.breadcrumbs?.length || location.state.breadcrumbs[0]?.id !== "root")
+        breadcrumbs.unshift(root!);
 
     const { cart, addQuantity, removeQuantity, setQuantity } = useCart();
 
@@ -76,7 +77,7 @@ export function Navbar() {
                     <NavigationMenuTrigger className="h-full px-2">Shop</NavigationMenuTrigger>
                     <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
                         <ul className="grid gap-3 p-1 md:w-100 md:grid-cols-2 list-none w-full">
-                            <ListItem title="New Arrivals" href="/c/new">
+                            {/* <ListItem title="New Arrivals" href="/c/new">
                                 Fresh drops and the latest products.
                             </ListItem>
                             <ListItem title="Best Sellers" href="/c/best-sellers">
@@ -93,33 +94,14 @@ export function Navbar() {
                             </ListItem>
                             <ListItem title="Collections" href="/c/collections" className="md:hidden">
                                 Curated selections and themed products.
-                            </ListItem>
+                            </ListItem> */}
+                            {categories.map((category) => (
+                                <ListItem key={category.id} title={category.name} href={`/c/${category.id}`}>
+                                    {category.description}
+                                </ListItem>
+                            ))}
                         </ul>
                     </NavigationMenuContent>
-                </NavigationMenuItem>
-
-                <NavigationMenuItem className="hidden lg:block h-full">
-                    <NavigationMenuLink
-                        render={
-                            <Link to="/c/deals" className="text-sm font-medium h-full justify-center" viewTransition>
-                                Deals
-                            </Link>
-                        }
-                    />
-                </NavigationMenuItem>
-
-                <NavigationMenuItem className="hidden lg:block h-full">
-                    <NavigationMenuLink
-                        render={
-                            <Link
-                                to="/c/collections"
-                                className="text-sm font-medium h-full justify-center"
-                                viewTransition
-                            >
-                                Collections
-                            </Link>
-                        }
-                    />
                 </NavigationMenuItem>
             </NavigationMenuList>
 
@@ -131,9 +113,23 @@ export function Navbar() {
             <NavigationMenuList className="flex justify-end items-center h-full">
                 <NavigationMenuItem className=" min-w-fit h-full flex flex-col items-center justify-center">
                     <Button variant="outline" size="icon-lg" onClick={toggleTheme} className="relative">
-                        <Sun className={"transition-all " + (theme == Theme.Light ? "scale-100 rotate-0" : "scale-0 -rotate-90")} />
-                        <Moon className={"transition-all absolute " + (theme == Theme.Dark ? "scale-100 rotate-0" : "scale-0 rotate-90")} />
-                        <Contrast className={"transition-all absolute " + (theme == Theme.System ? "scale-100 rotate-0" : "scale-0 rotate-90")} />
+                        <Sun
+                            className={
+                                "transition-all " + (theme == Theme.Light ? "scale-100 rotate-0" : "scale-0 -rotate-90")
+                            }
+                        />
+                        <Moon
+                            className={
+                                "transition-all absolute " +
+                                (theme == Theme.Dark ? "scale-100 rotate-0" : "scale-0 rotate-90")
+                            }
+                        />
+                        <Contrast
+                            className={
+                                "transition-all absolute " +
+                                (theme == Theme.System ? "scale-100 rotate-0" : "scale-0 rotate-90")
+                            }
+                        />
                         <span className="sr-only">Toggle theme</span>
                     </Button>
                 </NavigationMenuItem>
@@ -289,7 +285,7 @@ export function Navbar() {
     );
 }
 
-function ListItem({ title, children, href, ...props }: React.ComponentPropsWithoutRef<"li"> & { href: string; }) {
+function ListItem({ title, children, href, ...props }: React.ComponentPropsWithoutRef<"li"> & { href: string }) {
     return (
         <li {...props}>
             <NavigationMenuLink
@@ -306,7 +302,7 @@ function ListItem({ title, children, href, ...props }: React.ComponentPropsWitho
     );
 }
 
-function SearchBar({ className }: { className?: string; }) {
+function SearchBar({ className }: { className?: string }) {
     const navigate = useNavigate();
     return (
         <form
@@ -330,7 +326,7 @@ function SearchBar({ className }: { className?: string; }) {
     );
 }
 
-function Logo({ className }: { className?: string; }) {
+function Logo({ className }: { className?: string }) {
     return (
         <NavigationMenuLink
             render={

@@ -1,13 +1,11 @@
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { paths } from "@/lib/api";
-import createClient from "openapi-fetch";
 import type { Route } from "./+types/admin";
 import { Check, Pencil, Plus, Trash, X } from "lucide-react";
 import type { Product, Category } from "@/types";
 import { z } from "zod";
 import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
-import { cn, onChangeAsync } from "@/lib/utils";
+import { cn, getClient, onChangeAsync } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState, useMemo } from "react";
 import { useFetcher, type HTMLFormMethod } from "react-router";
@@ -52,7 +50,7 @@ type TableType = Product | Category;
 type TableTypeNames = "Product" | "Category";
 
 export async function action({ request }: { request: Request }) {
-    const client = createClient<paths>({ baseUrl: process.env.API_URL });
+    const client = getClient();
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     const data: TableType & { type: TableTypeNames } = await request.json();
@@ -268,7 +266,7 @@ function RowGenerator({
                                                                         </ItemTitle>
                                                                     </ItemContent>
                                                                 </Item>
-                                                            </ItemGroup>    
+                                                            </ItemGroup>
                                                         </div>
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter className="mt-2">
@@ -472,7 +470,7 @@ function TableGenerator({
 }
 
 export async function loader() {
-    const client = createClient<paths>({ baseUrl: process.env.API_URL });
+    const client = getClient();
     const { data: products, error: perror } = await client.GET("/products/");
     const { data: categories, error: cerror } = await client.GET("/categories/");
     if (perror || cerror) {

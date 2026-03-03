@@ -1,6 +1,8 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { FormAsyncValidateOrFn, StandardSchemaV1 } from "@tanstack/form-core";
+import type { paths } from "./api";
+import createClient from "openapi-fetch";
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -39,3 +41,8 @@ export const onChangeAsync = <TFormData,>(schema: StandardSchemaV1<TFormData, un
         };
     };
 };
+
+
+export function getClient() {
+    return createClient<paths>({ baseUrl: process.env.API_URL });
+}

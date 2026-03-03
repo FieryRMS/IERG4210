@@ -19,11 +19,12 @@ import type { Route } from "./+types/root";
 import "./app.css";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import type { LocationState, PageHandle } from "./types";
+import type { Category, LocationState, PageHandle } from "./types";
 import { CartProvider } from "./hooks/cart-provider";
 import { useCallback } from "react";
-import { prefsCookie, type Prefs } from "./cookies";
+import { prefsCookie } from "./cookies";
 import { Toaster } from "@/components/ui/sonner";
+import { getClient } from "./lib/utils";
 
 export const links: Route.LinksFunction = () => [
     { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -38,16 +39,23 @@ export const links: Route.LinksFunction = () => [
     },
 ];
 
-export async function loader({ request }: Route.LoaderArgs): Promise<Prefs> {
+type LoaderData = {
+    theme: Theme;
+    categories: Category[];
+};
+
+export async function loader({ request }: Route.LoaderArgs): Promise<LoaderData> {
+    const client = getClient();
     const cookieHeader = request.headers.get("Cookie");
     const prefs = (await prefsCookie.parse(cookieHeader)) || {};
     return {
         theme: prefs.theme || Theme.System,
+        categories: (await client.GET("/categories/")).data || [],
     };
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-    const { theme } = useRouteLoaderData("root") as Prefs;
+    const { theme, categories } = useRouteLoaderData<LoaderData>("root")!;
     const location: Location<LocationState> = useLocation();
     const matches = useMatches();
     const breadcrumbs = (matches as UIMatch<unknown, PageHandle>[])
@@ -97,7 +105,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <CartProvider>
                     <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden grid grid-rows-[auto_1fr_auto]">
                         <header className="sticky top-0 z-50 w-full bg-background pb-2">
-                            <Navbar />
+                            <Navbar categories={categories} />
                         </header>
                         <main className="py-4 w-full h-full">{children}</main>
                         <footer className="w-full py-6">
