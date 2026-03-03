@@ -13,6 +13,18 @@ import { useEffect, useState, useMemo } from "react";
 import { useFetcher, type HTMLFormMethod } from "react-router";
 import { Spinner } from "@/components/ui/spinner";
 import { useStore } from "@tanstack/react-form";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 
 const baseSchema = z.object({
     id: z.coerce.number<number>().min(1).optional(),
@@ -30,11 +42,10 @@ const baseSchema = z.object({
 const productSchema = baseSchema.extend({
     price: z.coerce.number<number>().min(0.01),
     catid: z.coerce.number<number>().min(1),
+    images: z.array(z.string()).nullable(),
 });
 
-const categorySchema = baseSchema.extend({
-    images: z.string().array().nullable(),
-});
+const categorySchema = baseSchema.extend({});
 
 const schema = z.discriminatedUnion("type", [
     productSchema.extend({ type: z.literal("Product") }),
@@ -158,11 +169,11 @@ function RowGenerator({
             <form onSubmit={(e) => e.preventDefault()} className={TableRow({}).props.className}>
                 {columns.map((col) => (
                     <TableCell className="text-center" key={col}>
-                        <form.AppField name={col as keyof (Product | Category)}>
+                        <form.AppField name={col as keyof Product}>
                             {(field) => (
                                 <form.Item>
                                     <field.Control>
-                                        {!Array.isArray(row[col as keyof typeof row]) ? (
+                                        {field.name != "images" ? (
                                             <Input
                                                 type="text"
                                                 inputMode="numeric"
@@ -177,14 +188,76 @@ function RowGenerator({
                                                 }
                                             />
                                         ) : (
-                                            <Input
-                                                type="file"
-                                                disabled={
-                                                    disabled.includes(col as keyof (Product | Category)) ||
-                                                    (!["edit", "save"].includes(bState) && row.id !== undefined) ||
-                                                    bState.includes("submit")
-                                                }
-                                            />
+                                            <AlertDialog>
+                                                <AlertDialogTrigger
+                                                    render={
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            className="text-center disabled:opacity-100! border-primary/50 disabled:border-primary/10"
+                                                        />
+                                                    }
+                                                >
+                                                    Edit
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader className="flex flex-col gap-1">
+                                                        <AlertDialogTitle>
+                                                            Edit {col} for {row.name}
+                                                        </AlertDialogTitle>
+                                                        <AlertDialogDescription className="flex w-full max-w-md flex-col gap-2">
+                                                            <ItemGroup className="gap-2" role="list">
+                                                                {(field.state.value as string[])?.map((image) => (
+                                                                    <Item
+                                                                        key={image}
+                                                                        variant="outline"
+                                                                        role="listitem"
+                                                                        className="w-full hover:bg-secondary"
+                                                                    >
+                                                                        <ItemMedia variant="image">
+                                                                            <img
+                                                                                src={image}
+                                                                                alt={image}
+                                                                                width={32}
+                                                                                height={32}
+                                                                                className="object-cover"
+                                                                            />
+                                                                        </ItemMedia>
+                                                                        <ItemContent>
+                                                                            <ItemTitle className="line-clamp-1">
+                                                                                {image}
+                                                                            </ItemTitle>
+                                                                        </ItemContent>
+                                                                        <ItemActions>
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                size="sm"
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    field.handleChange((old) => {
+                                                                                        if (old == null) return old;
+                                                                                        if (!Array.isArray(old))
+                                                                                            return old;
+                                                                                        return old.filter(
+                                                                                            (img) => img !== image,
+                                                                                        );
+                                                                                    });
+                                                                                }}
+                                                                            >
+                                                                                <Trash className="w-4" />
+                                                                            </Button>
+                                                                        </ItemActions>
+                                                                    </Item>
+                                                                ))}
+                                                            </ItemGroup>
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter className="mt-2">
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction>Continue</AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
                                         )}
                                     </field.Control>
                                     <field.Message className="text-wrap text-center" />
