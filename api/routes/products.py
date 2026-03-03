@@ -17,7 +17,7 @@ async def get_products(request: Request) -> list[Product]:
 
 
 @router.get("/{product_id}")
-async def get_product(request: Request, product_id: int) -> Product:
+async def get_product(request: Request, product_id: str) -> Product:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         product = session.get(Product, product_id)
@@ -27,7 +27,7 @@ async def get_product(request: Request, product_id: int) -> Product:
 
 
 @router.get("/category/{category_id}")
-async def get_products_by_category(request: Request, category_id: int) -> list[Product]:
+async def get_products_by_category(request: Request, category_id: str) -> list[Product]:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         category = session.get(Category, category_id)
@@ -49,7 +49,7 @@ async def new_product(request: Request, product: ProductBase) -> Product:
 
 @router.put("/{product_id}")
 async def update_product(
-    request: Request, product_id: int, product: ProductBase
+    request: Request, product_id: str, product: ProductBase
 ) -> Product:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
@@ -64,7 +64,7 @@ async def update_product(
 
 
 @router.delete("/{product_id}")
-async def delete_product(request: Request, product_id: int) -> None:
+async def delete_product(request: Request, product_id: str) -> None:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         product = session.get(Product, product_id)

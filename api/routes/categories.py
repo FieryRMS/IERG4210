@@ -20,7 +20,7 @@ async def get_categories(request: Request) -> list[Category]:
     status_code=status.HTTP_200_OK,
     responses={status.HTTP_404_NOT_FOUND: {"description": "Category not found"}},
 )
-async def get_category(request: Request, category_id: int) -> Category:
+async def get_category(request: Request, category_id: str) -> Category:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         category = session.get(Category, category_id)
@@ -42,7 +42,7 @@ async def new_category(request: Request, category: CategoryBase) -> Category:
 
 @router.put("/{category_id}", status_code=status.HTTP_200_OK)
 async def update_category(
-    request: Request, category_id: int, category: CategoryBase
+    request: Request, category_id: str, category: CategoryBase
 ) -> Category:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
@@ -57,7 +57,7 @@ async def update_category(
 
 
 @router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_category(request: Request, category_id: int) -> None:
+async def delete_category(request: Request, category_id: str) -> None:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         category = session.get(Category, category_id)

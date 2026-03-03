@@ -16,7 +16,7 @@ async def get_images(request: Request) -> list[Image]:
 
 
 @router.get("/{image_id}")
-async def get_image(request: Request, image_id: int) -> Image:
+async def get_image(request: Request, image_id: str) -> Image:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         image = session.get(Image, image_id)
@@ -37,7 +37,7 @@ async def new_image(request: Request, image: ImageBase) -> Image:
 
 
 @router.put("/{image_id}")
-async def update_image(request: Request, image_id: int, image: ImageBase) -> Image:
+async def update_image(request: Request, image_id: str, image: ImageBase) -> Image:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         db_image = session.get(Image, image_id)
@@ -51,7 +51,7 @@ async def update_image(request: Request, image_id: int, image: ImageBase) -> Ima
 
 
 @router.delete("/{image_id}")
-async def delete_image(request: Request, image_id: int) -> None:
+async def delete_image(request: Request, image_id: str) -> None:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         image = session.get(Image, image_id)
