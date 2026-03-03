@@ -11,7 +11,7 @@ import {
     useMatches,
     type Location,
     type UIMatch,
-    useRouteLoaderData,
+    useLoaderData,
 } from "react-router";
 import { ThemeProvider, Theme } from "@/hooks/theme-provider";
 
@@ -19,7 +19,7 @@ import type { Route } from "./+types/root";
 import "./app.css";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import type { Category, LocationState, PageHandle } from "./types";
+import type { LocationState, PageHandle } from "./types";
 import { CartProvider } from "./hooks/cart-provider";
 import { useCallback } from "react";
 import { prefsCookie } from "./cookies";
@@ -39,12 +39,7 @@ export const links: Route.LinksFunction = () => [
     },
 ];
 
-type LoaderData = {
-    theme: Theme;
-    categories: Category[];
-};
-
-export async function loader({ request }: Route.LoaderArgs): Promise<LoaderData> {
+export async function loader({ request }: Route.LoaderArgs) {
     const client = getClient();
     const cookieHeader = request.headers.get("Cookie");
     const prefs = (await prefsCookie.parse(cookieHeader)) || {};
@@ -55,21 +50,22 @@ export async function loader({ request }: Route.LoaderArgs): Promise<LoaderData>
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-    const { theme, categories } = useRouteLoaderData<LoaderData>("root")!;
+    const { theme, categories } = useLoaderData<Route.ComponentProps["loaderData"]>()!;
     const location: Location<LocationState> = useLocation();
     const matches = useMatches();
     const breadcrumbs = (matches as UIMatch<unknown, PageHandle>[])
         .filter((match) => match.handle && match.handle.breadcrumb)
-        .map((match) => match.handle!.breadcrumb!(match));
+        .map((match) => match.handle.breadcrumb!(match));
     const shouldBlock = useCallback<BlockerFunction>(
         ({ currentLocation, nextLocation, historyAction }) => {
+            // if pushing new entry
             if (
                 historyAction === "PUSH" &&
                 currentLocation.pathname === location.pathname &&
                 nextLocation.pathname !== currentLocation.pathname
             ) {
-                if (location.state?.breadcrumbs?.length && location.state.breadcrumbs[0]?.id === "root")
-                    breadcrumbs.shift();
+                // remove root breadcrumb if exists to avoid duplication
+                if (location.state.breadcrumbs?.[0]?.pathname === "/") breadcrumbs.shift();
                 nextLocation.state = {
                     breadcrumbs: [...(location.state?.breadcrumbs || []), ...breadcrumbs],
                     ...nextLocation.state,
@@ -154,8 +150,6 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
 
 export const handle: PageHandle = {
     breadcrumb: ({ pathname }) => ({
-        id: "root",
-        name: "Home",
         pathname,
     }),
 };

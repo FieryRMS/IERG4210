@@ -54,7 +54,7 @@ export function Navbar({ categories }: { categories: Category[] }) {
 
     const root = breadcrumbs.shift();
     breadcrumbs = [...(location.state?.breadcrumbs || []), ...breadcrumbs];
-    if (!location.state?.breadcrumbs?.length || location.state.breadcrumbs[0]?.id !== "root")
+    if (!location.state?.breadcrumbs?.length || location.state.breadcrumbs[0]?.pathname !== "/")
         breadcrumbs.unshift(root!);
 
     const { cart, addQuantity, removeQuantity, setQuantity } = useCart();
@@ -251,10 +251,10 @@ export function Navbar({ categories }: { categories: Category[] }) {
                                                                 breadcrumbs: breadcrumbs.slice(0, i),
                                                             }}
                                                         >
-                                                            {breadcrumb.id === "root" ? (
+                                                            {breadcrumb.pathname === "/" ? (
                                                                 <HomeIcon className="size-4" />
                                                             ) : (
-                                                                breadcrumb.name
+                                                                breadcrumb.pathname
                                                             )}
                                                         </Link>
                                                     }
@@ -267,10 +267,10 @@ export function Navbar({ categories }: { categories: Category[] }) {
                                     ) : (
                                         <BreadcrumbItem>
                                             <BreadcrumbPage>
-                                                {breadcrumb.id === "root" ? (
+                                                {breadcrumb.pathname === "/" ? (
                                                     <HomeIcon className="size-4" />
                                                 ) : (
-                                                    breadcrumb.name
+                                                    breadcrumb.pathname
                                                 )}
                                             </BreadcrumbPage>
                                         </BreadcrumbItem>

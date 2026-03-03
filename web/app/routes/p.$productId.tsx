@@ -18,6 +18,13 @@ import { Img } from "@/components/img-wrapper";
 import type { paths } from "@/lib/api";
 import createClient from "openapi-fetch";
 
+export function meta({ loaderData }: Route.MetaArgs) {
+    return [
+        { title: `${loaderData.name} | The Generic Company` },
+        { name: "description", content: loaderData.description ?? "A generic product from a generic company" },
+    ];
+}
+
 export async function loader({ params }: Route.LoaderArgs) {
     const client = createClient<paths>({ baseUrl: process.env.API_URL });
     if (Number.isInteger(parseInt(params.productId))) {
@@ -123,9 +130,7 @@ export default function ({ params, loaderData }: Route.ComponentProps) {
 }
 
 export const handle: PageHandle = {
-    breadcrumb: ({ params, id, pathname }) => ({
-        id,
-        name: `Product ${params.productId}`,
+    breadcrumb: ({ pathname }) => ({
         pathname,
     }),
 };
