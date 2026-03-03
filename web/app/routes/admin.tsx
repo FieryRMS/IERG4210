@@ -1,7 +1,7 @@
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Route } from "./+types/admin";
 import { Check, Pencil, Plus, Trash, X } from "lucide-react";
-import type { Product, Category } from "@/types";
+import type { Product, Category, PageHandle } from "@/types";
 import { z } from "zod";
 import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
@@ -523,3 +523,10 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         </div>
     );
 }
+
+export const handle: PageHandle<Route.ComponentProps["loaderData"]> = {
+    breadcrumb: ({ pathname }) => ({
+        pathname,
+        name: "Admin",
+    }),
+};

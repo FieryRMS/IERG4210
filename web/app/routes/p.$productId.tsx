@@ -129,8 +129,9 @@ export default function ({ params, loaderData }: Route.ComponentProps) {
     );
 }
 
-export const handle: PageHandle = {
-    breadcrumb: ({ pathname }) => ({
+export const handle: PageHandle<Route.ComponentProps["loaderData"]> = {
+    breadcrumb: ({ pathname, loaderData }) => ({
         pathname,
+        name: loaderData?.name || "Product",
     }),
 };

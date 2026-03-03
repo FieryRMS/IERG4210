@@ -1,4 +1,4 @@
-import { getClient, PascalCase } from "@/lib/utils";
+import { getClient } from "@/lib/utils";
 import type { PageHandle } from "@/types";
 
 import type { Route } from "./+types/c.$categoryId";
@@ -48,10 +48,9 @@ export default function MainPage({ loaderData }: Route.ComponentProps) {
     return <Category products={loaderData.products} />;
 }
 
-export const handle: PageHandle = {
-    breadcrumb: ({ params, id, pathname }) => ({
-        id,
-        name: params.categoryId ? PascalCase(params.categoryId.replace(/[^a-zA-Z0-9]+/g, " ")) : "Unknown Category",
+export const handle: PageHandle<Route.ComponentProps["loaderData"]> = {
+    breadcrumb: ({ pathname, loaderData }) => ({
         pathname,
+        name: loaderData?.category?.name || "Home",
     }),
 };

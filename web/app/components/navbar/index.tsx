@@ -45,8 +45,7 @@ import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } f
 import { cn } from "@/lib/utils";
 import { Img } from "@/components/img-wrapper";
 
-export function Navbar({ categories }: { categories: Category[]; }) {
-    // temp
+export function Navbar({ categories }: { categories: Category[] }) {
     const { theme, toggleTheme } = useTheme();
     const location: Location<LocationState> = useLocation();
     let breadcrumbs = (useMatches() as UIMatch<unknown, PageHandle>[])
@@ -78,24 +77,6 @@ export function Navbar({ categories }: { categories: Category[]; }) {
                     <NavigationMenuTrigger className="h-full px-2">Shop</NavigationMenuTrigger>
                     <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
                         <ul className="grid gap-3 p-1 md:w-100 md:grid-cols-2 list-none w-full">
-                            {/* <ListItem title="New Arrivals" href="/c/new">
-                                Fresh drops and the latest products.
-                            </ListItem>
-                            <ListItem title="Best Sellers" href="/c/best-sellers">
-                                Customer favorites and top-rated picks.
-                            </ListItem>
-                            <ListItem title="Men" href="/c/men">
-                                Clothing, shoes, and accessories for men.
-                            </ListItem>
-                            <ListItem title="Women" href="/c/women">
-                                Styles, outfits, and essentials for women.
-                            </ListItem>
-                            <ListItem title="Deals" href="/c/deals" className="md:hidden">
-                                Exclusive offers and discounts.
-                            </ListItem>
-                            <ListItem title="Collections" href="/c/collections" className="md:hidden">
-                                Curated selections and themed products.
-                            </ListItem> */}
                             {categories.map((category) => (
                                 <ListItem key={category.id} title={category.name} href={`/c/${category.id}`}>
                                     {category.description}
@@ -255,7 +236,7 @@ export function Navbar({ categories }: { categories: Category[]; }) {
                                                             {breadcrumb.pathname === "/" ? (
                                                                 <HomeIcon className="size-4" />
                                                             ) : (
-                                                                breadcrumb.pathname
+                                                                breadcrumb.name
                                                             )}
                                                         </Link>
                                                     }
@@ -271,7 +252,7 @@ export function Navbar({ categories }: { categories: Category[]; }) {
                                                 {breadcrumb.pathname === "/" ? (
                                                     <HomeIcon className="size-4" />
                                                 ) : (
-                                                    breadcrumb.pathname
+                                                    breadcrumb.name
                                                 )}
                                             </BreadcrumbPage>
                                         </BreadcrumbItem>
