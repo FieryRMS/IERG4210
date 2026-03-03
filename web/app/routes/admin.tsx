@@ -255,7 +255,13 @@ function RowGenerator({
                                                         </div>
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter className="mt-2">
-                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogCancel
+                                                            onClick={() => {
+                                                                field.handleChange(row[col] as string[]);
+                                                            }}
+                                                        >
+                                                            Cancel
+                                                        </AlertDialogCancel>
                                                         <AlertDialogAction>Continue</AlertDialogAction>
                                                     </AlertDialogFooter>
                                                 </AlertDialogContent>
