@@ -149,7 +149,7 @@ export function Navbar({ categories }: { categories: Category[] }) {
                                     <Item key={p.id} variant="outline" role="listitem">
                                         <ItemMedia variant="image">
                                             <Img
-                                                src={p.images?.[0]}
+                                                src={p.images?.[0]?.url}
                                                 alt={p.name}
                                                 className="w-16 h-16 object-cover pointer-events-none select-none"
                                                 draggable={false}

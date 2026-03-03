@@ -25,7 +25,7 @@ import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from 
 import { Img } from "@/components/img-wrapper";
 
 const baseSchema = z.object({
-    id: z.coerce.number<number>().min(1).optional(),
+    id: z.string().optional(),
     name: z.string(),
     description: z.string().nullable(),
     created_at: z
@@ -40,7 +40,7 @@ const baseSchema = z.object({
 const productSchema = baseSchema.extend({
     price: z.coerce.number<number>().min(0.01),
     catid: z.coerce.number<number>().min(1),
-    images: z.array(z.string()),
+    images: z.array(z.object({ url: z.string(), alt: z.string().nullable() })),
     type: z.literal("Product"),
 });
 
@@ -58,8 +58,12 @@ export async function action({ request }: { request: Request }) {
     if (data.type === "Product" && request.method === "POST")
         return (await client.POST("/products/", { body: data as Product })).data;
     else if (data.type === "Product" && request.method === "PUT")
-        return (await client.PUT(`/products/{product_id}`, { params: { path: { product_id: data.id! } }, body: data }))
-            .data;
+        return (
+            await client.PUT(`/products/{product_id}`, {
+                params: { path: { product_id: data.id! } },
+                body: data as Product,
+            })
+        ).data;
     else if (data.type === "Product" && request.method === "DELETE")
         return (await client.DELETE(`/products/{product_id}`, { params: { path: { product_id: data.id! } } })).data;
     else if (data.type === "Category" && request.method === "POST")
@@ -108,7 +112,8 @@ function ConfirmAnim({
         </>
     );
 }
-type TRowData = Record<string, string | number | null | Array<string | number | boolean>>;
+type RowData = Record<string, string | number | null | Array<Record<string, string | number | null>>> & { id?: string };
+
 function RowGenerator({
     type,
     data,
@@ -118,13 +123,13 @@ function RowGenerator({
     create,
 }: {
     type: TableTypeNames;
-    data: TRowData;
-    columns: (keyof TRowData)[];
-    disabled: (keyof TRowData)[];
-    schema: z.ZodType<TRowData & { type: TableTypeNames }, TRowData & { type: TableTypeNames }>;
+    data: RowData;
+    columns: (keyof RowData)[];
+    disabled: (keyof RowData)[];
+    schema: z.ZodType<RowData & { type: TableTypeNames }, RowData & { type: TableTypeNames }>;
     create?: boolean;
 }) {
-    const [row, setRow] = useState<TRowData>(data);
+    const [row, setRow] = useState<RowData>(data);
     useEffect(() => {
         setRow(data);
     }, [data]);
@@ -132,7 +137,7 @@ function RowGenerator({
     const [bState, setBState] = useState<
         "idle" | "edit" | "save" | "delete" | "create" | "ssubmit" | "dsubmit" | "csubmit"
     >("idle");
-    const fetcher = useFetcher<TRowData>();
+    const fetcher = useFetcher<RowData>();
     const form = useAppForm({
         defaultValues,
         validators: {
@@ -161,7 +166,7 @@ function RowGenerator({
         if (isSubmitted && bState.includes("submit") && fetcher.state === "idle") {
             setBState("idle");
             form.reset(defaultValues);
-            setRow((fetcher.data as TRowData) ?? row);
+            setRow((fetcher.data as RowData) ?? row);
         }
     }, [bState, defaultValues, fetcher.data, fetcher.state, form, isSubmitted, row]);
     return (
@@ -207,17 +212,17 @@ function RowGenerator({
                                                         </AlertDialogTitle>
                                                         <div className="flex w-full max-w-md flex-col gap-2">
                                                             <ItemGroup className="gap-2" role="list">
-                                                                {(field.state.value as string[])?.map((image) => (
+                                                                {field.state.value?.map((image, index) => (
                                                                     <Item
-                                                                        key={image}
+                                                                        key={index}
                                                                         variant="outline"
                                                                         role="listitem"
                                                                         className="w-full hover:bg-secondary"
                                                                     >
                                                                         <ItemMedia variant="image">
                                                                             <Img
-                                                                                src={image}
-                                                                                alt={image}
+                                                                                src={image.url as string}
+                                                                                alt={image.alt as string}
                                                                                 width={32}
                                                                                 height={32}
                                                                                 className="object-cover"
@@ -225,7 +230,7 @@ function RowGenerator({
                                                                         </ItemMedia>
                                                                         <ItemContent>
                                                                             <ItemTitle className="line-clamp-1">
-                                                                                {image}
+                                                                                {image.alt}
                                                                             </ItemTitle>
                                                                         </ItemContent>
                                                                         <ItemActions>
@@ -239,7 +244,7 @@ function RowGenerator({
                                                                                         if (!Array.isArray(old))
                                                                                             return old;
                                                                                         return old.filter(
-                                                                                            (img) => img !== image,
+                                                                                            (_, i) => i !== index,
                                                                                         );
                                                                                     });
                                                                                 }}
@@ -271,7 +276,7 @@ function RowGenerator({
                                                     <AlertDialogFooter className="mt-2">
                                                         <AlertDialogCancel
                                                             onClick={() => {
-                                                                field.handleChange(row[col] as string[]);
+                                                                field.handleChange(row[col]!);
                                                             }}
                                                         >
                                                             Cancel
@@ -419,10 +424,10 @@ function TableGenerator({
     columns,
     disabled,
 }: {
-    data: TRowData[];
+    data: RowData[];
     type: TableTypeNames;
-    schema: z.ZodType<TRowData & { type: TableTypeNames }, TRowData & { type: TableTypeNames }>;
-    columns: (keyof TRowData)[];
+    schema: z.ZodType<RowData & { type: TableTypeNames }, RowData & { type: TableTypeNames }>;
+    columns: (keyof RowData)[];
     disabled: (keyof TableType)[];
 }) {
     const arrayKeys = useMemo(() => {

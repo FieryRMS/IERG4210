@@ -15,19 +15,20 @@ export function meta({ loaderData }: Route.MetaArgs) {
 }
 
 export async function loader({ params }: Route.LoaderArgs) {
+    console.log(params);
     const client = getClient();
-    if (Number.isInteger(parseInt(params.categoryId))) {
+    if (params.categoryId) {
         const { data: pdata, error: perror } = await client.GET(`/products/category/{category_id}`, {
             params: {
                 path: {
-                    category_id: parseInt(params.categoryId),
+                    category_id: params.categoryId,
                 },
             },
         });
         const { data: cdata, error: cerror } = await client.GET(`/categories/{category_id}`, {
             params: {
                 path: {
-                    category_id: parseInt(params.categoryId),
+                    category_id: params.categoryId,
                 },
             },
         });

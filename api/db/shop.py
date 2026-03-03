@@ -54,7 +54,9 @@ class Product(ProductBase, SQLModel, table=True):
 
     category: Category = Relationship(back_populates="products")
     images: list[Image] = Relationship(
-        back_populates="products", link_model=ImageProductLink
+        back_populates="products",
+        link_model=ImageProductLink,
+        sa_relationship_kwargs={"lazy": "selectin"},
     )
 
     @computed_field(alias="images")

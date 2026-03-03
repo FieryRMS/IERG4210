@@ -13,6 +13,7 @@ interface PageHandle<T = unknown> {
 
 type Product = components["schemas"]["Product"];
 type Category = components["schemas"]["Category"];
+type Image = components["schemas"]["Image"];
 
 interface LocationState {
     breadcrumbs?: Breadcrumb[];
