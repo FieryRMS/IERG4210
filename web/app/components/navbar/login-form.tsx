@@ -43,7 +43,7 @@ export function LoginForm() {
                 <TabsTrigger value="Login">Login</TabsTrigger>
                 <TabsTrigger value="Register">Register</TabsTrigger>
             </TabsList>
-            {["Login", "Register"].map((t) => (
+            {(["Login", "Register"] satisfies FormTypes[]).map((t) => (
                 <TabsContent key={t} value={t}>
                     <Form type={t} />
                 </TabsContent>
@@ -51,8 +51,9 @@ export function LoginForm() {
         </Tabs>
     );
 }
+type FormTypes = "Login" | "Register";
 
-function Form({ type }: { type: string; }) {
+function Form({ type }: { type: FormTypes }) {
     const fields = schema.options.find((opt) => opt.shape.type.value === type)!.shape;
     const form = useAppForm({
         defaultValues: Object.fromEntries(
@@ -87,6 +88,13 @@ function Form({ type }: { type: string; }) {
                                         <Input
                                             placeholder={key.replaceAll("_", " ")}
                                             type={key.includes("Password") ? "password" : "text"}
+                                            autoComplete={
+                                                key === "Username"
+                                                    ? "username"
+                                                    : type === "Login"
+                                                      ? "current-password"
+                                                      : "new-password"
+                                            }
                                             name={field.name}
                                             value={field.state.value}
                                             onBlur={field.handleBlur}
