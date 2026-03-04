@@ -11,7 +11,8 @@ import { useEffect, useState, useMemo } from "react";
 import { useFetcher, type HTMLFormMethod } from "react-router";
 import { Spinner } from "@/components/ui/spinner";
 import { useStore } from "@tanstack/react-form";
-import { parseFormData } from "@remix-run/form-data-parser";
+import { type FileUpload, parseFormData } from "@remix-run/form-data-parser";
+import { getStorageKey, fileStorage, fileStorageConfig } from "@/storage";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -54,7 +55,7 @@ const categorySchema = baseSchema.extend({
 });
 
 const imageSchema = baseSchema.extend({
-    url: z.url(),
+    url: z.union([z.file().max(10 * 1024 * 1024), z.string()]),
     alt: z.string().nullable(),
     type: z.literal("Image"),
 });
@@ -63,8 +64,21 @@ type TableTypes = "Product" | "Category" | "Image";
 
 export async function action({ request }: { request: Request }) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    const form = await parseFormData(request);
+
+    async function uploadHandler(fileUpload: FileUpload) {
+        if (fileUpload.fieldName === "url" && fileUpload.type.startsWith("image/")) {
+            const storageKey = getStorageKey();
+            await fileStorage.set(storageKey, fileUpload);
+            return storageKey;
+        }
+    }
+
+    const form = await parseFormData(request, fileStorageConfig, uploadHandler);
     const client = getClient();
+
+    form.forEach((value, key) => {
+        console.log(`${key}:`, value);
+    });
 
     const rawdata = form.get("data");
 
@@ -72,8 +86,11 @@ export async function action({ request }: { request: Request }) {
         throw new Response("Invalid data", { status: 400 });
     }
 
-    const data: z.infer<typeof productSchema | typeof categorySchema | typeof imageSchema> & { type: TableTypes } =
-        await JSON.parse(rawdata);
+    const data: z.infer<typeof productSchema | typeof categorySchema | typeof imageSchema> & {
+        type: TableTypes;
+        url?: string;
+    } = await JSON.parse(rawdata);
+    data.url = (form.get("url") as string | undefined) || data.url;
     switch (data.type) {
         case "Product":
             switch (request.method) {
@@ -170,6 +187,7 @@ interface FieldConfig<T> {
     render: (value: SchemaType) => React.ReactNode | string;
     toSchemaType: (data: T) => SchemaType;
     fromSchemaType: (value: SchemaType) => T;
+    file: boolean;
 }
 function ConfigGenerator<T extends z.infer<typeof baseSchema>>(
     fields: (Partial<FieldConfig<T[keyof T]>> & { name: keyof T })[],
@@ -177,7 +195,7 @@ function ConfigGenerator<T extends z.infer<typeof baseSchema>>(
     [K in keyof T]: FieldConfig<T[K]>;
 } {
     return fields.reduce(
-        (acc, { name, disabled, render, toSchemaType, fromSchemaType }) => {
+        (acc, { name, disabled, render, toSchemaType, fromSchemaType, file }) => {
             acc[name] = {
                 disabled: disabled ?? false,
                 render: render ?? ((value) => (value !== null && value !== undefined ? String(value) : "null")),
@@ -197,6 +215,7 @@ function ConfigGenerator<T extends z.infer<typeof baseSchema>>(
                         return String(data);
                     }),
                 fromSchemaType: fromSchemaType ?? ((value) => value as T[keyof T]),
+                file: file ?? false,
             };
             return acc;
         },
@@ -263,6 +282,7 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
             const method = methodMap[bState];
             const form = new FormData();
             form.append("data", JSON.stringify(value));
+            if (value.url instanceof File) form.append("url", value.url as File, value.url.name);
             await fetcher.submit(form, { method, encType: "multipart/form-data" });
         },
     });
@@ -286,16 +306,27 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
                                     <field.Control>
                                         {!Array.isArray(field.state.value) ? (
                                             <Input
-                                                type="text"
+                                                type={config[col].file && create ? "file" : "text"}
                                                 inputMode="numeric"
-                                                value={(field.state.value as string) || ""}
-                                                onChange={(e) =>
-                                                    field.handleChange(e.target.value as typeof field.state.value)
+                                                value={
+                                                    config[col].file && create
+                                                        ? undefined
+                                                        : (field.state.value as string) || ""
                                                 }
+                                                accept="image/*"
+                                                name={col}
+                                                onChange={(e) => {
+                                                    if (config[col].file && create)
+                                                        field.handleChange(
+                                                            e.target.files?.[0] as typeof field.state.value,
+                                                        );
+                                                    else field.handleChange(e.target.value as typeof field.state.value);
+                                                }}
                                                 onBlur={field.handleBlur}
                                                 className="text-center disabled:opacity-100! border-primary/50 disabled:border-primary/10"
                                                 disabled={
-                                                    config[col]?.disabled ||
+                                                    (config[col].file && !create) ||
+                                                    config[col].disabled ||
                                                     (!["edit", "save"].includes(bState) && !create) ||
                                                     bState.includes("submit")
                                                 }
@@ -570,7 +601,6 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         { name: "created_at", disabled: true },
         { name: "updated_at", disabled: true },
     ]);
-    console.log(loaderData);
 
     const PConfig = {
         ...BaseConfig,
@@ -620,7 +650,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
 
     const IConfig = {
         ...BaseConfig,
-        ...ConfigGenerator<Image>([{ name: "url" }, { name: "alt" }]),
+        ...ConfigGenerator<Image>([{ name: "url", file: true }, { name: "alt" }]),
     };
 
     return (
