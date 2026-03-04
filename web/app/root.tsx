@@ -22,7 +22,7 @@ import { Footer } from "@/components/footer";
 import type { LocationState, PageHandle } from "./types";
 import { CartProvider } from "./hooks/cart-provider";
 import { useCallback } from "react";
-import { prefsCookie } from "./cookies";
+import { prefsCookie } from "@/cookies";
 import { Toaster } from "@/components/ui/sonner";
 import { getClient } from "./lib/utils";
 
@@ -44,13 +44,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     const cookieHeader = request.headers.get("Cookie");
     const prefs = (await prefsCookie.parse(cookieHeader)) || {};
     return {
-        theme: prefs.theme || Theme.System,
+        theme: prefs?.theme || Theme.System,
         categories: (await client.GET("/categories/")).data || [],
     };
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-    const { theme, categories } = useLoaderData<Route.ComponentProps["loaderData"]>()!;
+    const loaderData = useLoaderData<Route.ComponentProps["loaderData"]>();
     const location: Location<LocationState> = useLocation();
     const matches = useMatches();
     const breadcrumbs = (matches as UIMatch<unknown, PageHandle>[])
@@ -79,7 +79,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     useBlocker(shouldBlock);
 
     return (
-        <html lang="en" className={theme}>
+        <html lang="en" className={loaderData?.theme}>
             <head>
                 <meta charSet="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -98,11 +98,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     `}
                 </script>
             </head>
-            <ThemeProvider defaultTheme={theme}>
+            <ThemeProvider defaultTheme={loaderData?.theme}>
                 <CartProvider>
                     <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden grid grid-rows-[auto_1fr_auto]">
                         <header className="sticky top-0 z-50 w-full bg-background pb-2">
-                            <Navbar categories={categories} />
+                            <Navbar categories={loaderData?.categories || []} />
                         </header>
                         <main className="py-4 w-full h-full">{children}</main>
                         <footer className="w-full py-6">
@@ -110,7 +110,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         </footer>
                         <ScrollRestoration />
                         <Scripts />
-                        <Toaster theme={theme} />
+                        <Toaster theme={loaderData?.theme} />
                     </body>
                 </CartProvider>
             </ThemeProvider>
