@@ -1,7 +1,7 @@
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Route } from "./+types/admin";
 import { Check, Pencil, Plus, Trash, X } from "lucide-react";
-import type { Product, Category, PageHandle } from "@/types";
+import type { Product, Category, PageHandle, Image } from "@/types";
 import { z } from "zod";
 import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
@@ -25,9 +25,7 @@ import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from 
 import { Img } from "@/components/img-wrapper";
 
 const baseSchema = z.object({
-    id: z.string().optional(),
-    name: z.string(),
-    description: z.string().nullable(),
+    id: z.uuidv4().optional(),
     created_at: z
         .string()
         .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}$/, "Invalid date format")
@@ -38,45 +36,89 @@ const baseSchema = z.object({
         .optional(),
 });
 const productSchema = baseSchema.extend({
+    name: z.string(),
+    description: z.string().nullable(),
     price: z.coerce.number<number>().min(0.01),
-    catid: z.coerce.number<number>().min(1),
-    images: z.array(z.object({ url: z.string(), alt: z.string().nullable() })),
+    catid: z.uuidv4(),
+    images: z.array(z.uuidv4()),
     type: z.literal("Product"),
 });
 
-const categorySchema = baseSchema.extend({ type: z.literal("Category") });
+const categorySchema = baseSchema.extend({
+    name: z.string(),
+    description: z.string().nullable(),
+    type: z.literal("Category"),
+});
 
-type TableType = Product | Category;
-type TableTypeNames = "Product" | "Category";
+const imageSchema = baseSchema.extend({
+    url: z.url(),
+    alt: z.string().nullable(),
+    type: z.literal("Image"),
+});
+
+type TableTypes = "Product" | "Category" | "Image";
 
 export async function action({ request }: { request: Request }) {
     const client = getClient();
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    const data: TableType & { type: TableTypeNames } = await request.json();
-
-    if (data.type === "Product" && request.method === "POST")
-        return (await client.POST("/products/", { body: data as Product })).data;
-    else if (data.type === "Product" && request.method === "PUT")
-        return (
-            await client.PUT(`/products/{product_id}`, {
-                params: { path: { product_id: data.id! } },
-                body: data as Product,
-            })
-        ).data;
-    else if (data.type === "Product" && request.method === "DELETE")
-        return (await client.DELETE(`/products/{product_id}`, { params: { path: { product_id: data.id! } } })).data;
-    else if (data.type === "Category" && request.method === "POST")
-        return (await client.POST("/categories/", { body: data })).data;
-    else if (data.type === "Category" && request.method === "PUT")
-        return (
-            await client.PUT(`/categories/{category_id}`, {
-                params: { path: { category_id: data.id! } },
-                body: data,
-            })
-        ).data;
-    else if (data.type === "Category" && request.method === "DELETE")
-        return (await client.DELETE(`/categories/{category_id}`, { params: { path: { category_id: data.id! } } })).data;
+    const data: z.infer<typeof productSchema | typeof categorySchema | typeof imageSchema> & { type: TableTypes } =
+        await request.json();
+    switch (data.type) {
+        case "Product":
+            switch (request.method) {
+                case "POST":
+                    return (await client.POST("/products/", { body: data })).data;
+                case "PUT":
+                    return (
+                        await client.PUT(`/products/{product_id}`, {
+                            params: { path: { product_id: data.id! } },
+                            body: data,
+                        })
+                    ).data;
+                case "DELETE":
+                    return (
+                        await client.DELETE(`/products/{product_id}`, { params: { path: { product_id: data.id! } } })
+                    ).data;
+            }
+            break;
+        case "Category":
+            switch (request.method) {
+                case "POST":
+                    return (await client.POST("/categories/", { body: data })).data;
+                case "PUT":
+                    return (
+                        await client.PUT(`/categories/{category_id}`, {
+                            params: { path: { category_id: data.id! } },
+                            body: data,
+                        })
+                    ).data;
+                case "DELETE":
+                    return (
+                        await client.DELETE(`/categories/{category_id}`, {
+                            params: { path: { category_id: data.id! } },
+                        })
+                    ).data;
+            }
+            break;
+        case "Image":
+            switch (request.method) {
+                case "POST":
+                    return (await client.POST("/images/", { body: data })).data;
+                case "PUT":
+                    return (
+                        await client.PUT(`/images/{image_id}`, {
+                            params: { path: { image_id: data.id! } },
+                            body: data,
+                        })
+                    ).data;
+                case "DELETE":
+                    return (await client.DELETE(`/images/{image_id}`, { params: { path: { image_id: data.id! } } }))
+                        .data;
+            }
+            break;
+    }
+    throw new Response("Invalid request", { status: 400 });
 }
 
 function ConfirmAnim({
@@ -112,32 +154,79 @@ function ConfirmAnim({
         </>
     );
 }
-type RowData = Record<string, string | number | null | Array<Record<string, string | number | null>>> & { id?: string };
+type SchemaType = string | number | null | undefined | (string | number | null | undefined)[];
+interface FieldConfig<T> {
+    disabled: boolean;
+    render: (value: SchemaType) => React.ReactNode | string;
+    toSchemaType: (data: T) => SchemaType;
+    fromSchemaType: (value: SchemaType) => T;
+}
+function ConfigGenerator<T>(fields: (Partial<FieldConfig<T[keyof T]>> & { name: keyof T })[]): {
+    [K in keyof T]: FieldConfig<T[K]>;
+} {
+    return fields.reduce(
+        (acc, { name, disabled, render, toSchemaType, fromSchemaType }) => {
+            acc[name] = {
+                disabled: disabled ?? false,
+                render: render ?? ((value) => (value !== null && value !== undefined ? String(value) : "null")),
+                toSchemaType:
+                    toSchemaType ??
+                    ((data) => {
+                        if (Array.isArray(data))
+                            return data.map((item) => {
+                                if (typeof item === "object") return JSON.stringify(item);
+                                if (item === null) return null;
+                                if (item === undefined) return undefined;
+                                if (typeof item === "number") return item;
+                                return String(item);
+                            });
+                        if (typeof data === "object") return JSON.stringify(data);
+                        if (data === null) return null;
+                        if (data === undefined) return undefined;
+                        if (typeof data === "number") return data;
+                        return String(data);
+                    }),
+                fromSchemaType: fromSchemaType ?? ((value) => value as T[keyof T]),
+            };
+            return acc;
+        },
+        {} as { [K in keyof T]: FieldConfig<T[K]> },
+    );
+}
 
-function RowGenerator({
+function RowGenerator<T>({
     type,
     data,
-    columns,
-    disabled,
+    config,
     schema,
     create,
 }: {
-    type: TableTypeNames;
-    data: RowData;
-    columns: (keyof RowData)[];
-    disabled: (keyof RowData)[];
-    schema: z.ZodType<RowData & { type: TableTypeNames }, RowData & { type: TableTypeNames }>;
+    type: TableTypes;
+    data: T;
+    schema: z.ZodType<
+        { [K in keyof T]: ReturnType<FieldConfig<T[K]>["toSchemaType"]> } & { type: TableTypes },
+        { [K in keyof T]: ReturnType<FieldConfig<T[K]>["toSchemaType"]> } & { type: TableTypes }
+    >;
+    config: { [K in keyof T]: FieldConfig<T[K]> };
     create?: boolean;
 }) {
-    const [row, setRow] = useState<RowData>(data);
+    const [row, setRow] = useState<T>(data);
     useEffect(() => {
         setRow(data);
     }, [data]);
-    const defaultValues = useMemo(() => ({ ...row, type }) as z.infer<typeof schema>, [row, type]);
+
+    const defaultValues: z.infer<typeof schema> = useMemo(() => {
+        const values = {} as { [K in keyof T]: ReturnType<FieldConfig<T[K]>["toSchemaType"]> };
+        (Object.keys(config) as (keyof T)[]).forEach((col) => {
+            values[col] = config[col].toSchemaType(row[col]);
+        });
+        return { ...values, type };
+    }, [config, row, type]);
+
     const [bState, setBState] = useState<
         "idle" | "edit" | "save" | "delete" | "create" | "ssubmit" | "dsubmit" | "csubmit"
     >("idle");
-    const fetcher = useFetcher<RowData>();
+    const fetcher = useFetcher<T>();
     const form = useAppForm({
         defaultValues,
         validators: {
@@ -145,12 +234,19 @@ function RowGenerator({
             onChangeAsyncDebounceMs: 300,
             onSubmit: ({ formApi }) => {
                 const errors = formApi.parseValuesWithSchema(schema);
+                console.log(formApi);
                 if (!errors) return errors;
-                setBState((prev) => (prev.includes("submit") ? "idle" : prev));
+                setBState((prev) => {
+                    if (prev === "dsubmit") return "idle";
+                    if (prev === "ssubmit") return "edit";
+                    if (prev === "csubmit") return "idle";
+                    return prev;
+                });
                 return errors;
             },
         },
         onSubmit: async ({ value }) => {
+            console.log(value);
             const methodMap: Partial<Record<typeof bState, HTMLFormMethod>> = {
                 csubmit: "post",
                 ssubmit: "put",
@@ -161,18 +257,20 @@ function RowGenerator({
         },
     });
     const isSubmitted = useStore(form.store, (state) => state.isSubmitted);
+    console.log({ bState, isSubmitted, fetcherState: fetcher.state });
 
     useEffect(() => {
         if (isSubmitted && bState.includes("submit") && fetcher.state === "idle") {
+            console.log("Fetch complete", fetcher.data);
             setBState("idle");
             form.reset(defaultValues);
-            setRow((fetcher.data as RowData) ?? row);
+            setRow((fetcher.data as T) ?? row);
         }
     }, [bState, defaultValues, fetcher.data, fetcher.state, form, isSubmitted, row]);
     return (
         <form.AppForm>
             <form onSubmit={(e) => e.preventDefault()} className={TableRow({}).props.className}>
-                {columns.map((col) => (
+                {(Object.keys(config) as (keyof T extends string ? keyof T : never)[]).map((col) => (
                     <TableCell className="text-center" key={col}>
                         <form.AppField name={col}>
                             {(field) => (
@@ -182,12 +280,14 @@ function RowGenerator({
                                             <Input
                                                 type="text"
                                                 inputMode="numeric"
-                                                value={field.state.value ?? ""}
-                                                onChange={(e) => field.handleChange(e.target.value)}
+                                                value={(field.state.value as string) || ""}
+                                                onChange={(e) =>
+                                                    field.handleChange(e.target.value as typeof field.state.value)
+                                                }
                                                 onBlur={field.handleBlur}
                                                 className="text-center disabled:opacity-100! border-primary/50 disabled:border-primary/10"
                                                 disabled={
-                                                    disabled.includes(col as keyof TableType) ||
+                                                    config[col]?.disabled ||
                                                     (!["edit", "save"].includes(bState) && !create) ||
                                                     bState.includes("submit")
                                                 }
@@ -207,32 +307,17 @@ function RowGenerator({
                                                 </AlertDialogTrigger>
                                                 <AlertDialogContent>
                                                     <AlertDialogHeader className="flex flex-col gap-1 items-center">
-                                                        <AlertDialogTitle>
-                                                            Edit {col} for ID: {create ? "new" : row.id}
-                                                        </AlertDialogTitle>
+                                                        <AlertDialogTitle>Edit {col}</AlertDialogTitle>
                                                         <div className="flex w-full max-w-md flex-col gap-2">
                                                             <ItemGroup className="gap-2" role="list">
-                                                                {field.state.value?.map((image, index) => (
+                                                                {field.state.value?.map((val, index) => (
                                                                     <Item
                                                                         key={index}
                                                                         variant="outline"
                                                                         role="listitem"
                                                                         className="w-full hover:bg-secondary"
                                                                     >
-                                                                        <ItemMedia variant="image">
-                                                                            <Img
-                                                                                src={image.url as string}
-                                                                                alt={image.alt as string}
-                                                                                width={32}
-                                                                                height={32}
-                                                                                className="object-cover"
-                                                                            />
-                                                                        </ItemMedia>
-                                                                        <ItemContent>
-                                                                            <ItemTitle className="line-clamp-1">
-                                                                                {image.alt}
-                                                                            </ItemTitle>
-                                                                        </ItemContent>
+                                                                        {config[col].render(val)}
                                                                         <ItemActions>
                                                                             <Button
                                                                                 variant="outline"
@@ -245,7 +330,7 @@ function RowGenerator({
                                                                                             return old;
                                                                                         return old.filter(
                                                                                             (_, i) => i !== index,
-                                                                                        );
+                                                                                        ) as typeof old;
                                                                                     });
                                                                                 }}
                                                                             >
@@ -276,7 +361,11 @@ function RowGenerator({
                                                     <AlertDialogFooter className="mt-2">
                                                         <AlertDialogCancel
                                                             onClick={() => {
-                                                                field.handleChange(row[col]!);
+                                                                field.handleChange(
+                                                                    config[col].toSchemaType(
+                                                                        row[col],
+                                                                    ) as typeof field.state.value,
+                                                                );
                                                             }}
                                                         >
                                                             Cancel
@@ -417,30 +506,26 @@ function RowGenerator({
     );
 }
 
-function TableGenerator({
+function TableGenerator<T>({
     data,
     type,
     schema,
-    columns,
-    disabled,
+    config,
 }: {
-    data: RowData[];
-    type: TableTypeNames;
-    schema: z.ZodType<RowData & { type: TableTypeNames }, RowData & { type: TableTypeNames }>;
-    columns: (keyof RowData)[];
-    disabled: (keyof TableType)[];
+    data: T[];
+    type: TableTypes;
+    schema: z.ZodType<
+        { [K in keyof T]: ReturnType<FieldConfig<T[K]>["toSchemaType"]> } & { type: TableTypes },
+        { [K in keyof T]: ReturnType<FieldConfig<T[K]>["toSchemaType"]> } & { type: TableTypes }
+    >;
+    config: { [K in keyof T]: FieldConfig<T[K]> };
 }) {
-    const arrayKeys = useMemo(() => {
-        if (data.length === 0) return [];
-        const sample = data[0]!;
-        return columns.filter((col) => Array.isArray(sample[col]));
-    }, [columns, data]);
     return (
         <Table className="px-10">
             <TableCaption className="text-center">{type} CRUD table</TableCaption>
             <TableHeader>
                 <TableRow>
-                    {columns.map((col) => (
+                    {Object.keys(config).map((col) => (
                         <TableHead className="text-center" key={col}>
                             {col}
                         </TableHead>
@@ -450,24 +535,9 @@ function TableGenerator({
             </TableHeader>
             <TableBody>
                 {data.map((item, index) => (
-                    <RowGenerator
-                        type={type}
-                        key={index}
-                        data={item}
-                        columns={columns}
-                        disabled={disabled}
-                        schema={schema}
-                    />
+                    <RowGenerator type={type} key={index} data={item} config={config} schema={schema} />
                 ))}
-                <RowGenerator
-                    type={type}
-                    key="new"
-                    data={Object.fromEntries(arrayKeys.map((col) => [col, []]))}
-                    columns={columns}
-                    disabled={disabled}
-                    schema={schema}
-                    create
-                />
+                <RowGenerator type={type} data={{} as T} config={config} schema={schema} create />
             </TableBody>
         </Table>
     );
@@ -477,42 +547,78 @@ export async function loader() {
     const client = getClient();
     const { data: products, error: perror } = await client.GET("/products/");
     const { data: categories, error: cerror } = await client.GET("/categories/");
-    if (perror || cerror) {
+    const { data: images, error: ierror } = await client.GET("/images/");
+    if (perror || cerror || ierror) {
         throw new Response("Failed to load data", { status: 500 });
     }
-    return { products, categories };
+    return { products, categories, images };
 }
 
 export default function Admin({ loaderData }: Route.ComponentProps) {
-    const fixed: (keyof TableType)[] = ["id", "name", "description", "created_at", "updated_at"];
-    const Pcolumns: (keyof TableType)[] = [
-        ...["id", "name", "description"],
-        ...(Object.keys(loaderData.products[0] || {}) as (keyof TableType)[]).filter(
-            (col) => ![...fixed].includes(col),
-        ),
-        ...["created_at", "updated_at"],
-    ] as (keyof TableType)[];
-    const Ccolumns: (keyof TableType)[] = [
-        ...["id", "name", "description"],
-        ...(Object.keys(loaderData.categories[0] || {}) as (keyof TableType)[]).filter(
-            (col) => ![...fixed].includes(col),
-        ),
-        ...["created_at", "updated_at"],
-    ] as (keyof TableType)[];
-    const disabled: (keyof TableType)[] = ["id", "created_at", "updated_at"];
+    const BaseConfig = ConfigGenerator<{ id?: string; created_at?: string | null; updated_at?: string | null }>([
+        { name: "id", disabled: true },
+        { name: "created_at", disabled: true },
+        { name: "updated_at", disabled: true },
+    ]);
+
+    const PConfig = {
+        ...BaseConfig,
+        ...ConfigGenerator<Product>([
+            { name: "name" },
+            { name: "description" },
+            { name: "price" },
+            { name: "catid" },
+            {
+                name: "images",
+                toSchemaType: (data) => (Array.isArray(data) ? data.map((d) => String(d.id)) : []),
+                fromSchemaType: (value) =>
+                    Array.isArray(value)
+                        ? value.reduce((acc, id) => {
+                              const img = loaderData.images.find((i) => i.id === id);
+                              if (img) acc.push(img);
+                              return acc;
+                          }, [] as Image[])
+                        : [],
+
+                render: (value) => {
+                    const img = loaderData.images.find((i) => i.id === value);
+                    return (
+                        <>
+                            <ItemMedia variant="image">
+                                <Img
+                                    src={img?.url}
+                                    alt={img?.alt || ""}
+                                    width={32}
+                                    height={32}
+                                    className="object-cover"
+                                />
+                            </ItemMedia>
+                            <ItemContent>
+                                <ItemTitle className="line-clamp-1">{img?.id}</ItemTitle>
+                            </ItemContent>
+                        </>
+                    );
+                },
+            },
+        ]),
+    };
+    const CConfig = {
+        ...BaseConfig,
+        ...ConfigGenerator<Category>([{ name: "name" }, { name: "description" }]),
+    };
+
+    const IConfig = {
+        ...BaseConfig,
+        ...ConfigGenerator<Image>([{ name: "url" }, { name: "alt" }]),
+    };
+
     return (
         <div className="p-4">
             <h1 className="text-2xl font-bold mb-4">Admin Dashboard</h1>
             <div className="flex flex-col">
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2">Products</h2>
-                    <TableGenerator
-                        data={loaderData.products}
-                        type="Product"
-                        schema={productSchema}
-                        columns={Pcolumns}
-                        disabled={disabled}
-                    />
+                    <TableGenerator data={loaderData.products} type="Product" schema={productSchema} config={PConfig} />
                 </div>
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2">Categories</h2>
@@ -520,9 +626,12 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                         data={loaderData.categories}
                         type="Category"
                         schema={categorySchema}
-                        columns={Ccolumns}
-                        disabled={disabled}
+                        config={CConfig}
                     />
+                </div>
+                <div className="p-4 rounded shadow">
+                    <h2 className="text-xl font-semibold mb-2">Images</h2>
+                    <TableGenerator data={loaderData.images} type="Image" schema={imageSchema} config={IConfig} />
                 </div>
             </div>
         </div>
