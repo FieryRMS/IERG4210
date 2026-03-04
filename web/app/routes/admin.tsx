@@ -11,6 +11,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useFetcher, type HTMLFormMethod } from "react-router";
 import { Spinner } from "@/components/ui/spinner";
 import { useStore } from "@tanstack/react-form";
+import { parseFormData } from "@remix-run/form-data-parser";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -61,11 +62,18 @@ const imageSchema = baseSchema.extend({
 type TableTypes = "Product" | "Category" | "Image";
 
 export async function action({ request }: { request: Request }) {
-    const client = getClient();
     await new Promise((resolve) => setTimeout(resolve, 1000));
+    const form = await parseFormData(request);
+    const client = getClient();
+
+    const rawdata = form.get("data");
+
+    if (rawdata == null || typeof rawdata !== "string") {
+        throw new Response("Invalid data", { status: 400 });
+    }
 
     const data: z.infer<typeof productSchema | typeof categorySchema | typeof imageSchema> & { type: TableTypes } =
-        await request.json();
+        await JSON.parse(rawdata);
     switch (data.type) {
         case "Product":
             switch (request.method) {
@@ -253,7 +261,9 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
                 dsubmit: "delete",
             };
             const method = methodMap[bState];
-            await fetcher.submit(value, { method, encType: "application/json" });
+            const form = new FormData();
+            form.append("data", JSON.stringify(value));
+            await fetcher.submit(form, { method, encType: "multipart/form-data" });
         },
     });
     const isSubmitted = useStore(form.store, (state) => state.isSubmitted);
