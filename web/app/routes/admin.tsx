@@ -401,7 +401,12 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
                                                         <Button
                                                             type="button"
                                                             variant="outline"
-                                                            className="text-center disabled:opacity-100! border-primary/50 disabled:border-primary/10"
+                                                            className="text-center disabled:opacity-70! border-primary/50 disabled:border-primary/10 disabled:bg-transparent"
+                                                            disabled={
+                                                                config[col].disabled ||
+                                                                (!["edit", "save"].includes(bState) && !create) ||
+                                                                bState.includes("submit")
+                                                            }
                                                         />
                                                     }
                                                 >
@@ -456,11 +461,11 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
 
                                                                     <ItemActions>
                                                                         <Button
-                                                                            className="p-2 mx-1 relative overflow-hidden group"
                                                                             variant="outline"
                                                                             type="button"
+                                                                            size="sm"
                                                                         >
-                                                                            <Plus className="w-7" />
+                                                                            <Plus className="w-4" />
                                                                         </Button>
                                                                     </ItemActions>
                                                                 </Item>
@@ -585,7 +590,7 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
                                                     setBState("dsubmit");
                                                 }
                                             }}
-                                            disabled={bState.includes("submit")}
+                                            disabled={!["idle", "delete"].includes(bState)}
                                         >
                                             {["idle", "delete"].includes(bState) && (
                                                 <ConfirmAnim
