@@ -25,14 +25,16 @@ import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from 
 import { Img } from "@/components/img-wrapper";
 
 const baseSchema = z.object({
-    id: z.uuidv4().optional(),
+    id: z.uuidv4().nullable().optional(),
     created_at: z
         .string()
         .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}$/, "Invalid date format")
+        .nullable()
         .optional(),
     updated_at: z
         .string()
         .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}$/, "Invalid date format")
+        .nullable()
         .optional(),
 });
 const productSchema = baseSchema.extend({
@@ -154,14 +156,16 @@ function ConfirmAnim({
         </>
     );
 }
-type SchemaType = string | number | null | undefined | (string | number | null | undefined)[];
+type SchemaType = string | number | null | (string | number | null)[];
 interface FieldConfig<T> {
     disabled: boolean;
     render: (value: SchemaType) => React.ReactNode | string;
     toSchemaType: (data: T) => SchemaType;
     fromSchemaType: (value: SchemaType) => T;
 }
-function ConfigGenerator<T>(fields: (Partial<FieldConfig<T[keyof T]>> & { name: keyof T })[]): {
+function ConfigGenerator<T extends z.infer<typeof baseSchema>>(
+    fields: (Partial<FieldConfig<T[keyof T]>> & { name: keyof T })[],
+): {
     [K in keyof T]: FieldConfig<T[K]>;
 } {
     return fields.reduce(
@@ -175,14 +179,12 @@ function ConfigGenerator<T>(fields: (Partial<FieldConfig<T[keyof T]>> & { name: 
                         if (Array.isArray(data))
                             return data.map((item) => {
                                 if (typeof item === "object") return JSON.stringify(item);
-                                if (item === null) return null;
-                                if (item === undefined) return undefined;
+                                if (item === null || item === undefined) return null;
                                 if (typeof item === "number") return item;
                                 return String(item);
                             });
                         if (typeof data === "object") return JSON.stringify(data);
-                        if (data === null) return null;
-                        if (data === undefined) return undefined;
+                        if (data === null || data === undefined) return null;
                         if (typeof data === "number") return data;
                         return String(data);
                     }),
@@ -194,7 +196,7 @@ function ConfigGenerator<T>(fields: (Partial<FieldConfig<T[keyof T]>> & { name: 
     );
 }
 
-function RowGenerator<T>({
+function RowGenerator<T extends z.infer<typeof baseSchema>>({
     type,
     data,
     config,
@@ -226,7 +228,7 @@ function RowGenerator<T>({
     const [bState, setBState] = useState<
         "idle" | "edit" | "save" | "delete" | "create" | "ssubmit" | "dsubmit" | "csubmit"
     >("idle");
-    const fetcher = useFetcher<T>();
+    const fetcher = useFetcher<z.infer<typeof schema>>();
     const form = useAppForm({
         defaultValues,
         validators: {
@@ -234,7 +236,6 @@ function RowGenerator<T>({
             onChangeAsyncDebounceMs: 300,
             onSubmit: ({ formApi }) => {
                 const errors = formApi.parseValuesWithSchema(schema);
-                console.log(formApi);
                 if (!errors) return errors;
                 setBState((prev) => {
                     if (prev === "dsubmit") return "idle";
@@ -246,7 +247,6 @@ function RowGenerator<T>({
             },
         },
         onSubmit: async ({ value }) => {
-            console.log(value);
             const methodMap: Partial<Record<typeof bState, HTMLFormMethod>> = {
                 csubmit: "post",
                 ssubmit: "put",
@@ -257,11 +257,9 @@ function RowGenerator<T>({
         },
     });
     const isSubmitted = useStore(form.store, (state) => state.isSubmitted);
-    console.log({ bState, isSubmitted, fetcherState: fetcher.state });
 
     useEffect(() => {
         if (isSubmitted && bState.includes("submit") && fetcher.state === "idle") {
-            console.log("Fetch complete", fetcher.data);
             setBState("idle");
             form.reset(defaultValues);
             setRow((fetcher.data as T) ?? row);
@@ -307,7 +305,9 @@ function RowGenerator<T>({
                                                 </AlertDialogTrigger>
                                                 <AlertDialogContent>
                                                     <AlertDialogHeader className="flex flex-col gap-1 items-center">
-                                                        <AlertDialogTitle>Edit {col}</AlertDialogTitle>
+                                                        <AlertDialogTitle>
+                                                            Edit {col} for {type} ID: {row.id}
+                                                        </AlertDialogTitle>
                                                         <div className="flex w-full max-w-md flex-col gap-2">
                                                             <ItemGroup className="gap-2" role="list">
                                                                 {field.state.value?.map((val, index) => (
@@ -506,7 +506,7 @@ function RowGenerator<T>({
     );
 }
 
-function TableGenerator<T>({
+function TableGenerator<T extends z.infer<typeof baseSchema>>({
     data,
     type,
     schema,
@@ -534,8 +534,8 @@ function TableGenerator<T>({
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {data.map((item, index) => (
-                    <RowGenerator type={type} key={index} data={item} config={config} schema={schema} />
+                {data.map((item) => (
+                    <RowGenerator type={type} key={item.id} data={item} config={config} schema={schema} />
                 ))}
                 <RowGenerator type={type} data={{} as T} config={config} schema={schema} create />
             </TableBody>
@@ -560,6 +560,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         { name: "created_at", disabled: true },
         { name: "updated_at", disabled: true },
     ]);
+    console.log(loaderData);
 
     const PConfig = {
         ...BaseConfig,
