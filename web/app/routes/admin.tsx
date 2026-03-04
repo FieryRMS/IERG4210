@@ -7,7 +7,7 @@ import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
 import { cn, getClient, onChangeAsync } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useFetcher, type HTMLFormMethod } from "react-router";
 import { Spinner } from "@/components/ui/spinner";
 import { useStore } from "@tanstack/react-form";
@@ -55,11 +55,12 @@ const categorySchema = baseSchema.extend({
 });
 
 const imageSchema = baseSchema.extend({
-    url: z.union([z.file().max(10 * 1024 * 1024), z.string()]),
+    url: z.url(),
     alt: z.string().nullable(),
     type: z.literal("Image"),
 });
 
+type SchemaType = string | number | null | (string | number | null)[];
 type TableTypes = "Product" | "Category" | "Image";
 
 export async function action({ request }: { request: Request }) {
@@ -76,23 +77,31 @@ export async function action({ request }: { request: Request }) {
     const form = await parseFormData(request, fileStorageConfig, uploadHandler);
     const client = getClient();
 
-    form.forEach((value, key) => {
-        console.log(`${key}:`, value);
-    });
+    const type = form.get("type");
+    const object = Array.from(form.entries()).reduce(
+        (acc, [key, value]) => {
+            if (typeof value !== "string") {
+                return acc;
+            }
+            if (acc[key]) {
+                if (!Array.isArray(acc[key])) {
+                    acc[key] = [acc[key]];
+                }
+                acc[key].push(value);
+            } else if (typeof value === "string") {
+                acc[key] = value;
+            }
+            return acc;
+        },
+        {} as Record<string, string | string[]>,
+    );
 
-    const rawdata = form.get("data");
-
-    if (rawdata == null || typeof rawdata !== "string") {
-        throw new Response("Invalid data", { status: 400 });
-    }
-
-    const data: z.infer<typeof productSchema | typeof categorySchema | typeof imageSchema> & {
-        type: TableTypes;
-        url?: string;
-    } = await JSON.parse(rawdata);
-    data.url = (form.get("url") as string | undefined) || data.url;
-    switch (data.type) {
-        case "Product":
+    switch (type) {
+        case "Product": {
+            const { data, success, error } = productSchema.safeParse(object);
+            if (!success) {
+                throw new Response(JSON.stringify(error), { status: 400 });
+            }
             switch (request.method) {
                 case "POST":
                     return (await client.POST("/products/", { body: data })).data;
@@ -109,7 +118,12 @@ export async function action({ request }: { request: Request }) {
                     ).data;
             }
             break;
-        case "Category":
+        }
+        case "Category": {
+            const { data, success, error } = categorySchema.safeParse(object);
+            if (!success) {
+                throw new Response(JSON.stringify(error), { status: 400 });
+            }
             switch (request.method) {
                 case "POST":
                     return (await client.POST("/categories/", { body: data })).data;
@@ -128,7 +142,12 @@ export async function action({ request }: { request: Request }) {
                     ).data;
             }
             break;
-        case "Image":
+        }
+        case "Image": {
+            const { data, success, error } = imageSchema.safeParse(object);
+            if (!success) {
+                throw new Response(JSON.stringify(error), { status: 400 });
+            }
             switch (request.method) {
                 case "POST":
                     return (await client.POST("/images/", { body: data })).data;
@@ -144,6 +163,7 @@ export async function action({ request }: { request: Request }) {
                         .data;
             }
             break;
+        }
     }
     throw new Response("Invalid request", { status: 400 });
 }
@@ -181,7 +201,6 @@ function ConfirmAnim({
         </>
     );
 }
-type SchemaType = string | number | null | (string | number | null)[];
 interface FieldConfig<T> {
     disabled: boolean;
     render: (value: SchemaType) => React.ReactNode | string;
@@ -232,10 +251,7 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
 }: {
     type: TableTypes;
     data: T;
-    schema: z.ZodType<
-        { [K in keyof T]: ReturnType<FieldConfig<T[K]>["toSchemaType"]> } & { type: TableTypes },
-        { [K in keyof T]: ReturnType<FieldConfig<T[K]>["toSchemaType"]> } & { type: TableTypes }
-    >;
+    schema: z.ZodType<{ [K in keyof T]: SchemaType }, { [K in keyof T]: SchemaType }>;
     config: { [K in keyof T]: FieldConfig<T[K]> };
     create?: boolean;
 }) {
@@ -245,7 +261,7 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
     }, [data]);
 
     const defaultValues: z.infer<typeof schema> = useMemo(() => {
-        const values = {} as { [K in keyof T]: ReturnType<FieldConfig<T[K]>["toSchemaType"]> };
+        const values = {} as { [K in keyof T]: SchemaType };
         (Object.keys(config) as (keyof T)[]).forEach((col) => {
             values[col] = config[col].toSchemaType(row[col]);
         });
@@ -281,8 +297,20 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
             };
             const method = methodMap[bState];
             const form = new FormData();
-            form.append("data", JSON.stringify(value));
-            if (value.url instanceof File) form.append("url", value.url as File, value.url.name);
+            Object.entries(value).forEach(([key, val]) => {
+                // if serializable, then add as JSON string, otherwise add as is (for file uploads)
+                if (typeof val === "string" || typeof val === "number" || val === null) {
+                    form.append(key, String(val));
+                } else if (Array.isArray(val)) {
+                    val.forEach((item) => {
+                        if (typeof item === "string" || typeof item === "number" || item === null) {
+                            form.append(key, String(item));
+                        }
+                    });
+                } else {
+                    form.append(key, val);
+                }
+            });
             await fetcher.submit(form, { method, encType: "multipart/form-data" });
         },
     });
@@ -295,7 +323,6 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
             setRow((fetcher.data as T) ?? row);
         }
     }, [bState, defaultValues, fetcher.data, fetcher.state, form, isSubmitted, row]);
-    const tempref = useRef<HTMLInputElement>(null);
     return (
         <form.AppForm>
             <form onSubmit={(e) => e.preventDefault()} className={TableRow({}).props.className}>
@@ -307,21 +334,13 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
                                     <field.Control>
                                         {!Array.isArray(field.state.value) ? (
                                             <Input
-                                                type={config[col].file && create ? "file" : "text"}
+                                                type="text"
                                                 inputMode="numeric"
-                                                value={
-                                                    config[col].file && create
-                                                        ? undefined
-                                                        : (field.state.value as string) || ""
-                                                }
+                                                value={(field.state.value as string) || ""}
                                                 accept="image/*"
                                                 name={col}
                                                 onChange={(e) => {
-                                                    if (config[col].file && create)
-                                                        field.handleChange(
-                                                            e.target.files?.[0] as typeof field.state.value,
-                                                        );
-                                                    else field.handleChange(e.target.value as typeof field.state.value);
+                                                    field.handleChange(e.target.value as typeof field.state.value);
                                                 }}
                                                 onBlur={field.handleBlur}
                                                 className="text-center read-only:opacity-100! border-primary/50 read-only:border-primary/10"
@@ -388,7 +407,7 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
                                                                 >
                                                                     <ItemContent className="flex items-center justify-center">
                                                                         <ItemTitle className="line-clamp-1 w-full">
-                                                                            <Input type="text" ref={tempref} />
+                                                                            <Input type="text" />
                                                                         </ItemTitle>
                                                                     </ItemContent>
 
@@ -397,20 +416,6 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
                                                                             className="p-2 mx-1 relative overflow-hidden group"
                                                                             variant="outline"
                                                                             type="button"
-                                                                            onClick={() => {
-                                                                                field.handleChange((old) => {
-                                                                                    if (old == null)
-                                                                                        return [
-                                                                                            tempref.current?.value ??
-                                                                                                "",
-                                                                                        ] as typeof old;
-                                                                                    if (!Array.isArray(old)) return old;
-                                                                                    return [
-                                                                                        ...old,
-                                                                                        tempref.current?.value ?? "",
-                                                                                    ] as typeof old;
-                                                                                });
-                                                                            }}
                                                                         >
                                                                             <Plus className="w-7" />
                                                                         </Button>
