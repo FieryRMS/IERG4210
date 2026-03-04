@@ -7,7 +7,7 @@ export enum Theme {
     Dark = "dark",
     Light = "light",
     System = "system",
-};
+}
 
 type ThemeProviderProps = {
     children: React.ReactNode;
@@ -36,12 +36,13 @@ function getPrefersColorScheme(): Theme.Dark | Theme.Light {
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? Theme.Dark : Theme.Light;
 }
 
-export function ThemeProvider({
-    children,
-    defaultTheme,
-    ...props
-}: ThemeProviderProps) {
-    const [theme, setTheme] = useState<Theme>(defaultTheme);
+export function ThemeProvider({ children, defaultTheme, ...props }: ThemeProviderProps) {
+    const [theme, setTheme] = useState<Theme>(() => {
+        if (Object.values(Theme).includes(defaultTheme)) {
+            return defaultTheme;
+        }
+        return Theme.System;
+    });
 
     useEffect(() => {
         const root = window.document.documentElement;

@@ -1,4 +1,4 @@
-import { ConstructionIcon, ShoppingCartIcon } from "lucide-react";
+import { ShoppingCartIcon } from "lucide-react";
 import { Card, CardAction, CardHeader, CardTitle } from "@/components/ui/card";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { useCart } from "@/hooks/cart-provider";
 import { Img } from "@/components/img-wrapper";
 import { Skeleton } from "../ui/skeleton";
 
-export function ProductCard({ product }: { product: Product; }) {
+export function ProductCard({ product }: { product: Product }) {
     const dollars = Math.floor(product.price);
     const cents = Math.round((product.price - dollars) * 100)
         .toString()
@@ -17,18 +17,11 @@ export function ProductCard({ product }: { product: Product; }) {
     const { addQuantity: addToCart } = useCart();
     return (
         <Card className="w-full max-w-sm p-0 relative overflow-hidden flex max-h-fit">
-            <Link
-                to={`/p/${product.id}`}
-                viewTransition
-                state={{
-                    product,
-                }}
-                style={product.id ? {} : { pointerEvents: "none" }}
-            >
+            <Link to={`/p/${product.id}`} viewTransition style={product.id ? {} : { pointerEvents: "none" }}>
                 <AspectRatio ratio={3 / 4}>
                     <Img
-                        src={product?.images?.[0]}
-                        alt={product.name}
+                        src={`${product?.images?.[0]?.url}?thumbnail=true`}
+                        alt={product?.images?.[0]?.alt ?? product.name}
                         className="w-full h-full object-cover pointer-events-none select-none"
                         draggable={false}
                     />

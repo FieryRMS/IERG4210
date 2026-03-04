@@ -1,15 +1,14 @@
+import uuid
+
+from pydantic import computed_field
+from sqlmodel import Field, Relationship
+
 from db.base import SQLModel
 from models import BaseModel
-from sqlmodel import JSON, Column, Field, Relationship
 
 
 class CategoryBase(BaseModel):
     name: str
-    description: str | None = None
-
-
-class CategoryUpdate(BaseModel):
-    name: str | None = None
     description: str | None = None
 
 
@@ -21,22 +20,47 @@ class Category(CategoryBase, SQLModel, table=True):
     )
 
 
+class ImageProductLink(SQLModel, table=True):
+    image_id: uuid.UUID = Field(foreign_key="images.id", primary_key=True)
+    product_id: uuid.UUID = Field(foreign_key="products.id", primary_key=True)
+
+
+class ImageBase(BaseModel):
+    alt: str | None = None
+    url: str
+
+
+class Image(ImageBase, SQLModel, table=True):
+    __tablename__ = "images"  # pyright: ignore[reportAssignmentType]
+
+    products: list["Product"] = Relationship(
+        back_populates="images", link_model=ImageProductLink
+    )
+
+
 class ProductBase(BaseModel):
-    catid: int = Field(foreign_key="categories.id")
+    catid: uuid.UUID = Field(foreign_key="categories.id")
     name: str
     price: float
     description: str | None = None
-    images: list[str] = Field(default=[], sa_column=Column(JSON))
 
 
-class ProductUpdate(BaseModel):
-    name: str | None = None
-    price: float | None = None
-    description: str | None = None
-    images: list[str] | None = None
+class ProductUpdate(ProductBase):
+    images: list[uuid.UUID] = []
 
 
 class Product(ProductBase, SQLModel, table=True):
     __tablename__ = "products"  # pyright: ignore[reportAssignmentType]
+    UPSERT_EXCLUDE_FIELDS = {"images"}
 
     category: Category = Relationship(back_populates="products")
+    images: list[Image] = Relationship(
+        back_populates="products",
+        link_model=ImageProductLink,
+        sa_relationship_kwargs={"lazy": "selectin"},
+    )
+
+    @computed_field(alias="images")
+    @property
+    def _images(self) -> list[Image]:
+        return self.images

@@ -2,10 +2,11 @@
 from .shop import (
     Category,
     CategoryBase,
-    CategoryUpdate,
+    Image,
+    ImageBase,
     Product,
     ProductBase,
     ProductUpdate,
 )
 
-__all__ = ["Category", "Product"]
+__all__ = ["Category", "Product", "Image"]

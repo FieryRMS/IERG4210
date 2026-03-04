@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Request
-from sqlmodel import Session, select
+import uuid
 
-from db import Category, ProductBase, ProductUpdate
-from db.shop import Product
+from fastapi import APIRouter, Request
+from sqlmodel import Session, col, select
+
+from db import Category, Image, Product, ProductUpdate
 from models import NotFoundException
 from models.app import State
 
@@ -17,7 +18,7 @@ async def get_products(request: Request) -> list[Product]:
 
 
 @router.get("/{product_id}")
-async def get_product(request: Request, product_id: int) -> Product:
+async def get_product(request: Request, product_id: uuid.UUID) -> Product:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         product = session.get(Product, product_id)
@@ -27,7 +28,9 @@ async def get_product(request: Request, product_id: int) -> Product:
 
 
 @router.get("/category/{category_id}")
-async def get_products_by_category(request: Request, category_id: int) -> list[Product]:
+async def get_products_by_category(
+    request: Request, category_id: uuid.UUID
+) -> list[Product]:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         category = session.get(Category, category_id)
@@ -37,10 +40,14 @@ async def get_products_by_category(request: Request, category_id: int) -> list[P
 
 
 @router.post("/")
-async def new_product(request: Request, product: ProductBase) -> Product:
+async def new_product(request: Request, product: ProductUpdate) -> Product:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         db_product = Product.model_validate(product)
+        images = session.exec(
+            select(Image).where(col(Image.id).in_(product.images))
+        ).all()
+        db_product.images = list(images)
         session.add(db_product)
         session.commit()
         session.refresh(db_product)
@@ -49,7 +56,7 @@ async def new_product(request: Request, product: ProductBase) -> Product:
 
 @router.put("/{product_id}")
 async def update_product(
-    request: Request, product_id: int, product: ProductUpdate
+    request: Request, product_id: uuid.UUID, product: ProductUpdate
 ) -> Product:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
@@ -57,6 +64,10 @@ async def update_product(
         if not db_product:
             raise NotFoundException
         db_product.update_model(product)
+        images = session.exec(
+            select(Image).where(col(Image.id).in_(product.images))
+        ).all()
+        db_product.images = list(images)
         session.add(db_product)
         session.commit()
         session.refresh(db_product)
@@ -64,7 +75,7 @@ async def update_product(
 
 
 @router.delete("/{product_id}")
-async def delete_product(request: Request, product_id: int) -> None:
+async def delete_product(request: Request, product_id: uuid.UUID) -> None:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         product = session.get(Product, product_id)

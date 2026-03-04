@@ -1,4 +1,5 @@
 import datetime
+import uuid
 from typing import ClassVar
 
 # from sqlalchemy.dialects.postgresql import insert
@@ -19,7 +20,7 @@ class SQLModel(BaseModel, _SQLModel):
     # UPSERT statement
     UPSERT_EXCLUDE_FIELDS: ClassVar[set[str]] = set()
 
-    id: int = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     created_at: datetime.datetime | None = Field(
         default_factory=lambda: datetime.datetime.now(datetime.timezone.utc),
     )
@@ -53,6 +54,6 @@ class SQLModel(BaseModel, _SQLModel):
     def update_model(self, model: BaseModel):
         update = self.model_copy(update=model.model_dump(exclude_unset=True))
         for field in model.model_fields_set:
-            if hasattr(self, field):
+            if hasattr(self, field) and field not in self.UPSERT_EXCLUDE_FIELDS:
                 setattr(self, field, getattr(update, field))
         self.updated_at = datetime.datetime.now(datetime.timezone.utc)

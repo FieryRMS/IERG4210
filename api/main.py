@@ -5,13 +5,14 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import dotenv
-import routes
-import routes.categories
 from fastapi import FastAPI, Request, Response
 from fastapi.routing import APIRoute
-from models.app import State
 from sqlalchemy import create_engine
 from sqlmodel import Session, SQLModel
+
+import routes
+import routes.categories
+from models.app import State
 
 dotenv.load_dotenv()  # Load environment variables from .env file
 
@@ -52,51 +53,100 @@ async def lifespan(app: FastAPI):
         ]
         prods = [
             Product(
-                catid=1,
                 name="Smartphone",
                 price=699.99,
                 description="Latest model smartphone with advanced features",
+                category=cats[0],
+                images=[
+                    Image(
+                        url="https://avatar.vercel.sh/smartphone.png",
+                        alt="Smartphone front view",
+                    ),
+                    Image(
+                        url="https://avatar.vercel.sh/smartphone-back.png",
+                        alt="Smartphone back view",
+                    ),
+                    Image(
+                        url="https://avatar.vercel.sh/smartphone-side.png",
+                        alt="Smartphone side view",
+                    ),
+                ],
             ),
             Product(
-                catid=1,
                 name="Laptop",
                 price=1299.99,
                 description="High-performance laptop for work and gaming",
+                category=cats[0],
+                images=[
+                    Image(
+                        url="https://avatar.vercel.sh/laptop.png",
+                        alt="Laptop front view",
+                    ),
+                    Image(
+                        url="https://avatar.vercel.sh/laptop-side.png",
+                        alt="Laptop side view",
+                    ),
+                ],
             ),
             Product(
-                catid=2,
                 name="Novel",
                 price=19.99,
                 description="Bestselling fiction novel",
+                category=cats[1],
+                images=[
+                    Image(
+                        url="https://avatar.vercel.sh/novel.png",
+                        alt="Novel cover",
+                    ),
+                ],
             ),
             Product(
-                catid=2,
                 name="Textbook",
                 price=89.99,
                 description="Comprehensive textbook for students",
+                category=cats[1],
+                images=[
+                    Image(
+                        url="https://avatar.vercel.sh/textbook.png",
+                        alt="Textbook cover",
+                    ),
+                ],
             ),
             Product(
-                catid=3,
                 name="T-shirt",
                 price=12.99,
                 description="Comfortable cotton t-shirt",
+                category=cats[2],
+                images=[
+                    Image(
+                        url="https://avatar.vercel.sh/tshirt.png",
+                        alt="T-shirt front view",
+                    ),
+                    Image(
+                        url="https://avatar.vercel.sh/tshirt-back.png",
+                        alt="T-shirt back view",
+                    ),
+                ],
             ),
             Product(
-                catid=3,
                 name="Jeans",
                 price=49.99,
                 description="Stylish denim jeans",
+                category=cats[2],
                 images=[
-                    "https://avatar.vercel.sh/0x0",
-                    "https://avatar.vercel.sh/0x1",
-                    "https://avatar.vercel.sh/0x2",
+                    Image(
+                        url="https://avatar.vercel.sh/jeans.png",
+                        alt="Jeans front view",
+                    ),
+                    Image(
+                        url="https://avatar.vercel.sh/jeans-back.png",
+                        alt="Jeans back view",
+                    ),
                 ],
             ),
         ]
 
         with Session(state["engine"]) as session:
-            for cat in cats:
-                session.add(cat)
             for prod in prods:
                 session.add(prod)
             session.commit()
@@ -135,3 +185,4 @@ async def log_requests(
 app.include_router(routes.root.router)
 app.include_router(routes.categories.router)
 app.include_router(routes.products.router)
+app.include_router(routes.images.router)
