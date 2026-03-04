@@ -12,7 +12,8 @@ import { useFetcher, type HTMLFormMethod } from "react-router";
 import { Spinner } from "@/components/ui/spinner";
 import { useStore } from "@tanstack/react-form";
 import { type FileUpload, parseFormData } from "@remix-run/form-data-parser";
-import { getStorageKey, fileStorage, fileStorageConfig } from "@/storage";
+import { getStorageKey, fileStorage } from "@/storage";
+import { fileStorageConfig, UPLOAD_URL } from "@/config";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -25,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Img } from "@/components/img-wrapper";
+import { ButtonGroup } from "@/components/ui/button-group";
 
 const baseSchema = z.object({
     id: z.uuidv4().nullable().optional(),
@@ -55,12 +57,19 @@ const categorySchema = baseSchema.extend({
 });
 
 const imageSchema = baseSchema.extend({
-    url: z.url(),
-    alt: z.string().nullable(),
+    url: z.union([
+        z.url({
+            protocol: /^https?$/,
+            hostname: z.regexes.domain,
+        }),
+        z.string().regex(new RegExp(`^${UPLOAD_URL}`)),
+        z.file().max(fileStorageConfig.maxFileSize!),
+    ]),
+    alt: z.string().nullable().optional(),
     type: z.literal("Image"),
 });
 
-type SchemaType = string | number | null | (string | number | null)[];
+type SchemaType = string | number | null | File | (string | number | null)[];
 type TableTypes = "Product" | "Category" | "Image";
 
 export async function action({ request }: { request: Request }) {
@@ -145,17 +154,19 @@ export async function action({ request }: { request: Request }) {
         }
         case "Image": {
             const { data, success, error } = imageSchema.safeParse(object);
-            if (!success) {
+            if (!success || typeof data.url !== "string") {
                 throw new Response(JSON.stringify(error), { status: 400 });
             }
             switch (request.method) {
                 case "POST":
-                    return (await client.POST("/images/", { body: data })).data;
+                    return (
+                        await client.POST("/images/", { body: data as z.infer<typeof imageSchema> & { url: string } })
+                    ).data;
                 case "PUT":
                     return (
                         await client.PUT(`/images/{image_id}`, {
                             params: { path: { image_id: data.id! } },
-                            body: data,
+                            body: data as z.infer<typeof imageSchema> & { url: string },
                         })
                     ).data;
                 case "DELETE":
@@ -223,13 +234,13 @@ function ConfigGenerator<T extends z.infer<typeof baseSchema>>(
                     ((data) => {
                         if (Array.isArray(data))
                             return data.map((item) => {
-                                if (typeof item === "object") return JSON.stringify(item);
                                 if (item === null || item === undefined) return null;
+                                if (typeof item === "object") return JSON.stringify(item);
                                 if (typeof item === "number") return item;
                                 return String(item);
                             });
-                        if (typeof data === "object") return JSON.stringify(data);
                         if (data === null || data === undefined) return null;
+                        if (typeof data === "object") return JSON.stringify(data);
                         if (typeof data === "number") return data;
                         return String(data);
                     }),
@@ -299,11 +310,14 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
             const form = new FormData();
             Object.entries(value).forEach(([key, val]) => {
                 // if serializable, then add as JSON string, otherwise add as is (for file uploads)
-                if (typeof val === "string" || typeof val === "number" || val === null) {
+                if (val == null || val == undefined) {
+                    return;
+                }
+                if (typeof val === "string" || typeof val === "number") {
                     form.append(key, String(val));
                 } else if (Array.isArray(val)) {
                     val.forEach((item) => {
-                        if (typeof item === "string" || typeof item === "number" || item === null) {
+                        if (typeof item === "string" || typeof item === "number") {
                             form.append(key, String(item));
                         }
                     });
@@ -333,24 +347,53 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
                                 <form.Item>
                                     <field.Control>
                                         {!Array.isArray(field.state.value) ? (
-                                            <Input
-                                                type="text"
-                                                inputMode="numeric"
-                                                value={(field.state.value as string) || ""}
-                                                accept="image/*"
-                                                name={col}
-                                                onChange={(e) => {
-                                                    field.handleChange(e.target.value as typeof field.state.value);
-                                                }}
-                                                onBlur={field.handleBlur}
-                                                className="text-center read-only:opacity-100! border-primary/50 read-only:border-primary/10"
-                                                readOnly={
-                                                    (config[col].file && !create) ||
-                                                    config[col].disabled ||
-                                                    (!["edit", "save"].includes(bState) && !create) ||
-                                                    bState.includes("submit")
-                                                }
-                                            />
+                                            <ButtonGroup className="w-full">
+                                                <Input
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    value={
+                                                        field.state.value instanceof File
+                                                            ? field.state.value.name
+                                                            : String(field.state.value ?? "")
+                                                    }
+                                                    name={col}
+                                                    onChange={(e) => {
+                                                        console.log(field.state.value);
+                                                        field.handleChange(e.target.value as typeof field.state.value);
+                                                    }}
+                                                    onBlur={field.handleBlur}
+                                                    className="text-center read-only:opacity-80! border-primary/50 read-only:border-primary/10"
+                                                    readOnly={
+                                                        (config[col].file && !create) ||
+                                                        config[col].disabled ||
+                                                        (!["edit", "save"].includes(bState) && !create) ||
+                                                        bState.includes("submit")
+                                                    }
+                                                />
+                                                {config[col].file && create && (
+                                                    <Button
+                                                        onClick={() => {
+                                                            const input = document.createElement("input");
+                                                            input.type = "file";
+                                                            input.accept = "image/*";
+                                                            input.style.display = "none";
+                                                            input.onchange = (e) => {
+                                                                const file = (e.target as HTMLInputElement).files?.[0];
+                                                                if (file) {
+                                                                    field.handleChange(
+                                                                        file as typeof field.state.value,
+                                                                    );
+                                                                }
+                                                                input.remove();
+                                                            };
+                                                            document.body.appendChild(input);
+                                                            input.click();
+                                                        }}
+                                                    >
+                                                        File
+                                                    </Button>
+                                                )}
+                                            </ButtonGroup>
                                         ) : (
                                             <AlertDialog>
                                                 <AlertDialogTrigger

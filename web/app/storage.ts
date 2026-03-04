@@ -1,17 +1,11 @@
 import { createFsFileStorage } from "@remix-run/file-storage/fs";
-import type { ParseFormDataOptions } from "@remix-run/form-data-parser";
-
+import { UPLOAD_URL } from "./config";
 import { randomUUID } from "node:crypto";
 
 export const fileStorage = createFsFileStorage(
-    "./uploads/",
+    `${UPLOAD_URL}`,
 );
 
 export function getStorageKey() {
-    return `/uploads/${randomUUID()}`;
+    return `${UPLOAD_URL}${randomUUID()}`;
 }
-
-export const fileStorageConfig: ParseFormDataOptions = {
-    maxFileSize: 1024 * 1024 * 10, // 10MB
-    maxFiles: 1,
-};
