@@ -7,7 +7,7 @@ import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
 import { cn, getClient, onChangeAsync } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useFetcher, type HTMLFormMethod } from "react-router";
 import { Spinner } from "@/components/ui/spinner";
 import { useStore } from "@tanstack/react-form";
@@ -295,6 +295,7 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
             setRow((fetcher.data as T) ?? row);
         }
     }, [bState, defaultValues, fetcher.data, fetcher.state, form, isSubmitted, row]);
+    const tempref = useRef<HTMLInputElement>(null);
     return (
         <form.AppForm>
             <form onSubmit={(e) => e.preventDefault()} className={TableRow({}).props.className}>
@@ -323,8 +324,8 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
                                                     else field.handleChange(e.target.value as typeof field.state.value);
                                                 }}
                                                 onBlur={field.handleBlur}
-                                                className="text-center disabled:opacity-100! border-primary/50 disabled:border-primary/10"
-                                                disabled={
+                                                className="text-center read-only:opacity-100! border-primary/50 read-only:border-primary/10"
+                                                readOnly={
                                                     (config[col].file && !create) ||
                                                     config[col].disabled ||
                                                     (!["edit", "save"].includes(bState) && !create) ||
@@ -382,19 +383,38 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
                                                                 ))}
                                                                 <Item
                                                                     variant="outline"
-                                                                    className="w-full hover:bg-secondary items-center justify-center"
+                                                                    role="listitem"
+                                                                    className="w-full hover:bg-secondary"
                                                                 >
                                                                     <ItemContent className="flex items-center justify-center">
-                                                                        <ItemTitle className="line-clamp-1">
-                                                                            <Button
-                                                                                className="p-2 mx-1 relative overflow-hidden group"
-                                                                                variant="outline"
-                                                                                type="button"
-                                                                            >
-                                                                                <Plus className="w-7" />
-                                                                            </Button>
+                                                                        <ItemTitle className="line-clamp-1 w-full">
+                                                                            <Input type="text" ref={tempref} />
                                                                         </ItemTitle>
                                                                     </ItemContent>
+
+                                                                    <ItemActions>
+                                                                        <Button
+                                                                            className="p-2 mx-1 relative overflow-hidden group"
+                                                                            variant="outline"
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                field.handleChange((old) => {
+                                                                                    if (old == null)
+                                                                                        return [
+                                                                                            tempref.current?.value ??
+                                                                                                "",
+                                                                                        ] as typeof old;
+                                                                                    if (!Array.isArray(old)) return old;
+                                                                                    return [
+                                                                                        ...old,
+                                                                                        tempref.current?.value ?? "",
+                                                                                    ] as typeof old;
+                                                                                });
+                                                                            }}
+                                                                        >
+                                                                            <Plus className="w-7" />
+                                                                        </Button>
+                                                                    </ItemActions>
                                                                 </Item>
                                                             </ItemGroup>
                                                         </div>

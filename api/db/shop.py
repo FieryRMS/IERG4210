@@ -51,6 +51,7 @@ class ProductUpdate(ProductBase):
 
 class Product(ProductBase, SQLModel, table=True):
     __tablename__ = "products"  # pyright: ignore[reportAssignmentType]
+    UPSERT_EXCLUDE_FIELDS = {"images"}
 
     category: Category = Relationship(back_populates="products")
     images: list[Image] = Relationship(

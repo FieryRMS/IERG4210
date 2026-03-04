@@ -54,6 +54,6 @@ class SQLModel(BaseModel, _SQLModel):
     def update_model(self, model: BaseModel):
         update = self.model_copy(update=model.model_dump(exclude_unset=True))
         for field in model.model_fields_set:
-            if hasattr(self, field):
+            if hasattr(self, field) and field not in self.UPSERT_EXCLUDE_FIELDS:
                 setattr(self, field, getattr(update, field))
         self.updated_at = datetime.datetime.now(datetime.timezone.utc)
