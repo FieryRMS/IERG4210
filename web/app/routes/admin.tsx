@@ -483,22 +483,10 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                                                 onStart={() => setBState((prev) => (prev === "create" ? "idle" : prev))}
                                             />
                                         )}
-                                        {bState === "csubmit" ? <Spinner /> : <Plus className="w-7 relative z-10" />}
+                                        {bState === "csubmit" ? <Spinner /> : <Plus className="w-7 relative" />}
                                     </Button>
                                 ) : (
                                     <>
-                                        <Button
-                                            className="p-2 mx-1 relative overflow-hidden group"
-                                            variant="outline"
-                                            type="button"
-                                            disabled={bState == "idle"}
-                                            onClick={() => {
-                                                form.reset();
-                                                setBState("idle");
-                                            }}
-                                        >
-                                            <X className="w-7 relative z-10" />
-                                        </Button>
                                         <Button
                                             className="p-2 mx-1 relative overflow-hidden group"
                                             variant="outline"
@@ -547,11 +535,14 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                                             type="button"
                                             onClick={() => {
                                                 if (fetcher.state === "idle" && bState === "delete" && canSubmit) {
-                                                    form.handleSubmit();
                                                     setBState("dsubmit");
+                                                    form.handleSubmit();
+                                                } else if (fetcher.state === "idle" && !bState.includes("submit")) {
+                                                    setBState("idle");
+                                                    form.reset();
                                                 }
                                             }}
-                                            disabled={!["idle", "delete"].includes(bState)}
+                                            disabled={bState.includes("submit")}
                                         >
                                             {["idle", "delete"].includes(bState) && (
                                                 <ConfirmAnim
@@ -567,7 +558,24 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                                             {bState === "dsubmit" ? (
                                                 <Spinner />
                                             ) : (
-                                                <Trash className="w-7 relative z-10" />
+                                                <>
+                                                    <Trash
+                                                        className={
+                                                            "transition-all " +
+                                                            (["idle", "delete", "dsubmit"].includes(bState)
+                                                                ? "scale-100 rotate-0"
+                                                                : "scale-0 -rotate-90")
+                                                        }
+                                                    />
+                                                    <X
+                                                        className={
+                                                            "transition-all absolute " +
+                                                            (!["idle", "delete", "dsubmit"].includes(bState)
+                                                                ? "scale-100 rotate-0"
+                                                                : "scale-0 rotate-90")
+                                                        }
+                                                    />
+                                                </>
                                             )}
                                         </Button>
                                     </>
