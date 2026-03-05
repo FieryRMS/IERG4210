@@ -16,6 +16,7 @@ import { getStorageKey, fileStorage } from "@/storage";
 import { fileStorageConfig, UPLOAD_URL } from "@/config";
 import { Img } from "@/components/img-wrapper";
 import { ButtonGroup } from "@/components/ui/button-group";
+import { Drawer, DrawerClose, DrawerContent, DrawerPopup, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 
 const baseSchema = z.object({
     id: z.uuidv4().nullable().optional(),
@@ -282,8 +283,8 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
 
     const defaultValues: z.infer<typeof schema> = useMemo(() => {
         const values = {} as Partial<Record<K, SchemaType>>;
-        (Object.keys(config) as K[]).forEach((col) => {
-            if (col in row) values[col] = config[col].toSchemaType(row[col]); //  ts infers col as string, may be bug prone later
+        Object.keys(config).forEach((col) => {
+            values[config[col]!.key as K] = config[col]!.toSchemaType(row[config[col]!.key as K]);
         });
         return { ...values, type };
     }, [config, row, type]);
@@ -355,54 +356,103 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                     <TableCell className="text-center" key={col}>
                         <form.AppField name={config[col].key}>
                             {(field) => (
-                                <form.Item>
-                                    <field.Control>
-                                        {config[col].render({
-                                            type: "text",
-                                            inputMode: "numeric",
-                                            value:
-                                                field.state.value instanceof File
-                                                    ? field.state.value.name
-                                                    : String(field.state.value ?? ""),
-                                            name: col,
-                                            onChange: (e) => {
-                                                console.log(e);
-                                                if (e.target.files) {
-                                                    const file = e.target.files[0];
-                                                    if (file) {
-                                                        // Active bug in Tanstack: https://github.com/TanStack/form/issues/1932#issuecomment-3656323010
-                                                        Object.defineProperties(file, {
-                                                            name: {
-                                                                value: file.name,
-                                                                enumerable: true,
-                                                            },
-                                                            size: {
-                                                                value: file.size,
-                                                                enumerable: true,
-                                                            },
-                                                            type: {
-                                                                value: file.type,
-                                                                enumerable: true,
-                                                            },
-                                                        });
-                                                        field.handleChange(file as typeof field.state.value);
-                                                        return;
+                                <field.Control>
+                                    <form.Item>
+                                        {!config[col].nested ? (
+                                            config[col].render({
+                                                type: "text",
+                                                inputMode: "numeric",
+                                                value:
+                                                    field.state.value instanceof File
+                                                        ? field.state.value.name
+                                                        : String(field.state.value ?? ""),
+                                                name: col,
+                                                onChange: (e) => {
+                                                    console.log(e);
+                                                    if (e.target.files) {
+                                                        const file = e.target.files[0];
+                                                        if (file) {
+                                                            // Active bug in Tanstack: https://github.com/TanStack/form/issues/1932#issuecomment-3656323010
+                                                            Object.defineProperties(file, {
+                                                                name: {
+                                                                    value: file.name,
+                                                                    enumerable: true,
+                                                                },
+                                                                size: {
+                                                                    value: file.size,
+                                                                    enumerable: true,
+                                                                },
+                                                                type: {
+                                                                    value: file.type,
+                                                                    enumerable: true,
+                                                                },
+                                                            });
+                                                            field.handleChange(file as typeof field.state.value);
+                                                            return;
+                                                        }
                                                     }
-                                                }
-                                                field.handleChange(e.target.value as typeof field.state.value);
-                                            },
-                                            className:
-                                                "text-center read-only:opacity-80! border-primary/50 read-only:border-primary/10",
-                                            readOnly:
-                                                (config[col].file && !create) ||
-                                                config[col].disabled ||
-                                                (!["edit", "save"].includes(bState) && !create) ||
-                                                bState.includes("submit"),
-                                            create,
-                                        })}
-                                    </field.Control>
-                                    <field.Message className="text-wrap text-center" />
-                                </form.Item>
+                                                    field.handleChange(e.target.value as typeof field.state.value);
+                                                },
+                                                className:
+                                                    "text-center read-only:opacity-80! border-primary/50 read-only:border-primary/10",
+                                                readOnly:
+                                                    (config[col].file && !create) ||
+                                                    config[col].disabled ||
+                                                    (!["edit", "save"].includes(bState) && !create) ||
+                                                    bState.includes("submit"),
+                                                create,
+                                            })
+                                        ) : (
+                                            <Drawer swipeDirection="down" snapPoints={["65rem", 1]}>
+                                                <DrawerTrigger
+                                                    render={
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            className="text-center disabled:opacity-70! border-primary/50 disabled:border-primary/10 disabled:bg-transparent"
+                                                            disabled={
+                                                                config[col].disabled ||
+                                                                (!["edit", "save"].includes(bState) && !create) ||
+                                                                bState.includes("submit")
+                                                            }
+                                                        />
+                                                    }
+                                                >
+                                                    Edit
+                                                </DrawerTrigger>
+                                                <DrawerPopup className="min-h-screen">
+                                                    <DrawerContent className="">
+                                                        <DrawerTitle>
+                                                            Edit {col} for {type} ID: {create ? "New" : row.id}
+                                                        </DrawerTitle>
+
+                                                        <TableGenerator
+                                                            config={config[col].nested}
+                                                            data={
+                                                                config[col].fromSchemaType(
+                                                                    field.state.value as SchemaType,
+                                                                ) as Record<string, SchemaType>[]
+                                                            }
+                                                            type={type}
+                                                            schema={schema}
+                                                            onSubmit={() => {}}
+                                                        />
+
+                                                        <div className="flex items-center gap-2 w-full justify-center">
+                                                            <DrawerClose
+                                                                render={<Button variant="outline" size="sm" />}
+                                                            >
+                                                                Cancel
+                                                            </DrawerClose>
+                                                            <Button size="sm">Save</Button>
+                                                        </div>
+                                                    </DrawerContent>
+                                                </DrawerPopup>
+                                            </Drawer>
+                                        )}
+                                        <field.Message className="text-wrap text-center" />
+                                    </form.Item>
+                                </field.Control>
                             )}
                         </form.AppField>
                     </TableCell>
@@ -620,6 +670,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                         name: "preview",
                         disabled: true,
                         render: ({ create, value }) => {
+                            console.log(value);
                             return !create ? (
                                 <Img
                                     src={`${value}?thumbnail=true`}

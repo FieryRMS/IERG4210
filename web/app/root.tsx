@@ -79,7 +79,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     useBlocker(shouldBlock);
 
     return (
-        <html lang="en" className={loaderData?.theme}>
+        <html lang="en" className={`${loaderData?.theme} bg-background`}>
             <head>
                 <meta charSet="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
