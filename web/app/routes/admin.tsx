@@ -201,19 +201,28 @@ function ConfirmAnim({
         </>
     );
 }
-interface FieldConfig<T> {
+
+type FieldConfig<T> = {
     key: string;
     disabled: boolean;
     render: (props: React.ComponentProps<typeof Input> & { create?: boolean }) => JSX.Element;
     toSchemaType: (data: T) => SchemaType;
     fromSchemaType: (value: SchemaType) => T;
     file: boolean;
-}
+    nested?: T extends (infer U)[]
+        ? U extends z.infer<typeof baseSchema>
+            ? ReturnType<typeof ConfigGenerator<U>>
+            : undefined
+        : undefined;
+};
 function ConfigGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string>(
-    fields: (Partial<FieldConfig<T[K]>> & { key: K; name?: string })[],
+    fields: (Partial<FieldConfig<T[K]>> & {
+        key: K;
+        name?: string;
+    })[],
 ) {
     return fields.reduce(
-        (acc, { key, name, disabled, render, toSchemaType, fromSchemaType, file }) => {
+        (acc, { key, name, disabled, render, toSchemaType, fromSchemaType, file, nested }) => {
             (acc as Record<string, FieldConfig<T[K]>>)[name ?? key] = {
                 key,
                 disabled: disabled ?? false,
@@ -240,6 +249,7 @@ function ConfigGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T
                     }),
                 fromSchemaType: fromSchemaType ?? ((value) => value as T[K]),
                 file: file ?? false,
+                nested: nested ?? undefined,
             };
             return acc;
         },
@@ -604,6 +614,28 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                               return acc;
                           }, [] as Image[])
                         : [],
+                nested: ConfigGenerator<Image>([
+                    {
+                        key: "url",
+                        name: "preview",
+                        disabled: true,
+                        render: ({ create, value }) => {
+                            return !create ? (
+                                <Img
+                                    src={`${value}?thumbnail=true`}
+                                    alt="Image preview"
+                                    className="h-20 w-20 object-cover m-auto"
+                                />
+                            ) : (
+                                <> </>
+                            );
+                        },
+                    },
+                    {
+                        key: "id",
+                        disabled: true,
+                    },
+                ]),
             },
         ]),
     };
