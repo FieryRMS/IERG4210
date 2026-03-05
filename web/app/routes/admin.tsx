@@ -217,7 +217,12 @@ function ConfigGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T
             (acc as Record<string, FieldConfig<T[K]>>)[name ?? key] = {
                 key,
                 disabled: disabled ?? false,
-                render: render ?? (({ create, ...props }) => <Input {...props} data-create={create} />),
+                render:
+                    render ??
+                    (({ create, ...props }) => {
+                        void create;
+                        return <Input {...props} />;
+                    }),
                 toSchemaType:
                     toSchemaType ??
                     ((data) => {
@@ -614,13 +619,15 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 key: "url",
                 name: "preview",
                 disabled: true,
-                render: ({ value }) => {
-                    return (
+                render: ({ create, value }) => {
+                    return !create ? (
                         <Img
                             src={`${value}?thumbnail=true`}
                             alt="Image preview"
                             className="h-20 w-20 object-cover m-auto"
                         />
+                    ) : (
+                        <> </>
                     );
                 },
             },
