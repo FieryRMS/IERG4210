@@ -7,7 +7,7 @@ import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
 import { cn, getClient, onChangeAsync } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, type JSX } from "react";
 import { useFetcher, type HTMLFormMethod } from "react-router";
 import { Spinner } from "@/components/ui/spinner";
 import { useStore } from "@tanstack/react-form";
@@ -204,7 +204,7 @@ function ConfirmAnim({
 interface FieldConfig<T> {
     key: string;
     disabled: boolean;
-    render: (props: React.ComponentProps<typeof Input>) => React.ReactNode;
+    render: (props: React.ComponentProps<typeof Input> & { create?: boolean }) => JSX.Element;
     toSchemaType: (data: T) => SchemaType;
     fromSchemaType: (value: SchemaType) => T;
     file: boolean;
@@ -217,7 +217,7 @@ function ConfigGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T
             (acc as Record<string, FieldConfig<T[K]>>)[name ?? key] = {
                 key,
                 disabled: disabled ?? false,
-                render: render ?? ((props) => <Input {...props} />),
+                render: render ?? (({ create, ...props }) => <Input {...props} data-create={create} />),
                 toSchemaType:
                     toSchemaType ??
                     ((data) => {
@@ -342,48 +342,49 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                             {(field) => (
                                 <form.Item>
                                     <field.Control>
-                                        <ButtonGroup className="w-full">
-                                            {config[col].render({
-                                                type: "text",
-                                                inputMode: "numeric",
-                                                value:
-                                                    field.state.value instanceof File
-                                                        ? field.state.value.name
-                                                        : String(field.state.value ?? ""),
-                                                name: col,
-                                                onChange: (e) => {
-                                                    field.handleChange(e.target.value as typeof field.state.value);
-                                                },
-                                                className:
-                                                    "text-center read-only:opacity-80! border-primary/50 read-only:border-primary/10",
-                                                readOnly:
-                                                    (config[col].file && !create) ||
-                                                    config[col].disabled ||
-                                                    (!["edit", "save"].includes(bState) && !create) ||
-                                                    bState.includes("submit"),
-                                            })}
-                                            {config[col].file && create && (
-                                                <Button
-                                                    onClick={() => {
-                                                        const input = document.createElement("input");
-                                                        input.type = "file";
-                                                        input.accept = "image/*";
-                                                        input.style.display = "none";
-                                                        input.onchange = (e) => {
-                                                            const file = (e.target as HTMLInputElement).files?.[0];
-                                                            if (file) {
-                                                                field.handleChange(file as typeof field.state.value);
-                                                            }
-                                                            input.remove();
-                                                        };
-                                                        document.body.appendChild(input);
-                                                        input.click();
-                                                    }}
-                                                >
-                                                    File
-                                                </Button>
-                                            )}
-                                        </ButtonGroup>
+                                        {config[col].render({
+                                            type: "text",
+                                            inputMode: "numeric",
+                                            value:
+                                                field.state.value instanceof File
+                                                    ? field.state.value.name
+                                                    : String(field.state.value ?? ""),
+                                            name: col,
+                                            onChange: (e) => {
+                                                console.log(e);
+                                                if (e.target.files) {
+                                                    const file = e.target.files[0];
+                                                    if (file) {
+                                                        // Active bug in Tanstack: https://github.com/TanStack/form/issues/1932#issuecomment-3656323010
+                                                        Object.defineProperties(file, {
+                                                            name: {
+                                                                value: file.name,
+                                                                enumerable: true,
+                                                            },
+                                                            size: {
+                                                                value: file.size,
+                                                                enumerable: true,
+                                                            },
+                                                            type: {
+                                                                value: file.type,
+                                                                enumerable: true,
+                                                            },
+                                                        });
+                                                        field.handleChange(file as typeof field.state.value);
+                                                        return;
+                                                    }
+                                                }
+                                                field.handleChange(e.target.value as typeof field.state.value);
+                                            },
+                                            className:
+                                                "text-center read-only:opacity-80! border-primary/50 read-only:border-primary/10",
+                                            readOnly:
+                                                (config[col].file && !create) ||
+                                                config[col].disabled ||
+                                                (!["edit", "save"].includes(bState) && !create) ||
+                                                bState.includes("submit"),
+                                            create,
+                                        })}
                                     </field.Control>
                                     <field.Message className="text-wrap text-center" />
                                 </form.Item>
@@ -623,7 +624,37 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     );
                 },
             },
-            { key: "url", file: true },
+            {
+                key: "url",
+                file: true,
+                render: ({ create, onChange, ...props }) => {
+                    return (
+                        <ButtonGroup className="w-full">
+                            <Input {...props} onChange={onChange} />
+                            {create && (
+                                <Button
+                                    type="button"
+                                    onClick={(e) => {
+                                        const child = e.currentTarget?.children[0] as HTMLInputElement | null;
+                                        child?.click();
+                                    }}
+                                >
+                                    <Input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            onChange?.(e);
+                                            e.currentTarget.value = "";
+                                        }}
+                                    />
+                                    File
+                                </Button>
+                            )}
+                        </ButtonGroup>
+                    );
+                },
+            },
             { key: "alt" },
         ]),
     };
