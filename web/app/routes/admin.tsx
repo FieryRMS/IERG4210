@@ -14,17 +14,6 @@ import { useStore } from "@tanstack/react-form";
 import { type FileUpload, parseFormData } from "@remix-run/form-data-parser";
 import { getStorageKey, fileStorage } from "@/storage";
 import { fileStorageConfig, UPLOAD_URL } from "@/config";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Img } from "@/components/img-wrapper";
 import { ButtonGroup } from "@/components/ui/button-group";
 
@@ -69,7 +58,7 @@ const imageSchema = baseSchema.extend({
     type: z.literal("Image"),
 });
 
-type SchemaType = string | number | null | File | (string | number | null)[];
+type SchemaType = string | number | null | File | undefined | (string | number | null)[];
 type TableTypes = "Product" | "Category" | "Image";
 
 export async function action({ request }: { request: Request }) {
@@ -213,22 +202,22 @@ function ConfirmAnim({
     );
 }
 interface FieldConfig<T> {
+    key: string;
     disabled: boolean;
-    render: (value: SchemaType) => React.ReactNode | string;
+    render: (props: React.ComponentProps<typeof Input>) => React.ReactNode;
     toSchemaType: (data: T) => SchemaType;
     fromSchemaType: (value: SchemaType) => T;
     file: boolean;
 }
-function ConfigGenerator<T extends z.infer<typeof baseSchema>>(
-    fields: (Partial<FieldConfig<T[keyof T]>> & { name: keyof T })[],
-): {
-    [K in keyof T]: FieldConfig<T[K]>;
-} {
+function ConfigGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string>(
+    fields: (Partial<FieldConfig<T[K]>> & { key: K; name?: string })[],
+) {
     return fields.reduce(
-        (acc, { name, disabled, render, toSchemaType, fromSchemaType, file }) => {
-            acc[name] = {
+        (acc, { key, name, disabled, render, toSchemaType, fromSchemaType, file }) => {
+            (acc as Record<string, FieldConfig<T[K]>>)[name ?? key] = {
+                key,
                 disabled: disabled ?? false,
-                render: render ?? ((value) => (value !== null && value !== undefined ? String(value) : "null")),
+                render: render ?? ((props) => <Input {...props} />),
                 toSchemaType:
                     toSchemaType ??
                     ((data) => {
@@ -244,27 +233,32 @@ function ConfigGenerator<T extends z.infer<typeof baseSchema>>(
                         if (typeof data === "number") return data;
                         return String(data);
                     }),
-                fromSchemaType: fromSchemaType ?? ((value) => value as T[keyof T]),
+                fromSchemaType: fromSchemaType ?? ((value) => value as T[K]),
                 file: file ?? false,
             };
             return acc;
         },
-        {} as { [K in keyof T]: FieldConfig<T[K]> },
+        {} as Record<K | string, FieldConfig<T[K]>>,
     );
 }
 
-function RowGenerator<T extends z.infer<typeof baseSchema>>({
+function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string>({
     type,
     data,
     config,
     schema,
     create,
+    onSubmit,
 }: {
     type: TableTypes;
     data: T;
-    schema: z.ZodType<{ [K in keyof T]: SchemaType }, { [K in keyof T]: SchemaType }>;
-    config: { [K in keyof T]: FieldConfig<T[K]> };
+    schema: z.ZodType<
+        Partial<Record<K, SchemaType>> & { type: TableTypes },
+        Partial<Record<K, SchemaType>> & { type: TableTypes }
+    >;
+    config: ReturnType<typeof ConfigGenerator<T>>;
     create?: boolean;
+    onSubmit?: ({ value }: { value: z.infer<typeof schema> }) => void | Promise<void>;
 }) {
     const [row, setRow] = useState<T>(data);
     useEffect(() => {
@@ -272,9 +266,9 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
     }, [data]);
 
     const defaultValues: z.infer<typeof schema> = useMemo(() => {
-        const values = {} as { [K in keyof T]: SchemaType };
-        (Object.keys(config) as (keyof T)[]).forEach((col) => {
-            values[col] = config[col].toSchemaType(row[col]);
+        const values = {} as Partial<Record<K, SchemaType>>;
+        (Object.keys(config) as K[]).forEach((col) => {
+            if (col in row) values[col] = config[col].toSchemaType(row[col]); //  ts infers col as string, may be bug prone later
         });
         return { ...values, type };
     }, [config, row, type]);
@@ -300,33 +294,35 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
                 return errors;
             },
         },
-        onSubmit: async ({ value }) => {
-            const methodMap: Partial<Record<typeof bState, HTMLFormMethod>> = {
-                csubmit: "post",
-                ssubmit: "put",
-                dsubmit: "delete",
-            };
-            const method = methodMap[bState];
-            const form = new FormData();
-            Object.entries(value).forEach(([key, val]) => {
-                // if serializable, then add as JSON string, otherwise add as is (for file uploads)
-                if (val == null || val == undefined) {
-                    return;
-                }
-                if (typeof val === "string" || typeof val === "number") {
-                    form.append(key, String(val));
-                } else if (Array.isArray(val)) {
-                    val.forEach((item) => {
-                        if (typeof item === "string" || typeof item === "number") {
-                            form.append(key, String(item));
-                        }
-                    });
-                } else {
-                    form.append(key, val);
-                }
-            });
-            await fetcher.submit(form, { method, encType: "multipart/form-data" });
-        },
+        onSubmit:
+            onSubmit ??
+            (async ({ value }) => {
+                const methodMap: Partial<Record<typeof bState, HTMLFormMethod>> = {
+                    csubmit: "post",
+                    ssubmit: "put",
+                    dsubmit: "delete",
+                };
+                const method = methodMap[bState];
+                const form = new FormData();
+                (Object.entries(value) as [K, SchemaType][]).forEach(([key, val]) => {
+                    // if serializable, then add as JSON string, otherwise add as is (for file uploads)
+                    if (val == null || val == undefined) {
+                        return;
+                    }
+                    if (typeof val === "string" || typeof val === "number") {
+                        form.append(key, String(val));
+                    } else if (Array.isArray(val)) {
+                        val.forEach((item) => {
+                            if (typeof item === "string" || typeof item === "number") {
+                                form.append(key, String(item));
+                            }
+                        });
+                    } else {
+                        form.append(key, val);
+                    }
+                });
+                await fetcher.submit(form, { method, encType: "multipart/form-data" });
+            }),
     });
     const isSubmitted = useStore(form.store, (state) => state.isSubmitted);
 
@@ -342,153 +338,52 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
             <form onSubmit={(e) => e.preventDefault()} className={TableRow({}).props.className}>
                 {(Object.keys(config) as (keyof T extends string ? keyof T : never)[]).map((col) => (
                     <TableCell className="text-center" key={col}>
-                        <form.AppField name={col}>
+                        <form.AppField name={config[col].key}>
                             {(field) => (
                                 <form.Item>
                                     <field.Control>
-                                        {!Array.isArray(field.state.value) ? (
-                                            <ButtonGroup className="w-full">
-                                                <Input
-                                                    type="text"
-                                                    inputMode="numeric"
-                                                    value={
-                                                        field.state.value instanceof File
-                                                            ? field.state.value.name
-                                                            : String(field.state.value ?? "")
-                                                    }
-                                                    name={col}
-                                                    onChange={(e) => {
-                                                        console.log(field.state.value);
-                                                        field.handleChange(e.target.value as typeof field.state.value);
-                                                    }}
-                                                    onBlur={field.handleBlur}
-                                                    className="text-center read-only:opacity-80! border-primary/50 read-only:border-primary/10"
-                                                    readOnly={
-                                                        (config[col].file && !create) ||
-                                                        config[col].disabled ||
-                                                        (!["edit", "save"].includes(bState) && !create) ||
-                                                        bState.includes("submit")
-                                                    }
-                                                />
-                                                {config[col].file && create && (
-                                                    <Button
-                                                        onClick={() => {
-                                                            const input = document.createElement("input");
-                                                            input.type = "file";
-                                                            input.accept = "image/*";
-                                                            input.style.display = "none";
-                                                            input.onchange = (e) => {
-                                                                const file = (e.target as HTMLInputElement).files?.[0];
-                                                                if (file) {
-                                                                    field.handleChange(
-                                                                        file as typeof field.state.value,
-                                                                    );
-                                                                }
-                                                                input.remove();
-                                                            };
-                                                            document.body.appendChild(input);
-                                                            input.click();
-                                                        }}
-                                                    >
-                                                        File
-                                                    </Button>
-                                                )}
-                                            </ButtonGroup>
-                                        ) : (
-                                            <AlertDialog>
-                                                <AlertDialogTrigger
-                                                    render={
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            className="text-center disabled:opacity-70! border-primary/50 disabled:border-primary/10 disabled:bg-transparent"
-                                                            disabled={
-                                                                config[col].disabled ||
-                                                                (!["edit", "save"].includes(bState) && !create) ||
-                                                                bState.includes("submit")
+                                        <ButtonGroup className="w-full">
+                                            {config[col].render({
+                                                type: "text",
+                                                inputMode: "numeric",
+                                                value:
+                                                    field.state.value instanceof File
+                                                        ? field.state.value.name
+                                                        : String(field.state.value ?? ""),
+                                                name: col,
+                                                onChange: (e) => {
+                                                    field.handleChange(e.target.value as typeof field.state.value);
+                                                },
+                                                className:
+                                                    "text-center read-only:opacity-80! border-primary/50 read-only:border-primary/10",
+                                                readOnly:
+                                                    (config[col].file && !create) ||
+                                                    config[col].disabled ||
+                                                    (!["edit", "save"].includes(bState) && !create) ||
+                                                    bState.includes("submit"),
+                                            })}
+                                            {config[col].file && create && (
+                                                <Button
+                                                    onClick={() => {
+                                                        const input = document.createElement("input");
+                                                        input.type = "file";
+                                                        input.accept = "image/*";
+                                                        input.style.display = "none";
+                                                        input.onchange = (e) => {
+                                                            const file = (e.target as HTMLInputElement).files?.[0];
+                                                            if (file) {
+                                                                field.handleChange(file as typeof field.state.value);
                                                             }
-                                                        />
-                                                    }
+                                                            input.remove();
+                                                        };
+                                                        document.body.appendChild(input);
+                                                        input.click();
+                                                    }}
                                                 >
-                                                    Edit
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader className="flex flex-col gap-1 items-center">
-                                                        <AlertDialogTitle>
-                                                            Edit {col} for {type} ID: {row.id}
-                                                        </AlertDialogTitle>
-                                                        <div className="flex w-full max-w-md flex-col gap-2">
-                                                            <ItemGroup className="gap-2" role="list">
-                                                                {field.state.value?.map((val, index) => (
-                                                                    <Item
-                                                                        key={index}
-                                                                        variant="outline"
-                                                                        role="listitem"
-                                                                        className="w-full hover:bg-secondary"
-                                                                    >
-                                                                        {config[col].render(val)}
-                                                                        <ItemActions>
-                                                                            <Button
-                                                                                variant="outline"
-                                                                                size="sm"
-                                                                                type="button"
-                                                                                onClick={() => {
-                                                                                    field.handleChange((old) => {
-                                                                                        if (old == null) return old;
-                                                                                        if (!Array.isArray(old))
-                                                                                            return old;
-                                                                                        return old.filter(
-                                                                                            (_, i) => i !== index,
-                                                                                        ) as typeof old;
-                                                                                    });
-                                                                                }}
-                                                                            >
-                                                                                <Trash className="w-4" />
-                                                                            </Button>
-                                                                        </ItemActions>
-                                                                    </Item>
-                                                                ))}
-                                                                <Item
-                                                                    variant="outline"
-                                                                    role="listitem"
-                                                                    className="w-full hover:bg-secondary"
-                                                                >
-                                                                    <ItemContent className="flex items-center justify-center">
-                                                                        <ItemTitle className="line-clamp-1 w-full">
-                                                                            <Input type="text" />
-                                                                        </ItemTitle>
-                                                                    </ItemContent>
-
-                                                                    <ItemActions>
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            type="button"
-                                                                            size="sm"
-                                                                        >
-                                                                            <Plus className="w-4" />
-                                                                        </Button>
-                                                                    </ItemActions>
-                                                                </Item>
-                                                            </ItemGroup>
-                                                        </div>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter className="mt-2">
-                                                        <AlertDialogCancel
-                                                            onClick={() => {
-                                                                field.handleChange(
-                                                                    config[col].toSchemaType(
-                                                                        row[col],
-                                                                    ) as typeof field.state.value,
-                                                                );
-                                                            }}
-                                                        >
-                                                            Cancel
-                                                        </AlertDialogCancel>
-                                                        <AlertDialogAction>Continue</AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        )}
+                                                    File
+                                                </Button>
+                                            )}
+                                        </ButtonGroup>
                                     </field.Control>
                                     <field.Message className="text-wrap text-center" />
                                 </form.Item>
@@ -620,19 +515,21 @@ function RowGenerator<T extends z.infer<typeof baseSchema>>({
     );
 }
 
-function TableGenerator<T extends z.infer<typeof baseSchema>>({
+function TableGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string>({
     data,
     type,
     schema,
     config,
+    onSubmit,
 }: {
     data: T[];
     type: TableTypes;
     schema: z.ZodType<
-        { [K in keyof T]: ReturnType<FieldConfig<T[K]>["toSchemaType"]> } & { type: TableTypes },
-        { [K in keyof T]: ReturnType<FieldConfig<T[K]>["toSchemaType"]> } & { type: TableTypes }
+        Partial<Record<K, SchemaType>> & { type: TableTypes },
+        Partial<Record<K, SchemaType>> & { type: TableTypes }
     >;
-    config: { [K in keyof T]: FieldConfig<T[K]> };
+    config: ReturnType<typeof ConfigGenerator<T>>;
+    onSubmit?: ({ value }: { value: z.infer<typeof schema> }) => void | Promise<void>;
 }) {
     return (
         <Table className="px-10">
@@ -649,9 +546,16 @@ function TableGenerator<T extends z.infer<typeof baseSchema>>({
             </TableHeader>
             <TableBody>
                 {data.map((item) => (
-                    <RowGenerator type={type} key={item.id} data={item} config={config} schema={schema} />
+                    <RowGenerator
+                        type={type}
+                        key={item.id}
+                        data={item}
+                        config={config}
+                        schema={schema}
+                        onSubmit={onSubmit}
+                    />
                 ))}
-                <RowGenerator type={type} data={{} as T} config={config} schema={schema} create />
+                <RowGenerator type={type} data={{} as T} config={config} schema={schema} create onSubmit={onSubmit} />
             </TableBody>
         </Table>
     );
@@ -669,21 +573,22 @@ export async function loader() {
 }
 
 export default function Admin({ loaderData }: Route.ComponentProps) {
-    const BaseConfig = ConfigGenerator<{ id?: string; created_at?: string | null; updated_at?: string | null }>([
-        { name: "id", disabled: true },
-        { name: "created_at", disabled: true },
-        { name: "updated_at", disabled: true },
-    ]);
+    const baseConfigFor = <T extends z.infer<typeof baseSchema>>() =>
+        ConfigGenerator<T>([
+            { key: "id", disabled: true },
+            { key: "created_at", disabled: true },
+            { key: "updated_at", disabled: true },
+        ]);
 
     const PConfig = {
-        ...BaseConfig,
+        ...baseConfigFor<Product>(),
         ...ConfigGenerator<Product>([
-            { name: "name" },
-            { name: "description" },
-            { name: "price" },
-            { name: "catid" },
+            { key: "name" },
+            { key: "description" },
+            { key: "price" },
+            { key: "catid" },
             {
-                name: "images",
+                key: "images",
                 toSchemaType: (data) => (Array.isArray(data) ? data.map((d) => String(d.id)) : []),
                 fromSchemaType: (value) =>
                     Array.isArray(value)
@@ -693,37 +598,34 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                               return acc;
                           }, [] as Image[])
                         : [],
-
-                render: (value) => {
-                    const img = loaderData.images.find((i) => i.id === value);
-                    return (
-                        <>
-                            <ItemMedia variant="image">
-                                <Img
-                                    src={img?.url}
-                                    alt={img?.alt || ""}
-                                    width={32}
-                                    height={32}
-                                    className="object-cover"
-                                />
-                            </ItemMedia>
-                            <ItemContent>
-                                <ItemTitle className="line-clamp-1">{img?.id}</ItemTitle>
-                            </ItemContent>
-                        </>
-                    );
-                },
             },
         ]),
     };
     const CConfig = {
-        ...BaseConfig,
-        ...ConfigGenerator<Category>([{ name: "name" }, { name: "description" }]),
+        ...baseConfigFor<Category>(),
+        ...ConfigGenerator<Category>([{ key: "name" }, { key: "description" }]),
     };
 
     const IConfig = {
-        ...BaseConfig,
-        ...ConfigGenerator<Image>([{ name: "url", file: true }, { name: "alt" }]),
+        ...baseConfigFor<Image>(),
+        ...ConfigGenerator<Image>([
+            {
+                key: "url",
+                name: "preview",
+                disabled: true,
+                render: ({ value }) => {
+                    return (
+                        <Img
+                            src={`${value}?thumbnail=true`}
+                            alt="Image preview"
+                            className="h-20 w-20 object-cover m-auto"
+                        />
+                    );
+                },
+            },
+            { key: "url", file: true },
+            { key: "alt" },
+        ]),
     };
 
     return (
