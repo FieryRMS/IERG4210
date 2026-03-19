@@ -39,12 +39,24 @@ export const links: Route.LinksFunction = () => [
     },
 ];
 
+const rootHeadersMiddleware: Route.MiddlewareFunction = async (_, next) => {
+    const response = await next();
+    response.headers.append("Critical-CH", "Sec-Ch-Prefers-Color-Scheme");
+    response.headers.append("Accept-CH", "Sec-Ch-Prefers-Color-Scheme");
+    response.headers.append("Vary", "Sec-Ch-Prefers-Color-Scheme");
+    return response;
+};
+
+export const middleware: Route.MiddlewareFunction[] = [rootHeadersMiddleware];
+
 export async function loader({ request }: Route.LoaderArgs) {
     const client = getClient();
     const cookieHeader = request.headers.get("Cookie");
     const prefs = (await prefsCookie.parse(cookieHeader)) || {};
+    const theme = prefs?.theme || Theme.System;
     return {
-        theme: prefs?.theme || Theme.System,
+        theme,
+        system: theme === Theme.System ? request.headers.get("Sec-Ch-Prefers-Color-Scheme") || "" : "",
         categories: (await client.GET("/categories/")).data || [],
     };
 }
@@ -79,7 +91,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     useBlocker(shouldBlock);
 
     return (
-        <html lang="en" className={`${loaderData?.theme} bg-background`}>
+        <html lang="en" className={`${loaderData?.theme} ${loaderData?.system} bg-background`}>
             <head>
                 <meta charSet="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -94,7 +106,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             classList.toggle("${Theme.Dark}", prefersDarkScheme.matches);
                     }
                     prefersDarkScheme.addEventListener("change", setSystemTheme);
-                    setSystemTheme();
                     `}
                 </script>
             </head>
