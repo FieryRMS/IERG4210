@@ -20,16 +20,6 @@ import { Drawer, DrawerClose, DrawerContent, DrawerPopup, DrawerTitle, DrawerTri
 
 const baseSchema = z.object({
     id: z.uuidv4().nullable().optional(),
-    created_at: z
-        .string()
-        .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}$/, "Invalid date format")
-        .nullable()
-        .optional(),
-    updated_at: z
-        .string()
-        .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}$/, "Invalid date format")
-        .nullable()
-        .optional(),
 });
 const productSchema = baseSchema.extend({
     name: z.string(),
@@ -205,101 +195,89 @@ function ConfirmAnim({
 
 type FieldConfig<T> = {
     key: string;
+    name: string;
     disabled: boolean;
     render: (props: React.ComponentProps<typeof Input> & { create?: boolean }) => JSX.Element;
     toSchemaType: (data: T) => SchemaType;
     fromSchemaType: (value: SchemaType) => T;
     file: boolean;
-    nested?: T extends (infer U)[]
-        ? U extends z.infer<typeof baseSchema>
-            ? ReturnType<typeof ConfigGenerator<U>>
-            : undefined
-        : undefined;
+    nested?: T extends (infer U)[] ? (U extends z.infer<typeof baseSchema> ? Config<U> : undefined) : undefined;
 };
-function ConfigGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string>(
-    fields: (Partial<FieldConfig<T[K]>> & {
-        key: K;
-        name?: string;
-    })[],
-) {
-    return fields.reduce(
-        (acc, { key, name, disabled, render, toSchemaType, fromSchemaType, file, nested }) => {
-            (acc as Record<string, FieldConfig<T[K]>>)[name ?? key] = {
-                key,
-                disabled: disabled ?? false,
-                render:
-                    render ??
-                    (({ create, ...props }) => {
-                        void create;
-                        return <Input {...props} />;
-                    }),
-                toSchemaType:
-                    toSchemaType ??
-                    ((data) => {
-                        if (Array.isArray(data))
-                            return data.map((item) => {
-                                if (item === null || item === undefined) return null;
-                                if (typeof item === "object") return JSON.stringify(item);
-                                if (typeof item === "number") return item;
-                                return String(item);
-                            });
-                        if (data === null || data === undefined) return null;
-                        if (typeof data === "object") return JSON.stringify(data);
-                        if (typeof data === "number") return data;
-                        return String(data);
-                    }),
-                fromSchemaType: fromSchemaType ?? ((value) => value as T[K]),
-                file: file ?? false,
-                nested: nested ?? undefined,
-            };
-            return acc;
-        },
-        {} as Record<K | string, FieldConfig<T[K]>>,
-    );
-}
 
-function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string>({
-    type,
-    data,
-    config,
-    schema,
-    create,
-    onSubmit,
-}: {
+type Config<T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string> = {
     type: TableTypes;
-    data: T;
-    schema: z.ZodType<
+    fields: FieldConfig<T[K]>[];
+    $schema: z.ZodType<
         Partial<Record<K, SchemaType>> & { type: TableTypes },
         Partial<Record<K, SchemaType>> & { type: TableTypes }
     >;
-    config: ReturnType<typeof ConfigGenerator<T>>;
+};
+
+function FieldConfigDefaults<T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string>(
+    fields: (Partial<FieldConfig<T[K]>> & { key: K })[],
+): FieldConfig<T[K]>[] {
+    return fields.map((field) => ({
+        name: field.key,
+        disabled: false,
+        render: ({ create, ...props }) => {
+            void create;
+            return <Input {...props} />;
+        },
+        toSchemaType: (data) => {
+            if (Array.isArray(data))
+                return data.map((item) => {
+                    if (item === null || item === undefined) return null;
+                    if (typeof item === "object") return JSON.stringify(item);
+                    if (typeof item === "number") return item;
+                    return String(item);
+                });
+            if (data === null || data === undefined) return null;
+            if (typeof data === "object") return JSON.stringify(data);
+            if (typeof data === "number") return data;
+            return String(data);
+        },
+        fromSchemaType: (value) => value as T[K],
+        file: false,
+
+        ...field,
+    }));
+}
+
+function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string>({
+    data,
+    config,
+    create,
+    onSubmit,
+}: {
+    data: T;
+    config: Config<T, K>;
     create?: boolean;
-    onSubmit?: ({ value }: { value: z.infer<typeof schema> }) => void | Promise<void>;
+    onSubmit?: ({ value }: { value: z.infer<typeof config.$schema> }) => void | Promise<void>;
 }) {
     const [row, setRow] = useState<T>(data);
     useEffect(() => {
         setRow(data);
     }, [data]);
 
-    const defaultValues: z.infer<typeof schema> = useMemo(() => {
-        const values = {} as Partial<Record<K, SchemaType>>;
-        Object.keys(config).forEach((col) => {
-            values[config[col]!.key as K] = config[col]!.toSchemaType(row[config[col]!.key as K]);
+    const defaultValues: z.infer<typeof config.$schema> = useMemo(() => {
+        const values = {} as Record<K, SchemaType>;
+        config.fields.forEach((field) => {
+            values[field.key as K] = field.toSchemaType(row[field.key as K]);
         });
-        return { ...values, type };
-    }, [config, row, type]);
+        return { ...values, type: config.type };
+    }, [config, row]);
 
     const [bState, setBState] = useState<
         "idle" | "edit" | "save" | "delete" | "create" | "ssubmit" | "dsubmit" | "csubmit"
     >("idle");
-    const fetcher = useFetcher<z.infer<typeof schema>>();
+    const fetcher = useFetcher<z.infer<typeof config.$schema>>();
     const form = useAppForm({
         defaultValues,
         validators: {
-            onChangeAsync: onChangeAsync(schema),
+            onChangeAsync: onChangeAsync(config.$schema),
             onChangeAsyncDebounceMs: 300,
             onSubmit: ({ formApi }) => {
-                const errors = formApi.parseValuesWithSchema(schema);
+                const errors = formApi.parseValuesWithSchema(config.$schema);
                 if (!errors) return errors;
                 setBState((prev) => {
                     if (prev === "dsubmit") return "idle";
@@ -352,21 +330,21 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
     return (
         <form.AppForm>
             <form onSubmit={(e) => e.preventDefault()} className={TableRow({}).props.className}>
-                {(Object.keys(config) as (keyof T extends string ? keyof T : never)[]).map((col) => (
-                    <TableCell className="text-center" key={col}>
-                        <form.AppField name={config[col].key}>
+                {config.fields.map((fieldconfig, index) => (
+                    <TableCell className="text-center" key={index}>
+                        <form.AppField name={fieldconfig.key}>
                             {(field) => (
                                 <field.Control>
                                     <form.Item>
-                                        {!config[col].nested ? (
-                                            config[col].render({
+                                        {!fieldconfig.nested ? (
+                                            fieldconfig.render({
                                                 type: "text",
                                                 inputMode: "numeric",
                                                 value:
                                                     field.state.value instanceof File
                                                         ? field.state.value.name
                                                         : String(field.state.value ?? ""),
-                                                name: col,
+                                                name: fieldconfig.name,
                                                 onChange: (e) => {
                                                     console.log(e);
                                                     if (e.target.files) {
@@ -396,8 +374,8 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                                                 className:
                                                     "text-center read-only:opacity-80! border-primary/50 read-only:border-primary/10",
                                                 readOnly:
-                                                    (config[col].file && !create) ||
-                                                    config[col].disabled ||
+                                                    (fieldconfig.file && !create) ||
+                                                    fieldconfig.disabled ||
                                                     (!["edit", "save"].includes(bState) && !create) ||
                                                     bState.includes("submit"),
                                                 create,
@@ -411,7 +389,7 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                                                             variant="outline"
                                                             className="text-center disabled:opacity-70! border-primary/50 disabled:border-primary/10 disabled:bg-transparent"
                                                             disabled={
-                                                                config[col].disabled ||
+                                                                fieldconfig.disabled ||
                                                                 (!["edit", "save"].includes(bState) && !create) ||
                                                                 bState.includes("submit")
                                                             }
@@ -423,18 +401,17 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                                                 <DrawerPopup className="min-h-screen">
                                                     <DrawerContent className="">
                                                         <DrawerTitle>
-                                                            Edit {col} for {type} ID: {create ? "New" : row.id}
+                                                            Edit {fieldconfig.name} for {config.type} ID:{" "}
+                                                            {create ? "New" : row.id}
                                                         </DrawerTitle>
 
                                                         <TableGenerator
-                                                            config={config[col].nested}
+                                                            config={fieldconfig.nested}
                                                             data={
-                                                                config[col].fromSchemaType(
+                                                                fieldconfig.fromSchemaType(
                                                                     field.state.value as SchemaType,
                                                                 ) as Record<string, SchemaType>[]
                                                             }
-                                                            type={type}
-                                                            schema={schema}
                                                             onSubmit={() => {}}
                                                         />
 
@@ -591,28 +568,21 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
 
 function TableGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string>({
     data,
-    type,
-    schema,
     config,
     onSubmit,
 }: {
     data: T[];
-    type: TableTypes;
-    schema: z.ZodType<
-        Partial<Record<K, SchemaType>> & { type: TableTypes },
-        Partial<Record<K, SchemaType>> & { type: TableTypes }
-    >;
-    config: ReturnType<typeof ConfigGenerator<T>>;
-    onSubmit?: ({ value }: { value: z.infer<typeof schema> }) => void | Promise<void>;
+    config: Config<T, K>;
+    onSubmit?: ({ value }: { value: z.infer<typeof config.$schema> }) => void | Promise<void>;
 }) {
     return (
         <Table className="px-10">
-            <TableCaption className="text-center">{type} CRUD table</TableCaption>
+            <TableCaption className="text-center">{config.type} CRUD table</TableCaption>
             <TableHeader>
                 <TableRow>
-                    {Object.keys(config).map((col) => (
-                        <TableHead className="text-center" key={col}>
-                            {col}
+                    {config.fields.map((field) => (
+                        <TableHead className="text-center" key={field.key}>
+                            {field.name}
                         </TableHead>
                     ))}
                     <TableHead className="text-center">Actions</TableHead>
@@ -620,16 +590,9 @@ function TableGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T 
             </TableHeader>
             <TableBody>
                 {data.map((item) => (
-                    <RowGenerator
-                        type={type}
-                        key={item.id}
-                        data={item}
-                        config={config}
-                        schema={schema}
-                        onSubmit={onSubmit}
-                    />
+                    <RowGenerator key={item.id} data={item} config={config} onSubmit={onSubmit} />
                 ))}
-                <RowGenerator type={type} data={{} as T} config={config} schema={schema} create onSubmit={onSubmit} />
+                <RowGenerator data={{} as T} config={config} create onSubmit={onSubmit} />
             </TableBody>
         </Table>
     );
@@ -647,16 +610,13 @@ export async function loader() {
 }
 
 export default function Admin({ loaderData }: Route.ComponentProps) {
-    const baseConfigFor = <T extends z.infer<typeof baseSchema>>() =>
-        ConfigGenerator<T>([
+    const PConfig: Config<Product> = {
+        $schema: productSchema,
+        type: "Product",
+        fields: FieldConfigDefaults<Product>([
             { key: "id", disabled: true },
             { key: "created_at", disabled: true },
             { key: "updated_at", disabled: true },
-        ]);
-
-    const PConfig = {
-        ...baseConfigFor<Product>(),
-        ...ConfigGenerator<Product>([
             { key: "name" },
             { key: "description" },
             { key: "price" },
@@ -672,40 +632,55 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                               return acc;
                           }, [] as Image[])
                         : [],
-                nested: ConfigGenerator<Image>([
-                    {
-                        key: "url",
-                        name: "preview",
-                        disabled: true,
-                        render: ({ create, value }) => {
-                            console.log(value);
-                            return !create ? (
-                                <Img
-                                    src={`${value}?thumbnail=true`}
-                                    alt="Image preview"
-                                    className="h-20 w-20 object-cover m-auto"
-                                />
-                            ) : (
-                                <> </>
-                            );
+                nested: {
+                    type: "Image",
+                    $schema: imageSchema,
+                    fields: FieldConfigDefaults<Image>([
+                        {
+                            key: "url",
+                            name: "preview",
+                            disabled: true,
+                            render: ({ create, value }) => {
+                                console.log(value);
+                                return !create ? (
+                                    <Img
+                                        src={`${value}?thumbnail=true`}
+                                        alt="Image preview"
+                                        className="h-20 w-20 object-cover m-auto"
+                                    />
+                                ) : (
+                                    <> </>
+                                );
+                            },
                         },
-                    },
-                    {
-                        key: "id",
-                        disabled: true,
-                    },
-                ]),
+                        {
+                            key: "id",
+                            disabled: true,
+                        },
+                    ]),
+                },
             },
         ]),
     };
-    const CConfig = {
-        ...baseConfigFor<Category>(),
-        ...ConfigGenerator<Category>([{ key: "name" }, { key: "description" }]),
+    const CConfig: Config<Category> = {
+        $schema: categorySchema,
+        type: "Category",
+        fields: FieldConfigDefaults<Category>([
+            { key: "id", disabled: true },
+            { key: "created_at", disabled: true },
+            { key: "updated_at", disabled: true },
+            { key: "name" },
+            { key: "description" },
+        ]),
     };
 
-    const IConfig = {
-        ...baseConfigFor<Image>(),
-        ...ConfigGenerator<Image>([
+    const IConfig: Config<Image> = {
+        type: "Image",
+        $schema: imageSchema,
+        fields: FieldConfigDefaults<Image>([
+            { key: "id", disabled: true },
+            { key: "created_at", disabled: true },
+            { key: "updated_at", disabled: true },
             {
                 key: "url",
                 name: "preview",
@@ -763,20 +738,15 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             <div className="flex flex-col">
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2">Products</h2>
-                    <TableGenerator data={loaderData.products} type="Product" schema={productSchema} config={PConfig} />
+                    <TableGenerator data={loaderData.products} config={PConfig} />
                 </div>
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2">Categories</h2>
-                    <TableGenerator
-                        data={loaderData.categories}
-                        type="Category"
-                        schema={categorySchema}
-                        config={CConfig}
-                    />
+                    <TableGenerator data={loaderData.categories} config={CConfig} />
                 </div>
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2">Images</h2>
-                    <TableGenerator data={loaderData.images} type="Image" schema={imageSchema} config={IConfig} />
+                    <TableGenerator data={loaderData.images} config={IConfig} />
                 </div>
             </div>
         </div>
