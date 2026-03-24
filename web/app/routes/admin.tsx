@@ -15,6 +15,7 @@ import { Img } from "@/components/img-wrapper";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Drawer, DrawerClose, DrawerContent, DrawerPopup, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { productSchema, categorySchema, imageSchema, baseSchema, type SchemaType } from "@/schema";
+import { toast } from "sonner";
 
 type TableTypes = "Product" | "Category" | "Image";
 
@@ -435,9 +436,15 @@ function TableGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T 
         });
         if (!response.ok) {
             const error = await response.text();
+            toast.error(
+                `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.type}: ${error}`,
+            );
             throw new Error(error);
         }
         const responseData = await response.json();
+        toast.success(
+            `${config.type} ${method === "post" ? "created" : method === "put" ? "updated" : "deleted"} successfully`,
+        );
         return responseData as T;
     };
     return (
