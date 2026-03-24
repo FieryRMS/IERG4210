@@ -8,156 +8,15 @@ import { Input } from "@/components/ui/input";
 import { cn, getClient, onChangeAsync } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState, useMemo, type JSX } from "react";
-import { useFetcher, type HTMLFormMethod } from "react-router";
+import { type HTMLFormMethod } from "react-router";
 import { Spinner } from "@/components/ui/spinner";
 import { useStore } from "@tanstack/react-form";
-import { type FileUpload, parseFormData } from "@remix-run/form-data-parser";
-import { getStorageKey, fileStorage } from "@/storage";
-import { fileStorageConfig, UPLOAD_URL } from "@/config";
 import { Img } from "@/components/img-wrapper";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Drawer, DrawerClose, DrawerContent, DrawerPopup, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
+import { productSchema, categorySchema, imageSchema, baseSchema, type SchemaType } from "@/schema";
 
-const baseSchema = z.object({
-    id: z.uuidv4().nullable().optional(),
-});
-const productSchema = baseSchema.extend({
-    name: z.string(),
-    description: z.string().nullable(),
-    price: z.coerce.number<number>().min(0.01),
-    catid: z.uuidv4(),
-    images: z.array(z.uuidv4()),
-    type: z.literal("Product"),
-});
-
-const categorySchema = baseSchema.extend({
-    name: z.string(),
-    description: z.string().nullable(),
-    type: z.literal("Category"),
-});
-
-const imageSchema = baseSchema.extend({
-    url: z.union([
-        z.url({
-            protocol: /^https?$/,
-            hostname: z.regexes.domain,
-        }),
-        z.string().regex(new RegExp(`^${UPLOAD_URL}`)),
-        z.file().max(fileStorageConfig.maxFileSize!),
-    ]),
-    alt: z.string().nullable().optional(),
-    type: z.literal("Image"),
-});
-
-type SchemaType = string | number | null | File | undefined | (string | number | null)[];
 type TableTypes = "Product" | "Category" | "Image";
-
-export async function action({ request }: { request: Request }) {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    async function uploadHandler(fileUpload: FileUpload) {
-        if (fileUpload.fieldName === "url" && fileUpload.type.startsWith("image/")) {
-            const storageKey = getStorageKey();
-            await fileStorage.set(storageKey, fileUpload);
-            return storageKey;
-        }
-    }
-
-    const form = await parseFormData(request, fileStorageConfig, uploadHandler);
-    const client = getClient();
-
-    const type = form.get("type");
-    const object = Array.from(form.entries()).reduce(
-        (acc, [key, value]) => {
-            if (typeof value !== "string") {
-                return acc;
-            }
-            if (acc[key]) {
-                if (!Array.isArray(acc[key])) {
-                    acc[key] = [acc[key]];
-                }
-                acc[key].push(value);
-            } else if (typeof value === "string") {
-                acc[key] = value;
-            }
-            return acc;
-        },
-        {} as Record<string, string | string[]>,
-    );
-
-    switch (type) {
-        case "Product": {
-            const { data, success, error } = productSchema.safeParse(object);
-            if (!success) {
-                throw new Response(JSON.stringify(error), { status: 400 });
-            }
-            switch (request.method) {
-                case "POST":
-                    return (await client.POST("/products/", { body: data })).data;
-                case "PUT":
-                    return (
-                        await client.PUT(`/products/{product_id}`, {
-                            params: { path: { product_id: data.id! } },
-                            body: data,
-                        })
-                    ).data;
-                case "DELETE":
-                    return (
-                        await client.DELETE(`/products/{product_id}`, { params: { path: { product_id: data.id! } } })
-                    ).data;
-            }
-            break;
-        }
-        case "Category": {
-            const { data, success, error } = categorySchema.safeParse(object);
-            if (!success) {
-                throw new Response(JSON.stringify(error), { status: 400 });
-            }
-            switch (request.method) {
-                case "POST":
-                    return (await client.POST("/categories/", { body: data })).data;
-                case "PUT":
-                    return (
-                        await client.PUT(`/categories/{category_id}`, {
-                            params: { path: { category_id: data.id! } },
-                            body: data,
-                        })
-                    ).data;
-                case "DELETE":
-                    return (
-                        await client.DELETE(`/categories/{category_id}`, {
-                            params: { path: { category_id: data.id! } },
-                        })
-                    ).data;
-            }
-            break;
-        }
-        case "Image": {
-            const { data, success, error } = imageSchema.safeParse(object);
-            if (!success || typeof data.url !== "string") {
-                throw new Response(JSON.stringify(error), { status: 400 });
-            }
-            switch (request.method) {
-                case "POST":
-                    return (
-                        await client.POST("/images/", { body: data as z.infer<typeof imageSchema> & { url: string } })
-                    ).data;
-                case "PUT":
-                    return (
-                        await client.PUT(`/images/{image_id}`, {
-                            params: { path: { image_id: data.id! } },
-                            body: data as z.infer<typeof imageSchema> & { url: string },
-                        })
-                    ).data;
-                case "DELETE":
-                    return (await client.DELETE(`/images/{image_id}`, { params: { path: { image_id: data.id! } } }))
-                        .data;
-            }
-            break;
-        }
-    }
-    throw new Response("Invalid request", { status: 400 });
-}
 
 function ConfirmAnim({
     onStart,
@@ -252,7 +111,7 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
     data: T;
     config: Config<T, K>;
     create?: boolean;
-    onSubmit?: ({ value }: { value: z.infer<typeof config.$schema> }) => void | Promise<void>;
+    onSubmit: ({ method, value }: { method: HTMLFormMethod; value: z.infer<typeof config.$schema> }) => T | Promise<T>;
 }) {
     const [row, setRow] = useState<T>(data);
     useEffect(() => {
@@ -270,7 +129,6 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
     const [bState, setBState] = useState<
         "idle" | "edit" | "save" | "delete" | "create" | "ssubmit" | "dsubmit" | "csubmit"
     >("idle");
-    const fetcher = useFetcher<z.infer<typeof config.$schema>>();
     const form = useAppForm({
         defaultValues,
         validators: {
@@ -288,45 +146,24 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                 return errors;
             },
         },
-        onSubmit:
-            onSubmit ??
-            (async ({ value }) => {
-                const methodMap: Partial<Record<typeof bState, HTMLFormMethod>> = {
-                    csubmit: "post",
-                    ssubmit: "put",
-                    dsubmit: "delete",
-                };
-                const method = methodMap[bState];
-                const form = new FormData();
-                (Object.entries(value) as [K, SchemaType][]).forEach(([key, val]) => {
-                    // if serializable, then add as JSON string, otherwise add as is (for file uploads)
-                    if (val == null || val == undefined) {
-                        return;
-                    }
-                    if (typeof val === "string" || typeof val === "number") {
-                        form.append(key, String(val));
-                    } else if (Array.isArray(val)) {
-                        val.forEach((item) => {
-                            if (typeof item === "string" || typeof item === "number") {
-                                form.append(key, String(item));
-                            }
-                        });
-                    } else {
-                        form.append(key, val);
-                    }
-                });
-                await fetcher.submit(form, { method, encType: "multipart/form-data" });
-            }),
+        onSubmit: async ({ value }) => {
+            const methodMap: Partial<Record<typeof bState, HTMLFormMethod>> = {
+                csubmit: "post",
+                ssubmit: "put",
+                dsubmit: "delete",
+            };
+            const method = methodMap[bState]!;
+            setRow(await onSubmit({ method, value }));
+        },
     });
     const isSubmitted = useStore(form.store, (state) => state.isSubmitted);
 
     useEffect(() => {
-        if (isSubmitted && bState.includes("submit") && fetcher.state === "idle") {
+        if (isSubmitted && bState.includes("submit")) {
             setBState("idle");
             form.reset(defaultValues);
-            setRow((fetcher.data as T) ?? row);
         }
-    }, [bState, defaultValues, fetcher.data, fetcher.state, form, isSubmitted, row]);
+    }, [bState, defaultValues, form, isSubmitted, row]);
     return (
         <form.AppForm>
             <form onSubmit={(e) => e.preventDefault()} className={TableRow({}).props.className}>
@@ -412,7 +249,7 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                                                                     field.state.value as SchemaType,
                                                                 ) as Record<string, SchemaType>[]
                                                             }
-                                                            onSubmit={() => {}}
+                                                            // onSubmit={() => {}}
                                                         />
 
                                                         <div className="flex items-center gap-2 w-full justify-center">
@@ -435,8 +272,8 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                     </TableCell>
                 ))}
                 <TableCell className="text-center items-center justify-center w-0">
-                    <form.Subscribe selector={(state) => state.canSubmit}>
-                        {(canSubmit) => (
+                    <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting]}>
+                        {([canSubmit, isSubmitting]) => (
                             <>
                                 {create ? (
                                     <Button
@@ -444,7 +281,7 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                                         variant="outline"
                                         type="button"
                                         onClick={() => {
-                                            if (fetcher.state === "idle" && bState === "create" && canSubmit) {
+                                            if (!isSubmitting && bState === "create" && canSubmit) {
                                                 form.handleSubmit();
                                                 setBState("csubmit");
                                             }
@@ -469,7 +306,7 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                                             variant="outline"
                                             type="button"
                                             onClick={() => {
-                                                if (fetcher.state === "idle" && bState === "save" && canSubmit) {
+                                                if (!isSubmitting && bState === "save" && canSubmit) {
                                                     form.handleSubmit();
                                                     setBState("ssubmit");
                                                 }
@@ -511,10 +348,10 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                                             variant="outline"
                                             type="button"
                                             onClick={() => {
-                                                if (fetcher.state === "idle" && bState === "delete" && canSubmit) {
+                                                if (!isSubmitting && bState === "delete" && canSubmit) {
                                                     setBState("dsubmit");
                                                     form.handleSubmit();
-                                                } else if (fetcher.state === "idle" && !bState.includes("submit")) {
+                                                } else if (!isSubmitting && !bState.includes("submit")) {
                                                     setBState("idle");
                                                     form.reset();
                                                 }
@@ -569,19 +406,47 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
 function TableGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string>({
     data,
     config,
-    onSubmit,
 }: {
     data: T[];
     config: Config<T, K>;
-    onSubmit?: ({ value }: { value: z.infer<typeof config.$schema> }) => void | Promise<void>;
 }) {
+    const onSubmit = async ({ method, value }: { method: HTMLFormMethod; value: z.infer<typeof config.$schema> }) => {
+        const form = new FormData();
+        (Object.entries(value) as [K, SchemaType][]).forEach(([key, val]) => {
+            // if serializable, then add as JSON string, otherwise add as is (for file uploads)
+            if (val == null || val == undefined) {
+                return;
+            }
+            if (typeof val === "string" || typeof val === "number") {
+                form.append(key, String(val));
+            } else if (Array.isArray(val)) {
+                val.forEach((item) => {
+                    if (typeof item === "string" || typeof item === "number") {
+                        form.append(key, String(item));
+                    }
+                });
+            } else {
+                form.append(key, val);
+            }
+        });
+        const response = await fetch("/api/admin", {
+            method,
+            body: form,
+        });
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(error);
+        }
+        const responseData = await response.json();
+        return responseData as T;
+    };
     return (
         <Table className="px-10">
             <TableCaption className="text-center">{config.type} CRUD table</TableCaption>
             <TableHeader>
                 <TableRow>
-                    {config.fields.map((field) => (
-                        <TableHead className="text-center" key={field.key}>
+                    {config.fields.map((field, index) => (
+                        <TableHead className="text-center" key={index}>
                             {field.name}
                         </TableHead>
                     ))}

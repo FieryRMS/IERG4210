@@ -2,7 +2,6 @@ import type { UIMatch } from "react-router";
 import type { components } from "@/lib/api";
 
 
-// type Breadcrumb = ({ type: "Category"; } & Category | { type: "Product"; } & Product);
 interface Breadcrumb {
     pathname: string;
     name: string;
