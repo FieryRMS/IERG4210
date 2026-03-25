@@ -17,7 +17,7 @@ import { Drawer, DrawerClose, DrawerContent, DrawerPopup, DrawerTitle, DrawerTri
 import { productSchema, categorySchema, imageSchema, baseSchema, type SchemaType } from "@/schema";
 import { toast } from "sonner";
 
-type TableTypes = "Product" | "Category" | "Image";
+type TableTypes = "Product" | "Category" | "Image" | "Product Images";
 
 function ConfirmAnim({
     onStart,
@@ -61,16 +61,19 @@ type FieldConfig<T> = {
     toSchemaType: (data: T) => SchemaType;
     fromSchemaType: (value: SchemaType) => T;
     file: boolean;
+
     nested?: T extends (infer U)[] ? (U extends z.infer<typeof baseSchema> ? Config<U> : undefined) : undefined;
 };
 
 type Config<T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string> = {
-    type: TableTypes;
+    tableName: TableTypes;
+    onSubmit: (params: {
+        config: Config<T, K>;
+        method: HTMLFormMethod;
+        value: Partial<Record<K, SchemaType>>;
+    }) => T | Promise<T>;
     fields: FieldConfig<T[K]>[];
-    $schema: z.ZodType<
-        Partial<Record<K, SchemaType>> & { type: TableTypes },
-        Partial<Record<K, SchemaType>> & { type: TableTypes }
-    >;
+    $schema: z.ZodType<Partial<Record<K, SchemaType>>, Partial<Record<K, SchemaType>>>;
 };
 
 function FieldConfigDefaults<T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string>(
@@ -104,27 +107,22 @@ function FieldConfigDefaults<T extends z.infer<typeof baseSchema>, K extends key
 }
 
 function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string>({
-    data,
+    row,
     config,
     create,
     onSubmit,
 }: {
-    data: T;
+    row: T;
     config: Config<T, K>;
     create?: boolean;
-    onSubmit: (method: HTMLFormMethod, value: Partial<Record<K, SchemaType>> & { type: TableTypes }) => T | Promise<T>;
+    onSubmit: Config<T, K>["onSubmit"];
 }) {
-    const [row, setRow] = useState<T>(data);
-    useEffect(() => {
-        setRow(data);
-    }, [data]);
-
     const defaultValues: z.infer<typeof config.$schema> = useMemo(() => {
         const values = {} as Record<K, SchemaType>;
         config.fields.forEach((field) => {
             values[field.key as K] = field.toSchemaType(row[field.key as K]);
         });
-        return { ...values, type: config.type };
+        return { ...values, type: config.tableName };
     }, [config, row]);
 
     const [bState, setBState] = useState<
@@ -154,7 +152,15 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                 dsubmit: "delete",
             };
             const method = methodMap[bState]!;
-            setRow(await onSubmit(method, value));
+            // TODO: better error handling/pydantic to tanstack error translation
+            try {
+                await onSubmit({ config, method, value });
+            } catch (error) {
+                form.reset();
+                toast.error(
+                    `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.tableName}: ${error instanceof Error ? error.message : "Unknown error"}`,
+                );
+            }
         },
     });
     const isSubmitted = useStore(form.store, (state) => state.isSubmitted);
@@ -239,7 +245,7 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                                                 <DrawerPopup className="min-h-screen">
                                                     <DrawerContent className="">
                                                         <DrawerTitle>
-                                                            Edit {fieldconfig.name} for {config.type} ID:{" "}
+                                                            Edit {fieldconfig.name} for {config.tableName} ID:{" "}
                                                             {create ? "New" : row.id}
                                                         </DrawerTitle>
 
@@ -250,15 +256,20 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                                                                     field.state.value as SchemaType,
                                                                 ) as Record<string, SchemaType>[]
                                                             }
+                                                            onSubmit={(rows) => {
+                                                                const updatedValue = fieldconfig.toSchemaType(
+                                                                    rows as T[K],
+                                                                );
+                                                                field.handleChange(
+                                                                    updatedValue as typeof field.state.value,
+                                                                );
+                                                            }}
                                                         />
 
                                                         <div className="flex items-center gap-2 w-full justify-center">
-                                                            <DrawerClose
-                                                                render={<Button variant="outline" size="sm" />}
-                                                            >
-                                                                Cancel
+                                                            <DrawerClose data- render={<Button size="sm" />}>
+                                                                Close
                                                             </DrawerClose>
-                                                            <Button size="sm">Save</Button>
                                                         </div>
                                                     </DrawerContent>
                                                 </DrawerPopup>
@@ -410,7 +421,7 @@ function TableGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T 
 }: {
     data: T[];
     config: Config<T, K>;
-    onSubmit: (method: HTMLFormMethod, value: Partial<Record<K, SchemaType>> & { type: TableTypes }) => T | Promise<T>;
+    onSubmit?: (updatedRows: T[]) => void;
 }) {
     const [rows, setRows] = useState<T[]>(data);
     useEffect(() => {
@@ -419,7 +430,7 @@ function TableGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T 
 
     return (
         <Table className="px-10">
-            <TableCaption className="text-center">{config.type} CRUD table</TableCaption>
+            <TableCaption className="text-center">{config.tableName} CRUD table</TableCaption>
             <TableHeader>
                 <TableRow>
                     {config.fields.map((field, index) => (
@@ -434,19 +445,25 @@ function TableGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T 
                 {rows.map((item) => (
                     <RowGenerator
                         key={item.id}
-                        data={item}
+                        row={item}
                         config={config}
-                        onSubmit={async (method, value) => {
-                            const result = await onSubmit(method, value);
+                        onSubmit={async ({ config, method, value }) => {
+                            const result = await config.onSubmit({ config, method, value });
 
                             if (method === "put") {
-                                setRows((prev) =>
-                                    prev.map((row) =>
+                                setRows((prev) => {
+                                    const next = prev.map((row) =>
                                         row.id === item.id ? ({ ...row, ...value, id: item.id } as T) : row,
-                                    ),
-                                );
+                                    );
+                                    onSubmit?.(next);
+                                    return next;
+                                });
                             } else if (method === "delete") {
-                                setRows((prev) => prev.filter((row) => row.id !== item.id));
+                                setRows((prev) => {
+                                    const next = prev.filter((row) => row.id !== item.id);
+                                    onSubmit?.(next);
+                                    return next;
+                                });
                             }
 
                             return result;
@@ -454,13 +471,17 @@ function TableGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T 
                     />
                 ))}
                 <RowGenerator
-                    data={{} as T}
+                    row={{} as T}
                     config={config}
                     create
-                    onSubmit={async (method, value) => {
-                        const result = await onSubmit(method, value);
+                    onSubmit={async ({ config, method, value }) => {
+                        const result = await config.onSubmit({ config, method, value });
                         if (method === "post") {
-                            setRows((prev) => [...prev, result]);
+                            setRows((prev) => {
+                                const next = [...prev, result];
+                                onSubmit?.(next);
+                                return next;
+                            });
                         }
                         return result;
                     }}
@@ -483,8 +504,7 @@ export async function loader() {
 
 export default function Admin({ loaderData }: Route.ComponentProps) {
     const onSubmit = async <T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string>(
-        method: HTMLFormMethod,
-        value: Partial<Record<K, SchemaType>> & { type: TableTypes },
+        ...[{ config, method, value }]: Parameters<Config<T, K>["onSubmit"]>
     ) => {
         const form = new FormData();
         (Object.entries(value) as [K, SchemaType][]).forEach(([key, val]) => {
@@ -504,6 +524,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 form.append(key, val);
             }
         });
+        form.append("tabletype", config.tableName);
         const response = await fetch("/api/admin", {
             method,
             body: form,
@@ -511,20 +532,21 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         if (!response.ok) {
             const error = await response.text();
             toast.error(
-                `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${value.type}: ${error}`,
+                `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.tableName}: ${error}`,
             );
             throw new Error(error);
         }
         const responseData = await response.json();
         toast.success(
-            `${value.type} ${method === "post" ? "created" : method === "put" ? "updated" : "deleted"} successfully`,
+            `${config.tableName} ${method === "post" ? "created" : method === "put" ? "updated" : "deleted"} successfully`,
         );
         return responseData as T;
     };
 
     const PConfig: Config<Product> = {
         $schema: productSchema,
-        type: "Product",
+        tableName: "Product",
+        onSubmit: onSubmit<Product>,
         fields: FieldConfigDefaults<Product>([
             { key: "id", disabled: true },
             { key: "created_at", disabled: true },
@@ -545,8 +567,13 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                           }, [] as Image[])
                         : [],
                 nested: {
-                    type: "Image",
-                    $schema: imageSchema,
+                    tableName: "Product Images",
+                    $schema: baseSchema,
+                    onSubmit: ({ value }) => {
+                        const img = loaderData.images.find((i) => i.id === value.id);
+                        if (!img) throw new Error("Image not found");
+                        return img;
+                    },
                     fields: FieldConfigDefaults<Image>([
                         {
                             key: "url",
@@ -565,10 +592,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                                 );
                             },
                         },
-                        {
-                            key: "id",
-                            disabled: true,
-                        },
+                        { key: "id" },
                     ]),
                 },
             },
@@ -576,7 +600,8 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     };
     const CConfig: Config<Category> = {
         $schema: categorySchema,
-        type: "Category",
+        tableName: "Category",
+        onSubmit: onSubmit<Category>,
         fields: FieldConfigDefaults<Category>([
             { key: "id", disabled: true },
             { key: "created_at", disabled: true },
@@ -587,8 +612,9 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     };
 
     const IConfig: Config<Image> = {
-        type: "Image",
+        tableName: "Image",
         $schema: imageSchema,
+        onSubmit: onSubmit<Image>,
         fields: FieldConfigDefaults<Image>([
             { key: "id", disabled: true },
             { key: "created_at", disabled: true },
@@ -650,15 +676,15 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             <div className="flex flex-col">
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2">Products</h2>
-                    <TableGenerator data={loaderData.products} config={PConfig} onSubmit={onSubmit<Product>} />
+                    <TableGenerator data={loaderData.products} config={PConfig} />
                 </div>
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2">Categories</h2>
-                    <TableGenerator data={loaderData.categories} config={CConfig} onSubmit={onSubmit<Category>} />
+                    <TableGenerator data={loaderData.categories} config={CConfig} />
                 </div>
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2">Images</h2>
-                    <TableGenerator data={loaderData.images} config={IConfig} onSubmit={onSubmit<Image>} />
+                    <TableGenerator data={loaderData.images} config={IConfig} />
                 </div>
             </div>
         </div>

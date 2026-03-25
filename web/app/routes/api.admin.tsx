@@ -20,7 +20,7 @@ export async function action({ request }: Route.ActionArgs) {
     const form = await parseFormData(request, fileStorageConfig, uploadHandler);
     const client = getClient();
 
-    const type = form.get("type");
+    const type = form.get("tabletype");
     const object = Array.from(form.entries()).reduce(
         (acc, [key, value]) => {
             if (typeof value !== "string") {

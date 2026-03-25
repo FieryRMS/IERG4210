@@ -13,13 +13,11 @@ export const productSchema = baseSchema.extend({
     price: z.coerce.number<number>().min(0.01),
     catid: z.uuidv4(),
     images: z.array(z.uuidv4()),
-    type: z.literal("Product"),
 });
 
 export const categorySchema = baseSchema.extend({
     name: z.string(),
     description: z.string().nullable(),
-    type: z.literal("Category"),
 });
 
 export const imageSchema = baseSchema.extend({
@@ -32,5 +30,4 @@ export const imageSchema = baseSchema.extend({
         z.file().max(fileStorageConfig.maxFileSize!),
     ]),
     alt: z.string().nullable().optional(),
-    type: z.literal("Image"),
 });
