@@ -11,7 +11,6 @@ import {
     useMatches,
     type Location,
     type UIMatch,
-    useLoaderData,
 } from "react-router";
 import { ThemeProvider, Theme } from "@/hooks/theme-provider";
 
@@ -61,8 +60,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     };
 }
 
-export function Layout({ children }: { children: React.ReactNode }) {
-    const loaderData = useLoaderData<Route.ComponentProps["loaderData"]>();
+export function Layout({ loaderData }: Route.ComponentProps) {
     const location: Location<LocationState> = useLocation();
     const matches = useMatches();
     const breadcrumbs = (matches as UIMatch<unknown, PageHandle>[])
@@ -115,7 +113,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         <header className="sticky top-0 z-50 w-full bg-background pb-2">
                             <Navbar categories={loaderData?.categories || []} />
                         </header>
-                        <main className="py-4 w-full h-full">{children}</main>
+                        <main className="py-4 w-full h-full">
+                            <Outlet />
+                        </main>
                         <footer className="w-full py-6">
                             <Footer />
                         </footer>
