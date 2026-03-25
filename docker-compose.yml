@@ -14,6 +14,7 @@ services:
       - 3000:3000
     environment:
       - API_URL=${API_URL}
+      - SESSION_SECRET=${SESSION_SECRET}
   api:
     build: ./api
     environment:

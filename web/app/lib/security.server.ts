@@ -20,6 +20,7 @@ export function buildSecurityHeaders(nonce: string): SecurityHeaders {
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' https://fonts.gstatic.com",
             "img-src 'self' data: blob: https://avatar.vercel.sh",
+            "worker-src 'self' blob:",
             "connect-src 'self'",
             "frame-ancestors 'none'",
         ].join("; "),

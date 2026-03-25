@@ -24,8 +24,18 @@ import type { LocationState, PageHandle } from "./types";
 import { CartProvider } from "./hooks/cart-provider";
 import { useCallback } from "react";
 import { prefsCookie } from "@/cookies";
+import { getSession, commitSession } from "@/session.server";
 import { Toaster } from "@/components/ui/sonner";
 import { getClient } from "./lib/utils";
+
+const authMiddleware: Route.MiddlewareFunction = async ({ request }, next) => {
+    const session = await getSession(request.headers.get("Cookie"));
+    const response = await next();
+    response.headers.append("Set-Cookie", await commitSession(session));
+    return response;
+};
+
+export const middleware: Route.MiddlewareFunction[] = [authMiddleware];
 
 export const links: Route.LinksFunction = () => [
     { rel: "preconnect", href: "https://fonts.googleapis.com" },
