@@ -112,7 +112,7 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
     data: T;
     config: Config<T, K>;
     create?: boolean;
-    onSubmit: ({ method, value }: { method: HTMLFormMethod; value: z.infer<typeof config.$schema> }) => T | Promise<T>;
+    onSubmit: (method: HTMLFormMethod, value: Partial<Record<K, SchemaType>> & { type: TableTypes }) => T | Promise<T>;
 }) {
     const [row, setRow] = useState<T>(data);
     useEffect(() => {
@@ -154,7 +154,7 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                 dsubmit: "delete",
             };
             const method = methodMap[bState]!;
-            setRow(await onSubmit({ method, value }));
+            setRow(await onSubmit(method, value));
         },
     });
     const isSubmitted = useStore(form.store, (state) => state.isSubmitted);
@@ -250,7 +250,6 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                                                                     field.state.value as SchemaType,
                                                                 ) as Record<string, SchemaType>[]
                                                             }
-                                                            // onSubmit={() => {}}
                                                         />
 
                                                         <div className="flex items-center gap-2 w-full justify-center">
@@ -407,11 +406,86 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
 function TableGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string>({
     data,
     config,
+    onSubmit,
 }: {
     data: T[];
     config: Config<T, K>;
+    onSubmit: (method: HTMLFormMethod, value: Partial<Record<K, SchemaType>> & { type: TableTypes }) => T | Promise<T>;
 }) {
-    const onSubmit = async ({ method, value }: { method: HTMLFormMethod; value: z.infer<typeof config.$schema> }) => {
+    const [rows, setRows] = useState<T[]>(data);
+    useEffect(() => {
+        setRows(data);
+    }, [data]);
+
+    return (
+        <Table className="px-10">
+            <TableCaption className="text-center">{config.type} CRUD table</TableCaption>
+            <TableHeader>
+                <TableRow>
+                    {config.fields.map((field, index) => (
+                        <TableHead className="text-center" key={index}>
+                            {field.name}
+                        </TableHead>
+                    ))}
+                    <TableHead className="text-center">Actions</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {rows.map((item) => (
+                    <RowGenerator
+                        key={item.id}
+                        data={item}
+                        config={config}
+                        onSubmit={async (method, value) => {
+                            const result = await onSubmit(method, value);
+
+                            if (method === "put") {
+                                setRows((prev) =>
+                                    prev.map((row) =>
+                                        row.id === item.id ? ({ ...row, ...value, id: item.id } as T) : row,
+                                    ),
+                                );
+                            } else if (method === "delete") {
+                                setRows((prev) => prev.filter((row) => row.id !== item.id));
+                            }
+
+                            return result;
+                        }}
+                    />
+                ))}
+                <RowGenerator
+                    data={{} as T}
+                    config={config}
+                    create
+                    onSubmit={async (method, value) => {
+                        const result = await onSubmit(method, value);
+                        if (method === "post") {
+                            setRows((prev) => [...prev, result]);
+                        }
+                        return result;
+                    }}
+                />
+            </TableBody>
+        </Table>
+    );
+}
+
+export async function loader() {
+    const client = getClient();
+    const { data: products, error: perror } = await client.GET("/products/");
+    const { data: categories, error: cerror } = await client.GET("/categories/");
+    const { data: images, error: ierror } = await client.GET("/images/");
+    if (perror || cerror || ierror) {
+        throw new Response("Failed to load data", { status: 500 });
+    }
+    return { products, categories, images };
+}
+
+export default function Admin({ loaderData }: Route.ComponentProps) {
+    const onSubmit = async <T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string>(
+        method: HTMLFormMethod,
+        value: Partial<Record<K, SchemaType>> & { type: TableTypes },
+    ) => {
         const form = new FormData();
         (Object.entries(value) as [K, SchemaType][]).forEach(([key, val]) => {
             // if serializable, then add as JSON string, otherwise add as is (for file uploads)
@@ -437,51 +511,17 @@ function TableGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T 
         if (!response.ok) {
             const error = await response.text();
             toast.error(
-                `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.type}: ${error}`,
+                `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${value.type}: ${error}`,
             );
             throw new Error(error);
         }
         const responseData = await response.json();
         toast.success(
-            `${config.type} ${method === "post" ? "created" : method === "put" ? "updated" : "deleted"} successfully`,
+            `${value.type} ${method === "post" ? "created" : method === "put" ? "updated" : "deleted"} successfully`,
         );
         return responseData as T;
     };
-    return (
-        <Table className="px-10">
-            <TableCaption className="text-center">{config.type} CRUD table</TableCaption>
-            <TableHeader>
-                <TableRow>
-                    {config.fields.map((field, index) => (
-                        <TableHead className="text-center" key={index}>
-                            {field.name}
-                        </TableHead>
-                    ))}
-                    <TableHead className="text-center">Actions</TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {data.map((item) => (
-                    <RowGenerator key={item.id} data={item} config={config} onSubmit={onSubmit} />
-                ))}
-                <RowGenerator data={{} as T} config={config} create onSubmit={onSubmit} />
-            </TableBody>
-        </Table>
-    );
-}
 
-export async function loader() {
-    const client = getClient();
-    const { data: products, error: perror } = await client.GET("/products/");
-    const { data: categories, error: cerror } = await client.GET("/categories/");
-    const { data: images, error: ierror } = await client.GET("/images/");
-    if (perror || cerror || ierror) {
-        throw new Response("Failed to load data", { status: 500 });
-    }
-    return { products, categories, images };
-}
-
-export default function Admin({ loaderData }: Route.ComponentProps) {
     const PConfig: Config<Product> = {
         $schema: productSchema,
         type: "Product",
@@ -610,15 +650,15 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             <div className="flex flex-col">
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2">Products</h2>
-                    <TableGenerator data={loaderData.products} config={PConfig} />
+                    <TableGenerator data={loaderData.products} config={PConfig} onSubmit={onSubmit<Product>} />
                 </div>
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2">Categories</h2>
-                    <TableGenerator data={loaderData.categories} config={CConfig} />
+                    <TableGenerator data={loaderData.categories} config={CConfig} onSubmit={onSubmit<Category>} />
                 </div>
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2">Images</h2>
-                    <TableGenerator data={loaderData.images} config={IConfig} />
+                    <TableGenerator data={loaderData.images} config={IConfig} onSubmit={onSubmit<Image>} />
                 </div>
             </div>
         </div>
