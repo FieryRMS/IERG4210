@@ -536,7 +536,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             );
             throw new Error(error);
         }
-        const responseData = await response.json();
+        const responseData = response.status !== 204 ? await response.json() : null;
         toast.success(
             `${config.tableName} ${method === "post" ? "created" : method === "put" ? "updated" : "deleted"} successfully`,
         );

@@ -11,4 +11,3 @@ async def health_check(request: Request) -> Health:
     logger = state["logger"]
     logger.debug("Received health check request")
     return Health(status="ok")
-    return Health(status="ok")

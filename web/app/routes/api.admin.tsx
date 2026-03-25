@@ -57,8 +57,9 @@ export async function action({ request }: Route.ActionArgs) {
                     ).data;
                 case "DELETE":
                     return (
-                        await client.DELETE(`/products/{product_id}`, { params: { path: { product_id: data.id! } } })
-                    ).data;
+                        (await client.DELETE(`/products/{product_id}`, { params: { path: { product_id: data.id! } } }))
+                            .data ?? null
+                    );
             }
             break;
         }
@@ -79,10 +80,12 @@ export async function action({ request }: Route.ActionArgs) {
                     ).data;
                 case "DELETE":
                     return (
-                        await client.DELETE(`/categories/{category_id}`, {
-                            params: { path: { category_id: data.id! } },
-                        })
-                    ).data;
+                        (
+                            await client.DELETE(`/categories/{category_id}`, {
+                                params: { path: { category_id: data.id! } },
+                            })
+                        ).data ?? null
+                    );
             }
             break;
         }
@@ -104,8 +107,10 @@ export async function action({ request }: Route.ActionArgs) {
                         })
                     ).data;
                 case "DELETE":
-                    return (await client.DELETE(`/images/{image_id}`, { params: { path: { image_id: data.id! } } }))
-                        .data;
+                    return (
+                        (await client.DELETE(`/images/{image_id}`, { params: { path: { image_id: data.id! } } }))
+                            .data ?? null
+                    );
             }
             break;
         }

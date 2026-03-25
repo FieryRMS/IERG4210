@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, status
 from sqlmodel import Session, col, select
 
 from db import Category, Image, Product, ProductUpdate
@@ -10,14 +10,14 @@ from models.app import State
 router = APIRouter(prefix="/products", tags=["Products"])
 
 
-@router.get("/")
+@router.get("/", status_code=status.HTTP_200_OK)
 async def get_products(request: Request) -> list[Product]:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         return list(session.exec(select(Product)).all())
 
 
-@router.get("/{product_id}")
+@router.get("/{product_id}", status_code=status.HTTP_200_OK)
 async def get_product(request: Request, product_id: uuid.UUID) -> Product:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
@@ -27,7 +27,7 @@ async def get_product(request: Request, product_id: uuid.UUID) -> Product:
         return product
 
 
-@router.get("/category/{category_id}")
+@router.get("/category/{category_id}", status_code=status.HTTP_200_OK)
 async def get_products_by_category(
     request: Request, category_id: uuid.UUID
 ) -> list[Product]:
@@ -39,7 +39,7 @@ async def get_products_by_category(
         return category.products
 
 
-@router.post("/")
+@router.post("/", status_code=status.HTTP_201_CREATED)
 async def new_product(request: Request, product: ProductUpdate) -> Product:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
@@ -54,7 +54,7 @@ async def new_product(request: Request, product: ProductUpdate) -> Product:
         return db_product
 
 
-@router.put("/{product_id}")
+@router.put("/{product_id}", status_code=status.HTTP_200_OK)
 async def update_product(
     request: Request, product_id: uuid.UUID, product: ProductUpdate
 ) -> Product:
@@ -74,7 +74,7 @@ async def update_product(
         return db_product
 
 
-@router.delete("/{product_id}")
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_product(request: Request, product_id: uuid.UUID) -> None:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
