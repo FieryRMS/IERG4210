@@ -1,6 +1,6 @@
 import { PassThrough } from "node:stream";
 
-import type { EntryContext } from "react-router";
+import type { RouterContextProvider, EntryContext } from "react-router";
 import { createReadableStreamFromReadable } from "@react-router/node";
 import { ServerRouter } from "react-router";
 import { isbot } from "isbot";
@@ -14,10 +14,12 @@ export default function handleRequest(
     responseStatusCode: number,
     responseHeaders: Headers,
     routerContext: EntryContext,
-    // loadContext: AppLoadContext,
-    // If you have middleware enabled:
-    // loadContext: RouterContextProvider
+    _loadContext: RouterContextProvider,
 ) {
+    responseHeaders.append("Critical-CH", "Sec-Ch-Prefers-Color-Scheme");
+    responseHeaders.append("Accept-CH", "Sec-Ch-Prefers-Color-Scheme");
+    responseHeaders.append("Vary", "Sec-Ch-Prefers-Color-Scheme");
+
     // https://httpwg.org/specs/rfc9110.html#HEAD
     if (request.method.toUpperCase() === "HEAD") {
         return new Response(null, {

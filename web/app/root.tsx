@@ -11,6 +11,7 @@ import {
     useMatches,
     type Location,
     type UIMatch,
+    useLoaderData,
 } from "react-router";
 import { ThemeProvider, Theme } from "@/hooks/theme-provider";
 
@@ -38,21 +39,11 @@ export const links: Route.LinksFunction = () => [
     },
 ];
 
-const rootHeadersMiddleware: Route.MiddlewareFunction = async (_, next) => {
-    const response = await next();
-    response.headers.append("Critical-CH", "Sec-Ch-Prefers-Color-Scheme");
-    response.headers.append("Accept-CH", "Sec-Ch-Prefers-Color-Scheme");
-    response.headers.append("Vary", "Sec-Ch-Prefers-Color-Scheme");
-    return response;
-};
-
-export const middleware: Route.MiddlewareFunction[] = [rootHeadersMiddleware];
-
 export async function loader({ request }: Route.LoaderArgs) {
     const client = getClient();
     const cookieHeader = request.headers.get("Cookie");
     const prefs = (await prefsCookie.parse(cookieHeader)) || {};
-    const theme = prefs?.theme || Theme.System;
+    const theme: Theme = prefs.theme || Theme.System;
     return {
         theme,
         system: theme === Theme.System ? request.headers.get("Sec-Ch-Prefers-Color-Scheme") || "" : "",
@@ -60,7 +51,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     };
 }
 
-export function Layout({ loaderData }: Route.ComponentProps) {
+export function Layout() {
+    const loaderData = useLoaderData<Route.ComponentProps["loaderData"]>();
     const location: Location<LocationState> = useLocation();
     const matches = useMatches();
     const breadcrumbs = (matches as UIMatch<unknown, PageHandle>[])
