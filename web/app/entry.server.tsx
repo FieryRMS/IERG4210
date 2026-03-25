@@ -6,6 +6,8 @@ import { ServerRouter } from "react-router";
 import { isbot } from "isbot";
 import type { RenderToPipeableStreamOptions } from "react-dom/server";
 import { renderToPipeableStream } from "react-dom/server";
+import { generateNonce, buildSecurityHeaders } from "@/lib/security.server";
+import { NonceContext } from "@/context/nonce";
 
 export const streamTimeout = 5_000;
 
@@ -16,9 +18,16 @@ export default function handleRequest(
     routerContext: EntryContext,
     _loadContext: RouterContextProvider,
 ) {
+    const nonce = generateNonce();
+
     responseHeaders.append("Critical-CH", "Sec-Ch-Prefers-Color-Scheme");
     responseHeaders.append("Accept-CH", "Sec-Ch-Prefers-Color-Scheme");
     responseHeaders.append("Vary", "Sec-Ch-Prefers-Color-Scheme");
+
+    const securityHeaders = buildSecurityHeaders(nonce);
+    for (const [key, value] of Object.entries(securityHeaders)) {
+        responseHeaders.set(key, value);
+    }
 
     // https://httpwg.org/specs/rfc9110.html#HEAD
     if (request.method.toUpperCase() === "HEAD") {
@@ -41,42 +50,48 @@ export default function handleRequest(
         // flush down the rejected boundaries
         let timeoutId: ReturnType<typeof setTimeout> | undefined = setTimeout(() => abort(), streamTimeout + 1000);
 
-        const { pipe, abort } = renderToPipeableStream(<ServerRouter context={routerContext} url={request.url} />, {
-            [readyOption]() {
-                shellRendered = true;
-                const body = new PassThrough({
-                    final(callback) {
-                        // Clear the timeout to prevent retaining the closure and memory leak
-                        clearTimeout(timeoutId);
-                        timeoutId = undefined;
-                        callback();
-                    },
-                });
-                const stream = createReadableStreamFromReadable(body);
+        const { pipe, abort } = renderToPipeableStream(
+            <NonceContext.Provider value={nonce}>
+                <ServerRouter context={routerContext} url={request.url} nonce={nonce} />
+            </NonceContext.Provider>,
+            {
+                nonce,
+                [readyOption]() {
+                    shellRendered = true;
+                    const body = new PassThrough({
+                        final(callback) {
+                            // Clear the timeout to prevent retaining the closure and memory leak
+                            clearTimeout(timeoutId);
+                            timeoutId = undefined;
+                            callback();
+                        },
+                    });
+                    const stream = createReadableStreamFromReadable(body);
 
-                responseHeaders.set("Content-Type", "text/html");
+                    responseHeaders.set("Content-Type", "text/html");
 
-                pipe(body);
+                    pipe(body);
 
-                resolve(
-                    new Response(stream, {
-                        headers: responseHeaders,
-                        status: responseStatusCode,
-                    }),
-                );
+                    resolve(
+                        new Response(stream, {
+                            headers: responseHeaders,
+                            status: responseStatusCode,
+                        }),
+                    );
+                },
+                onShellError(error: unknown) {
+                    reject(error);
+                },
+                onError(error: unknown) {
+                    responseStatusCode = 500;
+                    // Log streaming rendering errors from inside the shell.  Don't log
+                    // errors encountered during initial shell rendering since they'll
+                    // reject and get logged in handleDocumentRequest.
+                    if (shellRendered) {
+                        console.error(error);
+                    }
+                },
             },
-            onShellError(error: unknown) {
-                reject(error);
-            },
-            onError(error: unknown) {
-                responseStatusCode = 500;
-                // Log streaming rendering errors from inside the shell.  Don't log
-                // errors encountered during initial shell rendering since they'll
-                // reject and get logged in handleDocumentRequest.
-                if (shellRendered) {
-                    console.error(error);
-                }
-            },
-        });
+        );
     });
 }

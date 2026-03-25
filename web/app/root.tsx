@@ -13,6 +13,7 @@ import {
     type UIMatch,
     useLoaderData,
 } from "react-router";
+import { useNonce } from "@/context/nonce";
 import { ThemeProvider, Theme } from "@/hooks/theme-provider";
 
 import type { Route } from "./+types/root";
@@ -52,6 +53,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export function Layout() {
+    const nonce = useNonce();
     const loaderData = useLoaderData<Route.ComponentProps["loaderData"]>();
     const location: Location<LocationState> = useLocation();
     const matches = useMatches();
@@ -86,8 +88,8 @@ export function Layout() {
                 <meta charSet="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <Meta />
-                <Links />
-                <script>
+                <Links nonce={nonce} />
+                <script nonce={nonce}>
                     {`
                     const classList = document.documentElement.classList;
                     const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: ${Theme.Dark})");
@@ -111,8 +113,8 @@ export function Layout() {
                         <footer className="w-full py-6">
                             <Footer />
                         </footer>
-                        <ScrollRestoration />
-                        <Scripts />
+                        <ScrollRestoration nonce={nonce} />
+                        <Scripts nonce={nonce} />
                         <Toaster theme={loaderData?.theme} />
                     </body>
                 </CartProvider>
