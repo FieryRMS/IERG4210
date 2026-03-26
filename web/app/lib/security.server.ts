@@ -72,5 +72,5 @@ const createTokenGenerator = ({
 
 export const cstfTokenGenerator = createTokenGenerator({
     size: 32,
-    secret: process.env.SESSION_SECRET ?? "default_secret",
+    secret: process.env.SIGNING_SECRET ?? "default_secret",
 });
