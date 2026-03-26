@@ -4,9 +4,11 @@ import { getClient } from "@/lib/utils";
 import { parseFormData, type FileUpload } from "@remix-run/form-data-parser";
 import { getStorageKey, fileStorage } from "@/storage";
 import { type TableTypes } from "@/routes/admin";
+import { StatusCodes } from "http-status-codes";
 
 export async function action({ request }: Route.ActionArgs) {
-    if (!["POST", "PUT", "DELETE"].includes(request.method)) throw new Response("Invalid method", { status: 405 });
+    if (!["POST", "PUT", "DELETE"].includes(request.method))
+        throw new Response("Invalid method", { status: StatusCodes.METHOD_NOT_ALLOWED });
 
     if (process.env.API_MODE === "dev") await new Promise((resolve) => setTimeout(resolve, 1000));
 
@@ -41,7 +43,7 @@ export async function action({ request }: Route.ActionArgs) {
     );
 
     // TODO: better error handling and validation
-    if (!type || typeof type !== "string") throw new Response("Invalid type", { status: 400 });
+    if (!type || typeof type !== "string") throw new Response("Invalid type", { status: StatusCodes.BAD_REQUEST });
 
     const endpointMap: Partial<Record<TableTypes, string>> = {
         Product: "/products/",
@@ -49,7 +51,7 @@ export async function action({ request }: Route.ActionArgs) {
         Image: "/images/",
     };
     let endpoint = endpointMap[type];
-    if (!endpoint) throw new Response("Invalid type", { status: 400 });
+    if (!endpoint) throw new Response("Invalid type", { status: StatusCodes.BAD_REQUEST });
     if (["PUT", "DELETE"].includes(request.method)) endpoint += `{id}`;
 
     // @ts-expect-error: request.method is validated to POST/PUT/DELETE above, endpoints are also retrived from endpointMap, so this is safe

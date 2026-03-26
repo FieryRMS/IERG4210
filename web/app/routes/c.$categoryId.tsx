@@ -3,6 +3,7 @@ import type { PageHandle } from "@/types";
 
 import type { Route } from "./+types/c.$categoryId";
 import { Category } from "@/components/category";
+import { StatusCodes } from "http-status-codes";
 
 export function meta({ loaderData }: Route.MetaArgs) {
     return [
@@ -33,13 +34,13 @@ export async function loader({ params }: Route.LoaderArgs) {
             },
         });
         if (cerror || perror) {
-            throw new Response("Not Found", { status: 404 });
+            throw new Response("Not Found", { status: StatusCodes.NOT_FOUND });
         }
         return { products: pdata, category: cdata };
     } else {
         const { data, error } = await client.GET(`/products/`);
         if (error) {
-            throw new Response("Not Found", { status: 404 });
+            throw new Response("Not Found", { status: StatusCodes.NOT_FOUND });
         }
         return { products: data, category: null };
     }

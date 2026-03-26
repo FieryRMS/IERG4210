@@ -16,6 +16,7 @@ import { ButtonGroup } from "@/components/ui/button-group";
 import { Drawer, DrawerClose, DrawerContent, DrawerPopup, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { toast } from "sonner";
 import { fileStorageConfig, UPLOAD_URL } from "@/config";
+import { StatusCodes } from "http-status-codes";
 
 export type SchemaType = string | number | null | File | undefined | (string | number | null)[];
 export type TableTypes = "Product" | "Category" | "Image" | "Product Images";
@@ -526,7 +527,7 @@ export async function loader() {
     const { data: categories, error: cerror } = await client.GET("/categories/");
     const { data: images, error: ierror } = await client.GET("/images/");
     if (perror || cerror || ierror) {
-        throw new Response("Failed to load data", { status: 500 });
+        throw new Response("Failed to load data", { status: StatusCodes.INTERNAL_SERVER_ERROR });
     }
     return { products, categories, images };
 }
