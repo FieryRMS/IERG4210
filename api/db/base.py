@@ -1,10 +1,11 @@
 import datetime
 import uuid
-from typing import ClassVar
+from typing import ClassVar, Any
 
 # from sqlalchemy.dialects.postgresql import insert
 from sqlmodel import Field
 from sqlmodel import SQLModel as _SQLModel
+from collections.abc import Mapping
 
 from models import BaseModel
 
@@ -51,9 +52,11 @@ class SQLModel(BaseModel, _SQLModel):
 
     #     return stmt
 
-    def update_model(self, model: BaseModel):
-        update = self.model_copy(update=model.model_dump(exclude_unset=True))
+    def update_model(self, model: BaseModel, update: Mapping[str, Any] | None = None):
+        updated = self.model_copy(
+            update=model.model_dump(exclude_unset=True).update(update or {})
+        )
         for field in model.model_fields_set:
             if hasattr(self, field) and field not in self.UPSERT_EXCLUDE_FIELDS:
-                setattr(self, field, getattr(update, field))
+                setattr(self, field, getattr(updated, field))
         self.updated_at = datetime.datetime.now(datetime.timezone.utc)

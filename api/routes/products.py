@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Request, status
 from sqlmodel import Session, col, select
 
-from db import Category, Image, Product, ProductUpdate
+from db import Category, Image, Product, ProductCreate, ProductUpdate
 from models import NotFoundException
 from models.app import State
 
@@ -40,7 +40,7 @@ async def get_products_by_category(
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-async def new_product(request: Request, product: ProductUpdate) -> Product:
+async def new_product(request: Request, product: ProductCreate) -> Product:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         db_product = Product.model_validate(product)

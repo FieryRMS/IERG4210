@@ -5,7 +5,7 @@ from fastapi import APIRouter, Request, status, Cookie
 from typing import Annotated
 from sqlmodel import Session as SQLSession, select
 
-from db import User, UserBase, UserCreate, Session as UserSession
+from db import User, UserCreate, UserUpdate, Session as UserSession
 from models.app import State
 from models.errors import NotFoundException
 from fastapi_decorators import depends
@@ -66,7 +66,9 @@ async def get_user(request: Request, user_id: uuid.UUID) -> User:
 async def create_user(request: Request, user: UserCreate) -> User:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with SQLSession(state["engine"]) as session:
-        db_user = User.model_validate(user, update={"password_hash": _ph.hash(user.password)})
+        db_user = User.model_validate(
+            user, update={"password_hash": _ph.hash(user.password)}
+        )
         session.add(db_user)
         session.commit()
         session.refresh(db_user)
@@ -74,13 +76,18 @@ async def create_user(request: Request, user: UserCreate) -> User:
 
 
 @router.put("/{user_id}", status_code=status.HTTP_200_OK)
-async def update_user(request: Request, user_id: uuid.UUID, user: UserBase) -> User:
+async def update_user(request: Request, user_id: uuid.UUID, user: UserUpdate) -> User:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with SQLSession(state["engine"]) as session:
         db_user = session.get(User, user_id)
         if not db_user:
             raise NotFoundException
-        db_user.update_model(user)
+        db_user.update_model(
+            user,
+            update=(
+                {"password_hash": _ph.hash(user.password)} if user.password else None
+            ),
+        )
         session.add(db_user)
         session.commit()
         session.refresh(db_user)

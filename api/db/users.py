@@ -4,6 +4,7 @@ import uuid
 
 from pydantic import EmailStr
 from sqlmodel import Field, Relationship
+from pydantic_partial import create_partial_model
 
 from db.base import SQLModel
 from models import BaseModel
@@ -14,17 +15,19 @@ class Role(str, enum.Enum):
     user = "user"
 
 
-class UserBase(BaseModel):
+class _User(BaseModel):
     email: EmailStr
     username: str
     role: Role = Role.user
 
 
-class UserCreate(UserBase):
+class UserCreate(_User):
     password: str
 
+class UserUpdate(create_partial_model(UserCreate), BaseModel):
+    pass
 
-class User(UserBase, SQLModel, table=True):
+class User(_User, SQLModel, table=True):
     __tablename__ = "users"  # pyright: ignore[reportAssignmentType]
 
     password_hash: str = Field(exclude=True)

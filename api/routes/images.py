@@ -3,13 +3,14 @@ import uuid
 from fastapi import APIRouter, Request, status
 from sqlmodel import Session, select
 
-from db import Image, ImageBase
+from db import Image, ImageCreate, ImageUpdate
 from models.app import State
 from models.errors import NotFoundException
 
 router = APIRouter(prefix="/images", tags=["Images"])
 
 # TODO: type request states when fastapi merges https://github.com/fastapi/fastapi/pull/14863
+
 
 @router.get("/", status_code=status.HTTP_200_OK)
 async def get_images(request: Request) -> list[Image]:
@@ -29,7 +30,7 @@ async def get_image(request: Request, image_id: uuid.UUID) -> Image:
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-async def new_image(request: Request, image: ImageBase) -> Image:
+async def new_image(request: Request, image: ImageCreate) -> Image:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
         db_image = Image.model_validate(image)
@@ -41,7 +42,7 @@ async def new_image(request: Request, image: ImageBase) -> Image:
 
 @router.put("/{image_id}", status_code=status.HTTP_200_OK)
 async def update_image(
-    request: Request, image_id: uuid.UUID, image: ImageBase
+    request: Request, image_id: uuid.UUID, image: ImageUpdate
 ) -> Image:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     with Session(state["engine"]) as session:
