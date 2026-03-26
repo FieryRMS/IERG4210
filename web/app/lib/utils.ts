@@ -45,17 +45,24 @@ export function isPrimitive(value: unknown): boolean {
     return type === "string" || type === "number" || type === "boolean";
 }
 
-function getChildKeys(formData: FormData, parentKey: string): string[] {
-    const prefix = `${parentKey}[`;
-    const seen = new Set<string>();
+function buildChildIndex(formData: FormData): Map<string, Set<string>> {
+    const index = new Map<string, Set<string>>();
     for (const key of formData.keys()) {
-        if (key.startsWith(prefix)) {
-            const rest = key.slice(prefix.length);
-            const end = rest.indexOf(']');
-            if (end !== -1) seen.add(rest.slice(0, end));
+        let pos = 0;
+        while (true) {
+            const open = key.indexOf('[', pos);
+            if (open === -1) break;
+            const close = key.indexOf(']', open);
+            if (close === -1) break;
+            const parent = key.slice(0, open);
+            const child = key.slice(open + 1, close);
+            let set = index.get(parent);
+            if (!set) { set = new Set(); index.set(parent, set); }
+            set.add(child);
+            pos = close + 1;
         }
     }
-    return [...seen];
+    return index;
 }
 
 export function Any2FormData(data: unknown, parentKey = "root", result = new FormData()) {
@@ -87,23 +94,22 @@ export function Any2FormData(data: unknown, parentKey = "root", result = new For
     return result;
 }
 
-export function FormData2Any(formData: FormData, parentKey = "root"): unknown {
+function deserialize(formData: FormData, parentKey: string, index: Map<string, Set<string>>): unknown {
     const type = formData.get(`${parentKey}.__type`);
 
     if (type === "null") return null;
 
-    if (type === "array") {
-        return getChildKeys(formData, parentKey)
-            .map(Number)
-            .filter((n) => !isNaN(n))
-            .sort((a, b) => a - b)
-            .map((i) => FormData2Any(formData, `${parentKey}[${i}]`));
-    }
-
-    if (type === "object") {
+    if (type === "array" || type === "object") {
+        const childKeys = [...(index.get(parentKey) ?? [])];
+        if (type === "array") {
+            return childKeys
+                .map(Number)
+                .filter((n) => !isNaN(n))
+                .sort((a, b) => a - b)
+                .map((i) => deserialize(formData, `${parentKey}[${i}]`, index));
+        }
         return Object.fromEntries(
-            getChildKeys(formData, parentKey)
-                .map((key) => [key, FormData2Any(formData, `${parentKey}[${key}]`)])
+            childKeys.map((key) => [key, deserialize(formData, `${parentKey}[${key}]`, index)])
         );
     }
 
@@ -113,4 +119,8 @@ export function FormData2Any(formData: FormData, parentKey = "root"): unknown {
 
     // Primitive or File — null means the key was absent (undefined in original)
     return formData.get(parentKey) ?? undefined;
+}
+
+export function FormData2Any(formData: FormData, parentKey = "root"): unknown {
+    return deserialize(formData, parentKey, buildChildIndex(formData));
 }

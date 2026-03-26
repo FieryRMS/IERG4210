@@ -701,15 +701,15 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             <h1 className="text-2xl font-bold mb-4">Admin Dashboard</h1>
             <div className="flex flex-col">
                 <div className="p-4 rounded shadow">
-                    <h2 className="text-xl font-semibold mb-2">Products</h2>
+                    <h2 className="text-xl font-semibold mb-2 w-full text-center">Products</h2>
                     <TableGenerator data={loaderData.products} config={PConfig} />
                 </div>
                 <div className="p-4 rounded shadow">
-                    <h2 className="text-xl font-semibold mb-2">Categories</h2>
+                    <h2 className="text-xl font-semibold mb-2 w-full text-center">Categories</h2>
                     <TableGenerator data={loaderData.categories} config={CConfig} />
                 </div>
                 <div className="p-4 rounded shadow">
-                    <h2 className="text-xl font-semibold mb-2">Images</h2>
+                    <h2 className="text-xl font-semibold mb-2 w-full text-center">Images</h2>
                     <TableGenerator data={loaderData.images} config={IConfig} />
                 </div>
             </div>
