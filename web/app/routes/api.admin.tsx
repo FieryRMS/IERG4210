@@ -1,6 +1,6 @@
 import type { Route } from "./+types/api.admin";
 import { fileStorageConfig } from "@/config";
-import { getClient } from "@/lib/utils";
+import { FormData2Any, getClient } from "@/lib/utils";
 import { parseFormData, type FileUpload } from "@remix-run/form-data-parser";
 import { getStorageKey, fileStorage } from "@/storage";
 import { type TableTypes } from "@/routes/admin";
@@ -24,23 +24,7 @@ export async function action({ request }: Route.ActionArgs) {
     const client = getClient();
 
     const type = form.get("TableType") as TableTypes | null;
-    const object = Array.from(form.entries()).reduce(
-        (acc, [key, value]) => {
-            if (typeof value !== "string") {
-                return acc;
-            }
-            if (acc[key]) {
-                if (!Array.isArray(acc[key])) {
-                    acc[key] = [acc[key]];
-                }
-                acc[key].push(value);
-            } else if (typeof value === "string") {
-                acc[key] = value;
-            }
-            return acc;
-        },
-        {} as Record<string, string | string[]>,
-    );
+    const object = FormData2Any(form) as { id?: string };
 
     // TODO: better error handling and validation
     if (!type || typeof type !== "string") throw new Response("Invalid type", { status: StatusCodes.BAD_REQUEST });

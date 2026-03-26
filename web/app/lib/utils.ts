@@ -39,3 +39,78 @@ export const onChangeAsync = <TFormData,>(schema: StandardSchemaV1<TFormData, un
 export function getClient() {
     return createClient<paths>({ baseUrl: process.env.API_URL });
 }
+
+export function isPrimitive(value: unknown): boolean {
+    const type = typeof value;
+    return type === "string" || type === "number" || type === "boolean";
+}
+
+function getChildKeys(formData: FormData, parentKey: string): string[] {
+    const prefix = `${parentKey}[`;
+    const seen = new Set<string>();
+    for (const key of formData.keys()) {
+        if (key.startsWith(prefix)) {
+            const rest = key.slice(prefix.length);
+            const end = rest.indexOf(']');
+            if (end !== -1) seen.add(rest.slice(0, end));
+        }
+    }
+    return [...seen];
+}
+
+export function Any2FormData(data: unknown, parentKey = "root", result = new FormData()) {
+    if (typeof data === 'symbol' || typeof data === 'bigint' || typeof data === 'function') {
+        throw new Error(`Any2FormData does not support data of type ${typeof data} at key "${parentKey}"`);
+    }
+    if (data === undefined) return result;
+    if (data === null) {
+        result.append(`${parentKey}.__type`, "null");
+        return result;
+    }
+    if (isPrimitive(data)) {
+        result.append(parentKey, String(data));
+        return result;
+    }
+    if (data instanceof File) {
+        result.append(parentKey, data);
+        return result;
+    }
+    if (typeof data !== "object") {
+        throw new Error(`Any2FormData does not support data of type ${typeof data} at key "${parentKey}"`);
+    }
+
+    const isArray = Array.isArray(data);
+    result.append(`${parentKey}.__type`, isArray ? "array" : "object");
+
+    for (const [key, value] of Object.entries(data))
+        Any2FormData(value, `${parentKey}[${key}]`, result);
+    return result;
+}
+
+export function FormData2Any(formData: FormData, parentKey = "root"): unknown {
+    const type = formData.get(`${parentKey}.__type`);
+
+    if (type === "null") return null;
+
+    if (type === "array") {
+        return getChildKeys(formData, parentKey)
+            .map(Number)
+            .filter((n) => !isNaN(n))
+            .sort((a, b) => a - b)
+            .map((i) => FormData2Any(formData, `${parentKey}[${i}]`));
+    }
+
+    if (type === "object") {
+        return Object.fromEntries(
+            getChildKeys(formData, parentKey)
+                .map((key) => [key, FormData2Any(formData, `${parentKey}[${key}]`)])
+        );
+    }
+
+    if (type !== null) {
+        throw new Error(`FormData2Any: unknown __type "${type}" at key "${parentKey}"`);
+    }
+
+    // Primitive or File — null means the key was absent (undefined in original)
+    return formData.get(parentKey) ?? undefined;
+}

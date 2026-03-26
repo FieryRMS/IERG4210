@@ -5,7 +5,7 @@ import type { Product, Category, PageHandle, Image } from "@/types";
 import { z } from "zod";
 import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
-import { cn, getClient, onChangeAsync } from "@/lib/utils";
+import { Any2FormData, cn, getClient, onChangeAsync } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState, useMemo, type JSX } from "react";
 import { type HTMLFormMethod } from "react-router";
@@ -536,24 +536,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     const onSubmit = async <T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string>(
         ...[{ config, method, value }]: Parameters<Config<T, K>["onSubmit"]>
     ) => {
-        const form = new FormData();
-        (Object.entries(value) as [K, SchemaType][]).forEach(([key, val]) => {
-            // if serializable, then add as JSON string, otherwise add as is (for file uploads)
-            if (val == null || val == undefined) {
-                return;
-            }
-            if (typeof val === "string" || typeof val === "number") {
-                form.append(key, String(val));
-            } else if (Array.isArray(val)) {
-                val.forEach((item) => {
-                    if (typeof item === "string" || typeof item === "number") {
-                        form.append(key, String(item));
-                    }
-                });
-            } else {
-                form.append(key, val);
-            }
-        });
+        const form = Any2FormData(value);
         form.append("TableType", config.TableType);
         const response = await fetch("/api/admin", {
             method,
