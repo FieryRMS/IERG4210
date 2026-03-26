@@ -8,7 +8,7 @@ import dotenv
 from fastapi import FastAPI, Request, Response
 from fastapi.routing import APIRoute
 from sqlalchemy import create_engine
-from sqlmodel import Session, SQLModel
+from sqlmodel import Session as SQLSession, SQLModel
 
 import routes
 import routes.categories
@@ -146,7 +146,7 @@ async def lifespan(app: FastAPI):
             ),
         ]
 
-        with Session(state["engine"]) as session:
+        with SQLSession(state["engine"]) as session:
             for prod in prods:
                 session.add(prod)
             session.commit()
@@ -169,20 +169,25 @@ app = FastAPI(
 async def log_requests(
     request: Request[State], call_next: Callable[..., Any]
 ) -> Response:
-    appstate: State = request.app.state
-    logger = appstate["logger"].getChild(f"{request.url.path}")
+    request.state["logger"].debug(f"Request: {request.method}")
+    response: Response = await call_next(request)
+    request.state["logger"].debug(f"Response: {response.status_code}")
+    return response
 
-    request.state["logger"] = logger
+
+@app.middleware("http")
+async def inject_state(
+    request: Request[State], call_next: Callable[..., Any]
+) -> Response:
+    appstate: State = request.app.state
+    request.state["logger"] = appstate["logger"].getChild(f"{request.url.path}")
     request.state["debug"] = appstate["debug"]
     request.state["engine"] = appstate["engine"]
-
-    logger.debug(f"Request: {request.method} {request.url.path}")
-    response: Response = await call_next(request)
-    logger.debug(f"Response: {response.status_code} {request.url.path}")
-    return response
+    return await call_next(request)
 
 
 app.include_router(routes.root.router)
 app.include_router(routes.categories.router)
 app.include_router(routes.products.router)
 app.include_router(routes.images.router)
+app.include_router(routes.users.router)

@@ -9,6 +9,7 @@ from models.errors import NotFoundException
 
 router = APIRouter(prefix="/images", tags=["Images"])
 
+# TODO: type request states when fastapi merges https://github.com/fastapi/fastapi/pull/14863
 
 @router.get("/", status_code=status.HTTP_200_OK)
 async def get_images(request: Request) -> list[Image]:
