@@ -23,7 +23,7 @@ import { Footer } from "@/components/footer";
 import type { LocationState, PageHandle } from "./types";
 import { CartProvider } from "./hooks/cart-provider";
 import { useCallback } from "react";
-import { prefsCookie } from "@/cookies";
+import { prefsCookie } from "@/prefs.cookies";
 import { getSession, commitSession } from "@/session.server";
 import { Toaster } from "@/components/ui/sonner";
 import { getClient } from "./lib/utils";
