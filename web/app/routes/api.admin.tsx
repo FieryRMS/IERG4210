@@ -1,13 +1,14 @@
 import type { Route } from "./+types/api.admin";
-import { z } from "zod";
 import { fileStorageConfig } from "@/config";
 import { getClient } from "@/lib/utils";
 import { parseFormData, type FileUpload } from "@remix-run/form-data-parser";
 import { getStorageKey, fileStorage } from "@/storage";
-import { productSchema, categorySchema, imageSchema } from "@/schema";
+import { type TableTypes } from "@/routes/admin";
 
 export async function action({ request }: Route.ActionArgs) {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    if (!["POST", "PUT", "DELETE"].includes(request.method)) throw new Response("Invalid method", { status: 405 });
+
+    if (process.env.API_MODE === "dev") await new Promise((resolve) => setTimeout(resolve, 1000));
 
     async function uploadHandler(fileUpload: FileUpload) {
         if (fileUpload.fieldName === "url" && fileUpload.type.startsWith("image/")) {
@@ -20,7 +21,7 @@ export async function action({ request }: Route.ActionArgs) {
     const form = await parseFormData(request, fileStorageConfig, uploadHandler);
     const client = getClient();
 
-    const type = form.get("tabletype");
+    const type = form.get("tabletype") as TableTypes | null;
     const object = Array.from(form.entries()).reduce(
         (acc, [key, value]) => {
             if (typeof value !== "string") {
@@ -39,81 +40,23 @@ export async function action({ request }: Route.ActionArgs) {
         {} as Record<string, string | string[]>,
     );
 
-    switch (type) {
-        case "Product": {
-            const { data, success, error } = productSchema.safeParse(object);
-            if (!success) {
-                throw new Response(JSON.stringify(error), { status: 400 });
-            }
-            switch (request.method) {
-                case "POST":
-                    return (await client.POST("/products/", { body: data })).data;
-                case "PUT":
-                    return (
-                        await client.PUT(`/products/{product_id}`, {
-                            params: { path: { product_id: data.id! } },
-                            body: data,
-                        })
-                    ).data;
-                case "DELETE":
-                    return (
-                        (await client.DELETE(`/products/{product_id}`, { params: { path: { product_id: data.id! } } }))
-                            .data ?? null
-                    );
-            }
-            break;
-        }
-        case "Category": {
-            const { data, success, error } = categorySchema.safeParse(object);
-            if (!success) {
-                throw new Response(JSON.stringify(error), { status: 400 });
-            }
-            switch (request.method) {
-                case "POST":
-                    return (await client.POST("/categories/", { body: data })).data;
-                case "PUT":
-                    return (
-                        await client.PUT(`/categories/{category_id}`, {
-                            params: { path: { category_id: data.id! } },
-                            body: data,
-                        })
-                    ).data;
-                case "DELETE":
-                    return (
-                        (
-                            await client.DELETE(`/categories/{category_id}`, {
-                                params: { path: { category_id: data.id! } },
-                            })
-                        ).data ?? null
-                    );
-            }
-            break;
-        }
-        case "Image": {
-            const { data, success, error } = imageSchema.safeParse(object);
-            if (!success || typeof data.url !== "string") {
-                throw new Response(JSON.stringify(error), { status: 400 });
-            }
-            switch (request.method) {
-                case "POST":
-                    return (
-                        await client.POST("/images/", { body: data as z.infer<typeof imageSchema> & { url: string } })
-                    ).data;
-                case "PUT":
-                    return (
-                        await client.PUT(`/images/{image_id}`, {
-                            params: { path: { image_id: data.id! } },
-                            body: data as z.infer<typeof imageSchema> & { url: string },
-                        })
-                    ).data;
-                case "DELETE":
-                    return (
-                        (await client.DELETE(`/images/{image_id}`, { params: { path: { image_id: data.id! } } }))
-                            .data ?? null
-                    );
-            }
-            break;
-        }
-    }
-    throw new Response("Invalid request", { status: 400 });
+    // TODO: better error handling and validation
+    if (!type || typeof type !== "string") throw new Response("Invalid type", { status: 400 });
+
+    const endpointMap: Partial<Record<TableTypes, string>> = {
+        Product: "/products/",
+        Category: "/categories/",
+        Image: "/images/",
+    };
+    let endpoint = endpointMap[type];
+    if (!endpoint) throw new Response("Invalid type", { status: 400 });
+    if (["PUT", "DELETE"].includes(request.method)) endpoint += `{id}`;
+
+    // @ts-expect-error: request.method is validated to POST/PUT/DELETE above, endpoints are also retrived from endpointMap, so this is safe
+    const { data, error, response } = await client.request(request.method, endpoint, {
+        body: object,
+        params: { path: { id: object.id } },
+    });
+    // if error or success just duplicate response and pass on
+    return Response.json(data ?? error ?? null, { status: response.status });
 }

@@ -8,7 +8,7 @@
     "start": "react-router-serve ./build/server/index.js",
     "lint": "eslint .",
     "typecheck": "react-router typegen && tsc",
-    "gen": "curl http://localhost:8000/openapi.json | npx openapi-typescript -o app/lib/api.d.ts"
+    "gen": "npx openapi-typescript http://localhost:8000/openapi.json -o app/lib/api.d.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",

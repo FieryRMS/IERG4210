@@ -14,10 +14,39 @@ import { useStore } from "@tanstack/react-form";
 import { Img } from "@/components/img-wrapper";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Drawer, DrawerClose, DrawerContent, DrawerPopup, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
-import { productSchema, categorySchema, imageSchema, baseSchema, type SchemaType } from "@/schema";
 import { toast } from "sonner";
+import { fileStorageConfig, UPLOAD_URL } from "@/config";
 
-type TableTypes = "Product" | "Category" | "Image" | "Product Images";
+export type SchemaType = string | number | null | File | undefined | (string | number | null)[];
+export type TableTypes = "Product" | "Category" | "Image" | "Product Images";
+
+export const baseSchema = z.object({
+    id: z.uuidv4().nullable().optional(),
+});
+export const productSchema = baseSchema.extend({
+    name: z.string(),
+    description: z.string().nullable(),
+    price: z.coerce.number<number>().min(0.01),
+    catid: z.uuidv4(),
+    images: z.array(z.uuidv4()),
+});
+
+export const categorySchema = baseSchema.extend({
+    name: z.string(),
+    description: z.string().nullable(),
+});
+
+export const imageSchema = baseSchema.extend({
+    url: z.union([
+        z.url({
+            protocol: /^https?$/,
+            hostname: z.regexes.domain,
+        }),
+        z.string().regex(new RegExp(`^${UPLOAD_URL}`)),
+        z.file().max(fileStorageConfig.maxFileSize!),
+    ]),
+    alt: z.string().nullable().optional(),
+});
 
 function ConfirmAnim({
     onStart,
@@ -122,7 +151,7 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
         config.fields.forEach((field) => {
             values[field.key as K] = field.toSchemaType(row[field.key as K]);
         });
-        return { ...values, type: config.tableName };
+        return { ...values };
     }, [config, row]);
 
     const [bState, setBState] = useState<
@@ -524,7 +553,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 form.append(key, val);
             }
         });
-        form.append("tabletype", config.tableName);
+        form.append("tableName", config.tableName);
         const response = await fetch("/api/admin", {
             method,
             body: form,
