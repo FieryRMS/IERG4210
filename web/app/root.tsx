@@ -24,18 +24,36 @@ import type { LocationState, PageHandle } from "./types";
 import { CartProvider } from "./hooks/cart-provider";
 import { useCallback } from "react";
 import { prefsCookie } from "@/prefs.cookies";
-import { getSession, commitSession } from "@/session.server";
+import { csrfCookie } from "@/cookies.server";
 import { Toaster } from "@/components/ui/sonner";
 import { getClient } from "./lib/utils";
+import { cstfTokenGenerator } from "@/lib/security.server";
+import { CsrfContext } from "./context";
 
-const authMiddleware: Route.MiddlewareFunction = async ({ request }, next) => {
-    const session = await getSession(request.headers.get("Cookie"));
+const authMiddleware: Route.MiddlewareFunction = async ({ request, context }, next) => {
     const response = await next();
-    response.headers.append("Set-Cookie", await commitSession(session));
     return response;
 };
 
-export const middleware: Route.MiddlewareFunction[] = [authMiddleware];
+const csrfMiddleware: Route.MiddlewareFunction = async ({ request, context }, next) => {
+    const cookieHeader = request.headers.get("Cookie");
+    let csrfSalt = await csrfCookie.parse(cookieHeader);
+    if (["POST", "PUT", "DELETE"].includes(request.method)) {
+        const csrfToken = request.headers.get("X-CSRF-Token");
+        if (!csrfToken || !csrfSalt || !cstfTokenGenerator.verifySignedToken(csrfToken, csrfSalt)) {
+            return new Response("Invalid CSRF token", { status: 403 });
+        }
+    } else {
+        if (!csrfSalt) csrfSalt = cstfTokenGenerator.generateSalt();
+        const token = cstfTokenGenerator.generateSignedToken(csrfSalt);
+        context.set(CsrfContext, token);
+    }
+    const response = await next();
+    response.headers.append("Set-Cookie", await csrfCookie.serialize(csrfSalt));
+    return response;
+};
+
+export const middleware: Route.MiddlewareFunction[] = [authMiddleware, csrfMiddleware];
 
 export const links: Route.LinksFunction = () => [
     { rel: "preconnect", href: "https://fonts.googleapis.com" },

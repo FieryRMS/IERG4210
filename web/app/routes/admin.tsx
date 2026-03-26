@@ -17,6 +17,7 @@ import { Drawer, DrawerClose, DrawerContent, DrawerPopup, DrawerTitle, DrawerTri
 import { toast } from "sonner";
 import { fileStorageConfig, UPLOAD_URL } from "@/config";
 import { StatusCodes } from "http-status-codes";
+import { CsrfContext } from "@/context";
 
 export type SchemaType = string | number | null | File | undefined | (string | number | null)[];
 export type TableTypes = "Product" | "Category" | "Image" | "Product Images";
@@ -185,11 +186,8 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
             // TODO: better error handling/pydantic to tanstack error translation
             try {
                 await onSubmit({ config, method, value });
-            } catch (error) {
+            } catch {
                 form.reset();
-                toast.error(
-                    `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.TableType}: ${error instanceof Error ? error.message : "Unknown error"}`,
-                );
             }
         },
     });
@@ -521,15 +519,16 @@ function TableGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T 
     );
 }
 
-export async function loader() {
+export async function loader({ context }: Route.LoaderArgs) {
     const client = getClient();
     const { data: products, error: perror } = await client.GET("/products/");
     const { data: categories, error: cerror } = await client.GET("/categories/");
     const { data: images, error: ierror } = await client.GET("/images/");
-    if (perror || cerror || ierror) {
+    const csrf = context.get(CsrfContext);
+    if (perror || cerror || ierror || !csrf) {
         throw new Response("Failed to load data", { status: StatusCodes.INTERNAL_SERVER_ERROR });
     }
-    return { products, categories, images };
+    return { products, categories, images, csrf };
 }
 
 export default function Admin({ loaderData }: Route.ComponentProps) {
@@ -541,6 +540,9 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         const response = await fetch("/api/admin", {
             method,
             body: form,
+            headers: {
+                "X-CSRF-Token": loaderData.csrf,
+            },
         });
         if (!response.ok) {
             const error = await response.text();
