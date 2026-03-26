@@ -52,11 +52,11 @@ class SQLModel(BaseModel, _SQLModel):
 
     #     return stmt
 
-    def update_model(self, model: BaseModel, update: Mapping[str, Any] | None = None):
+    def update_model(self, model: BaseModel, update: Mapping[str, Any] = {}):
         updated = self.model_copy(
-            update=model.model_dump(exclude_unset=True).update(update or {})
+            update={**model.model_dump(exclude_unset=True), **update}
         )
-        for field in model.model_fields_set:
+        for field in model.model_fields_set | set(update):
             if hasattr(self, field) and field not in self.UPSERT_EXCLUDE_FIELDS:
                 setattr(self, field, getattr(updated, field))
         self.updated_at = datetime.datetime.now(datetime.timezone.utc)

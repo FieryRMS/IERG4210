@@ -176,16 +176,28 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                 return errors;
             },
         },
-        onSubmit: async ({ value }) => {
+        onSubmit: async ({ value, formApi }) => {
             const methodMap: Partial<Record<typeof bState, HTMLFormMethod>> = {
                 csubmit: "post",
                 ssubmit: "put",
                 dsubmit: "delete",
             };
             const method = methodMap[bState]!;
+            const dirtyFields = new Set(
+                (Object.keys(formApi.fieldInfo) as Array<keyof typeof formApi.fieldInfo>)
+                    .filter((key) => formApi.getFieldMeta(key)?.isDirty)
+                    .map(String),
+            );
+            const updatedValue: Partial<Record<K, SchemaType>> = {};
+            for (const key of Object.keys(value) as K[]) {
+                if (dirtyFields.has(key) || (key === "id" && method !== "post")) {
+                    updatedValue[key] = value[key];
+                }
+            }
+
             // TODO: better error handling/pydantic to tanstack error translation
             try {
-                await onSubmit({ config, method, value });
+                await onSubmit({ config, method, value: updatedValue });
             } catch {
                 form.reset();
             }
@@ -218,7 +230,6 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                                                         : String(field.state.value ?? ""),
                                                 name: fieldconfig.name,
                                                 onChange: (e) => {
-                                                    console.log(e);
                                                     if (e.target.files) {
                                                         const file = e.target.files[0];
                                                         if (file) {
@@ -481,7 +492,7 @@ function TableGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T 
                             if (method === "put") {
                                 setRows((prev) => {
                                     const next = prev.map((row) =>
-                                        row.id === item.id ? ({ ...row, ...value, id: item.id } as T) : row,
+                                        row.id === item.id ? ({ ...row, ...result, id: item.id } as T) : row,
                                     );
                                     onSubmit?.(next);
                                     return next;

@@ -44,5 +44,6 @@ export async function action({ request }: Route.ActionArgs) {
         params: { path: { id: object.id } },
     });
     // if error or success just duplicate response and pass on
+    if (response.status === StatusCodes.NO_CONTENT) return new Response(null, { status: StatusCodes.NO_CONTENT });
     return Response.json(data ?? error ?? null, { status: response.status });
 }
