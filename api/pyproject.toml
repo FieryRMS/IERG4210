@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "API for IERG4210 project"
 requires-python = ">=3.14"
 dependencies = [
+    "alembic>=1.18.4",
     "fastapi-decorators>=1.0.19",
     "fastapi[standard-no-fastapi-cloud-cli]>=0.134.0",
     "psycopg2-binary>=2.9.11",
