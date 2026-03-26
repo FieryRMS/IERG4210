@@ -95,7 +95,7 @@ type FieldConfig<T> = {
 };
 
 type Config<T extends z.infer<typeof baseSchema>, K extends keyof T & string = keyof T & string> = {
-    tableName: TableTypes;
+    TableType: TableTypes;
     onSubmit: (params: {
         config: Config<T, K>;
         method: HTMLFormMethod;
@@ -187,7 +187,7 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
             } catch (error) {
                 form.reset();
                 toast.error(
-                    `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.tableName}: ${error instanceof Error ? error.message : "Unknown error"}`,
+                    `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.TableType}: ${error instanceof Error ? error.message : "Unknown error"}`,
                 );
             }
         },
@@ -274,7 +274,7 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
                                                 <DrawerPopup className="min-h-screen">
                                                     <DrawerContent className="">
                                                         <DrawerTitle>
-                                                            Edit {fieldconfig.name} for {config.tableName} ID:{" "}
+                                                            Edit {fieldconfig.name} for {config.TableType} ID:{" "}
                                                             {create ? "New" : row.id}
                                                         </DrawerTitle>
 
@@ -459,7 +459,7 @@ function TableGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T 
 
     return (
         <Table className="px-10">
-            <TableCaption className="text-center">{config.tableName} CRUD table</TableCaption>
+            <TableCaption className="text-center">{config.TableType} CRUD table</TableCaption>
             <TableHeader>
                 <TableRow>
                     {config.fields.map((field, index) => (
@@ -553,7 +553,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 form.append(key, val);
             }
         });
-        form.append("tableName", config.tableName);
+        form.append("TableType", config.TableType);
         const response = await fetch("/api/admin", {
             method,
             body: form,
@@ -561,20 +561,20 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         if (!response.ok) {
             const error = await response.text();
             toast.error(
-                `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.tableName}: ${error}`,
+                `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.TableType}: ${error}`,
             );
             throw new Error(error);
         }
         const responseData = response.status !== 204 ? await response.json() : null;
         toast.success(
-            `${config.tableName} ${method === "post" ? "created" : method === "put" ? "updated" : "deleted"} successfully`,
+            `${config.TableType} ${method === "post" ? "created" : method === "put" ? "updated" : "deleted"} successfully`,
         );
         return responseData as T;
     };
 
     const PConfig: Config<Product> = {
         $schema: productSchema,
-        tableName: "Product",
+        TableType: "Product",
         onSubmit: onSubmit<Product>,
         fields: FieldConfigDefaults<Product>([
             { key: "id", disabled: true },
@@ -596,7 +596,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                           }, [] as Image[])
                         : [],
                 nested: {
-                    tableName: "Product Images",
+                    TableType: "Product Images",
                     $schema: baseSchema,
                     onSubmit: ({ value }) => {
                         const img = loaderData.images.find((i) => i.id === value.id);
@@ -629,7 +629,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     };
     const CConfig: Config<Category> = {
         $schema: categorySchema,
-        tableName: "Category",
+        TableType: "Category",
         onSubmit: onSubmit<Category>,
         fields: FieldConfigDefaults<Category>([
             { key: "id", disabled: true },
@@ -641,7 +641,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     };
 
     const IConfig: Config<Image> = {
-        tableName: "Image",
+        TableType: "Image",
         $schema: imageSchema,
         onSubmit: onSubmit<Image>,
         fields: FieldConfigDefaults<Image>([
