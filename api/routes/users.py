@@ -36,6 +36,10 @@ def with_session():
             ).first()
             if not user_session:
                 return None
+            if user_session.is_expired():
+                session.delete(user_session)
+                session.commit()
+                return None
             return user_session
 
     return depends(session=dependency)

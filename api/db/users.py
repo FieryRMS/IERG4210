@@ -12,7 +12,7 @@ from models import BaseModel
 import secrets
 import os
 from typing import TypedDict, NotRequired, Literal
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class CookieSettings(TypedDict):
@@ -89,3 +89,8 @@ class Session(SQLModel, table=True):
     max_age: int = SESSION_COOKIE_SETTINGS["max_age"]
 
     user: User = Relationship(back_populates="sessions")
+
+    def is_expired(self) -> bool:
+        return self.created_at is not None and (
+            datetime.now(timezone.utc) - self.created_at
+        ).total_seconds() > self.max_age
