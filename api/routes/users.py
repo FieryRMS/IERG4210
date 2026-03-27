@@ -18,10 +18,10 @@ COOKIE_NAME = "__Host-session" if os.getenv("API_MODE") != "dev" else "session"
 _ph = PasswordHasher()
 
 
-def with_user():
+def with_session():
     def dependency(
         request: Request, token: Annotated[str | None, Cookie(alias=COOKIE_NAME)]
-    ) -> None | User:
+    ) -> None | UserSession:
         state: State = request.state  # pyright: ignore[reportAssignmentType]
         if not token:
             return None
@@ -32,9 +32,9 @@ def with_user():
             ).first()
             if not user_session:
                 return None
-            return user_session.user
+            return user_session
 
-    return depends(user=dependency)
+    return depends(session=dependency)
 
 
 @router.get("/", status_code=status.HTTP_200_OK)
@@ -45,11 +45,11 @@ async def get_users(request: Request) -> list[User]:
 
 
 @router.get("/me", status_code=status.HTTP_200_OK)
-@with_user()
-async def get_current_user(user: User | None) -> User | None:
-    if user is None:
+@with_session()
+async def get_current_user(session: UserSession | None) -> User | None:
+    if session is None:
         raise NotFoundException
-    return user
+    return session.user
 
 
 @router.get("/{user_id}", status_code=status.HTTP_200_OK)
