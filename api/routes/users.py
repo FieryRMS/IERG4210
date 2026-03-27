@@ -91,9 +91,7 @@ async def login(request: Request, response: Response, credentials: UserLogin) ->
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 @with_session()
-async def logout(
-    request: Request, response: Response, session: UserSession | None
-) -> None:
+async def logout(request: Request, response: Response, session: UserSession | None):
     if session is None:
         raise NotFoundException
     state: State = request.state  # pyright: ignore[reportAssignmentType]

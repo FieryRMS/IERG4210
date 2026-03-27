@@ -24,13 +24,28 @@ import type { LocationState, PageHandle } from "./types";
 import { CartProvider } from "./hooks/cart-provider";
 import { useCallback } from "react";
 import { prefsCookie } from "@/prefs.cookies";
-import { csrfCookie } from "@/cookies.server";
+import { csrfCookie, sessionCookie } from "@/cookies.server";
 import { Toaster } from "@/components/ui/sonner";
 import { getClient } from "./lib/utils";
 import { cstfTokenGenerator } from "@/lib/security.server";
-import { CsrfContext } from "./context";
+import { CsrfContext, UserContext } from "./context";
 
 const authMiddleware: Route.MiddlewareFunction = async ({ request, context }, next) => {
+    const client = getClient();
+    const cookieHeader = request.headers.get("Cookie");
+    const session = await sessionCookie.parse(cookieHeader);
+    const user = session
+        ? ((
+              await client.GET("/users/me", {
+                  params: {
+                      cookie: {
+                          "__Host-session": session,
+                      },
+                  },
+              })
+          ).data ?? null)
+        : null;
+    context.set(UserContext, user);
     const response = await next();
     return response;
 };

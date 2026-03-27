@@ -10,7 +10,6 @@ from pydantic_partial import PartialModelMixin
 from db.base import SQLModel
 from models import BaseModel
 import secrets
-import os
 from typing import TypedDict, NotRequired, Literal
 from datetime import datetime, timezone
 
@@ -28,8 +27,8 @@ class CookieSettings(TypedDict):
 
 
 SESSION_COOKIE_SETTINGS = CookieSettings(
-    key="__Host-session" if os.getenv("API_MODE") != "dev" else "session",
-    secure=os.getenv("API_MODE") != "dev",
+    key="__Host-session",
+    secure=True,
     httponly=True,
     samesite="lax",
     path="/",
