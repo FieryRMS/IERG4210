@@ -1,24 +1,19 @@
-import { createCookie, type Cookie } from "react-router";
-import { parse } from "cookie";
+import { createCookie } from "react-router";
 
 
-export const csrfCookie = createCookie(process.env.API_MODE === "dev" ? "csrf" : "__Host-csrf", {
+export const csrfCookie = createCookie("__Host-csrf", {
     httpOnly: true,
-    secure: process.env.API_MODE !== "dev",
+    secure: true,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 12, // 12 hours
     secrets: [process.env.SIGNING_SECRET!],
 });
 
-export const sessionCookie: Cookie = {
-    isSigned: false,
-    name: "__Host-session",
-    async serialize(_value, _options) {
-        throw new Error("Session cookie should not be set in the frontend");
-    },
-    async parse(cookieHeader, options) {
-        const cookies = parse(cookieHeader || "", options);
-        return cookies["__Host-session"] || null;
-    },
-};
+export const sessionCookie = createCookie("__Host-session", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    secrets: [process.env.SIGNING_SECRET!],
+});

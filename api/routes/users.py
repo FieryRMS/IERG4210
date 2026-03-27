@@ -1,8 +1,11 @@
 import uuid
+from datetime import timedelta
+
+from typing import Annotated
 
 from argon2.exceptions import VerificationError
-from fastapi import APIRouter, Request, status, Cookie, Response
-from typing import Annotated
+from fastapi import APIRouter, Depends, Request, status, Response
+from fastapi.security import APIKeyHeader
 from sqlmodel import Session as SQLSession, select
 from email_validator import validate_email, EmailNotValidError
 
@@ -12,24 +15,29 @@ from db import (
     UserLogin,
     UserUpdate,
     Session as UserSession,
-    CookieSettings,
-    SESSION_COOKIE_SETTINGS,
 )
 from models import State, NotFoundException, UnauthorizedException
 from fastapi_decorators import depends
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
+_session_scheme = APIKeyHeader(name="X-Session-Token", auto_error=False)
+
+
+def _set_session_headers(response: Response, user_session: UserSession) -> None:
+    expires = (
+        user_session.created_at + timedelta(seconds=user_session.max_age)
+    ).strftime("%a, %d %b %Y %H:%M:%S GMT")
+    response.headers[_session_scheme.model.name] = f"{user_session.token}:{expires}"
+
 
 def with_session():
     def dependency(
         request: Request,
-        token: Annotated[
-            str | None, Cookie(alias=SESSION_COOKIE_SETTINGS["key"])
-        ] = None,
+        token: Annotated[str | None, Depends(_session_scheme)] = None,
     ) -> None | UserSession:
         state: State = request.state  # pyright: ignore[reportAssignmentType]
-        state["logger"].debug(f"Session token from cookie: {token}")
+        state["logger"].debug(f"Session token from header: {token}")
         if not token:
             return None
 
@@ -91,14 +99,15 @@ async def login(request: Request, response: Response, credentials: UserLogin) ->
         user_session = UserSession(user_id=db_user.id)
         session.add(user_session)
         session.commit()
-        response.set_cookie(**SESSION_COOKIE_SETTINGS, value=user_session.token)
         session.refresh(db_user)
+
+        _set_session_headers(response, user_session)
         return db_user
 
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 @with_session()
-async def logout(request: Request, response: Response, session: UserSession | None):
+async def logout(request: Request, session: UserSession | None):
     if session is None:
         raise NotFoundException
     state: State = request.state  # pyright: ignore[reportAssignmentType]
@@ -107,8 +116,6 @@ async def logout(request: Request, response: Response, session: UserSession | No
         if db_session:
             sql_session.delete(db_session)
             sql_session.commit()
-    del_cookie: CookieSettings = {**SESSION_COOKIE_SETTINGS, "max_age": 0, "expires": 0}
-    response.set_cookie(**del_cookie)
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -121,7 +128,8 @@ async def register(request: Request, response: Response, user: UserCreate) -> Us
         session.add(user_session)
         session.commit()
         session.refresh(db_user)
-        response.set_cookie(**SESSION_COOKIE_SETTINGS, value=user_session.token)
+
+        _set_session_headers(response, user_session)
         return db_user
 
 

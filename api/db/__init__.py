@@ -10,15 +10,6 @@ from .shop import (
     ProductCreate,
     ProductUpdate,
 )
-from .users import (
-    Role,
-    Session,
-    User,
-    UserCreate,
-    UserLogin,
-    UserUpdate,
-    CookieSettings,
-    SESSION_COOKIE_SETTINGS,
-)
+from .users import Role, Session, User, UserCreate, UserLogin, UserUpdate
 
 __all__ = ["Category", "Product", "Image", "User", "Session"]

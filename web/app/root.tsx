@@ -38,9 +38,9 @@ const authMiddleware: Route.MiddlewareFunction = async ({ request, context }, ne
         ? ((
               await client.GET("/users/me", {
                   params: {
-                      cookie: {
-                          "__Host-session": session,
-                      },
+                      header: {
+                          "X-Session-Token": session,
+                      }
                   },
               })
           ).data ?? null)

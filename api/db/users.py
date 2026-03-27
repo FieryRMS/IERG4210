@@ -10,30 +10,7 @@ from pydantic_partial import PartialModelMixin
 from db.base import SQLModel
 from models import BaseModel
 import secrets
-from typing import TypedDict, NotRequired, Literal
 from datetime import datetime, timezone
-
-
-class CookieSettings(TypedDict):
-    key: str
-    max_age: int
-    expires: NotRequired[datetime | str | int | None]
-    path: NotRequired[str | None]
-    domain: NotRequired[str | None]
-    secure: NotRequired[bool]
-    httponly: NotRequired[bool]
-    samesite: NotRequired[Literal["lax", "strict", "none"] | None]
-    partitioned: NotRequired[bool]
-
-
-SESSION_COOKIE_SETTINGS = CookieSettings(
-    key="__Host-session",
-    secure=True,
-    httponly=True,
-    samesite="lax",
-    path="/",
-    max_age=60 * 60 * 24 * 7,  # 7 days
-)
 
 _ph = PasswordHasher()
 
@@ -86,7 +63,7 @@ class Session(SQLModel, table=True):
 
     user_id: uuid.UUID = Field(foreign_key="users.id")
     token: str = Field(unique=True, default_factory=lambda: secrets.token_urlsafe(32))
-    max_age: int = SESSION_COOKIE_SETTINGS["max_age"]
+    max_age: int = 60 * 60 * 24 * 7  # 7 days in seconds
 
     user: User = Relationship(
         back_populates="sessions", sa_relationship_kwargs={"lazy": "joined"}
