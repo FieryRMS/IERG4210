@@ -15,7 +15,10 @@ from .users import (
     Session,
     User,
     UserCreate,
+    UserLogin,
     UserUpdate,
+    CookieSettings,
+    SESSION_COOKIE_SETTINGS,
 )
 
 __all__ = ["Category", "Product", "Image", "User", "Session"]

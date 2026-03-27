@@ -64,7 +64,6 @@ class ProductUpdate(ProductCreate.as_partial(), BaseModel):
 
 class Product(_Product, SQLModel, table=True):
     __tablename__ = "products"  # pyright: ignore[reportAssignmentType]
-    UPSERT_EXCLUDE_FIELDS = {"images"}
 
     category: Category = Relationship(back_populates="products")
     images: list[Image] = Relationship(

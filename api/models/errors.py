@@ -10,3 +10,12 @@ class NotFoundException(HTTPException):
         headers: Mapping[str, str] | None = None,
     ):
         super().__init__(status_code=404, detail=detail, headers=headers)
+
+
+class UnauthorizedException(HTTPException):
+    def __init__(
+        self,
+        detail: str = "Unauthorized",
+        headers: Mapping[str, str] | None = None,
+    ):
+        super().__init__(status_code=401, detail=detail, headers=headers)

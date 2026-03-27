@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request
 
 from models.app import State
-from models.root import Health
+from models import Health
 
 router = APIRouter(tags=["root"])
 
