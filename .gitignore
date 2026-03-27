@@ -1,15 +1,6 @@
 .DS_Store
 .env*
 !.env.example
-node_modules/
-
-# React Router
-.react-router/
-build/
 
 *.zip
-
-.venv/
-__pycache__/
-.mypy_cache/
 .*.json
