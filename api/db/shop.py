@@ -5,15 +5,15 @@ from sqlmodel import Field, Relationship
 
 from db.base import SQLModel
 from models import BaseModel
-from pydantic_partial import create_partial_model
+from pydantic_partial import PartialModelMixin
 
 
-class CategoryCreate(BaseModel):
+class CategoryCreate(BaseModel, PartialModelMixin):
     name: str
     description: str | None = None
 
 
-class CategoryUpdate(create_partial_model(CategoryCreate), BaseModel):
+class CategoryUpdate(CategoryCreate.as_partial(), BaseModel):
     pass
 
 
@@ -30,12 +30,12 @@ class ImageProductLink(SQLModel, table=True):
     product_id: uuid.UUID = Field(foreign_key="products.id", primary_key=True)
 
 
-class ImageCreate(BaseModel):
+class ImageCreate(BaseModel, PartialModelMixin):
     alt: str | None = None
     url: str
 
 
-class ImageUpdate(create_partial_model(ImageCreate), BaseModel):
+class ImageUpdate(ImageCreate.as_partial(), BaseModel):
     pass
 
 
@@ -54,11 +54,11 @@ class _Product(BaseModel):
     description: str | None = None
 
 
-class ProductCreate(_Product):
+class ProductCreate(_Product, PartialModelMixin):
     images: list[uuid.UUID] = []
 
 
-class ProductUpdate(create_partial_model(ProductCreate), BaseModel):
+class ProductUpdate(ProductCreate.as_partial(), BaseModel):
     pass
 
 

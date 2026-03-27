@@ -4,7 +4,7 @@ import uuid
 
 from pydantic import EmailStr
 from sqlmodel import Field, Relationship
-from pydantic_partial import create_partial_model
+from pydantic_partial import  PartialModelMixin
 
 from db.base import SQLModel
 from models import BaseModel
@@ -21,10 +21,10 @@ class _User(BaseModel):
     role: Role = Role.user
 
 
-class UserCreate(_User):
+class UserCreate(_User, PartialModelMixin):
     password: str
 
-class UserUpdate(create_partial_model(UserCreate), BaseModel):
+class UserUpdate(UserCreate.as_partial(), BaseModel):
     pass
 
 class User(_User, SQLModel, table=True):

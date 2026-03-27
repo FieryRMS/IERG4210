@@ -85,7 +85,7 @@ async def update_user(request: Request, user_id: uuid.UUID, user: UserUpdate) ->
         db_user.update_model(
             user,
             update=(
-                {"password_hash": _ph.hash(user.password)} if user.password else None
+                {"password_hash": _ph.hash(user.password)} if user.password else {}
             ),
         )
         session.add(db_user)
