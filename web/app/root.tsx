@@ -83,7 +83,7 @@ export const links: Route.LinksFunction = () => [
     },
 ];
 
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
     const client = getClient();
     const cookieHeader = request.headers.get("Cookie");
     const prefs = (await prefsCookie.parse(cookieHeader)) || {};
@@ -92,6 +92,8 @@ export async function loader({ request }: Route.LoaderArgs) {
         theme,
         system: theme === Theme.System ? request.headers.get("Sec-Ch-Prefers-Color-Scheme") || "" : "",
         categories: (await client.GET("/categories/")).data || [],
+        csrfToken: context.get(CsrfContext),
+        user: context.get(UserContext),
     };
 }
 

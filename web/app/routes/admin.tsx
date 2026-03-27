@@ -606,7 +606,6 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                             name: "preview",
                             disabled: true,
                             render: ({ create, value }) => {
-                                console.log(value);
                                 return !create ? (
                                     <Img
                                         src={`${value}?thumbnail=true`}

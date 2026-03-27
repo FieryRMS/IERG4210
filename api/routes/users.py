@@ -24,9 +24,12 @@ router = APIRouter(prefix="/users", tags=["Users"])
 def with_session():
     def dependency(
         request: Request,
-        token: Annotated[str | None, Cookie(alias=SESSION_COOKIE_SETTINGS["key"])],
+        token: Annotated[
+            str | None, Cookie(alias=SESSION_COOKIE_SETTINGS["key"])
+        ] = None,
     ) -> None | UserSession:
         state: State = request.state  # pyright: ignore[reportAssignmentType]
+        state["logger"].debug(f"Session token from cookie: {token}")
         if not token:
             return None
 
@@ -54,7 +57,11 @@ async def get_users(request: Request) -> list[User]:
 
 @router.get("/me", status_code=status.HTTP_200_OK)
 @with_session()
-async def get_current_user(session: UserSession | None) -> User | None:
+async def get_current_user(
+    request: Request, session: UserSession | None
+) -> User | None:
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    state["logger"].debug(f"Getting current user for session: {session}")
     if session is None:
         raise NotFoundException
     return session.user

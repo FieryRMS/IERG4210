@@ -4,6 +4,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { onChangeAsync } from "@/lib/utils";
+import { useRouteLoaderData, useRevalidator } from "react-router";
+import { useState } from "react";
+import type { loader as rootLoader } from "@/root";
 
 // TODO: add descriptions "input-group"
 const temp = z.object({
@@ -36,7 +39,33 @@ const schema = z.discriminatedUnion("type", [
     temp,
 ]);
 
+
 export function LoginForm() {
+    const rootData = useRouteLoaderData<typeof rootLoader>("root");
+    const { revalidate } = useRevalidator();
+
+    if (rootData?.user) {
+        return (
+            <div className="p-4 space-y-2">
+                <p className="text-sm font-medium">Welcome, {rootData.user.username}</p>
+                <p className="text-xs text-muted-foreground">{rootData.user.email}</p>
+                <Button
+                    className="w-full"
+                    variant="outline"
+                    onClick={async () => {
+                        await fetch("/api/users", {
+                            method: "DELETE",
+                            headers: { "X-CSRF-Token": rootData.csrfToken ?? "" },
+                        });
+                        revalidate();
+                    }}
+                >
+                    Logout
+                </Button>
+            </div>
+        );
+    }
+
     return (
         <Tabs defaultValue="Login">
             <TabsList className="grid w-full grid-cols-2">
@@ -45,7 +74,7 @@ export function LoginForm() {
             </TabsList>
             {(["Login", "Register"] satisfies FormTypes[]).map((t) => (
                 <TabsContent key={t} value={t}>
-                    <Form type={t} />
+                    <Form type={t} csrfToken={rootData?.csrfToken ?? null} onSuccess={revalidate} />
                 </TabsContent>
             ))}
         </Tabs>
@@ -53,7 +82,16 @@ export function LoginForm() {
 }
 type FormTypes = "Login" | "Register";
 
-function Form({ type }: { type: FormTypes }) {
+function Form({
+    type,
+    csrfToken,
+    onSuccess,
+}: {
+    type: FormTypes;
+    csrfToken: string | null;
+    onSuccess: () => void;
+}) {
+    const [submitError, setSubmitError] = useState<string | null>(null);
     const fields = schema.options.find((opt) => opt.shape.type.value === type)!.shape;
     const form = useAppForm({
         defaultValues: Object.fromEntries(
@@ -64,9 +102,24 @@ function Form({ type }: { type: FormTypes }) {
             onChangeAsyncDebounceMs: 300,
             onSubmit: schema,
         },
-        onSubmit: (data) => {
-            console.log(data);
-            // TODO: handle form submission
+        onSubmit: async ({ value }) => {
+            setSubmitError(null);
+            const response = await fetch("/api/users", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-Token": csrfToken ?? "",
+                },
+                body: JSON.stringify(value),
+            });
+            if (response.ok) {
+                onSuccess();
+            } else {
+                const error = await response.json().catch(() => null);
+                setSubmitError(
+                    error?.detail?.[0]?.msg ?? error?.detail ?? `Failed to ${type.toLowerCase()}`,
+                );
+            }
         },
     });
     return (
@@ -106,6 +159,7 @@ function Form({ type }: { type: FormTypes }) {
                             )}
                         </form.AppField>
                     ))}
+                {submitError && <p className="text-destructive text-sm">{submitError}</p>}
                 <Button type="submit" className="w-full mt-2">
                     {type}
                 </Button>

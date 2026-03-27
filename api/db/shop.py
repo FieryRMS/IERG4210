@@ -8,7 +8,7 @@ from models import BaseModel
 from pydantic_partial import PartialModelMixin
 
 
-class CategoryCreate(BaseModel, PartialModelMixin):
+class CategoryCreate(PartialModelMixin, BaseModel):
     name: str
     description: str | None = None
 
@@ -30,7 +30,7 @@ class ImageProductLink(SQLModel, table=True):
     product_id: uuid.UUID = Field(foreign_key="products.id", primary_key=True)
 
 
-class ImageCreate(BaseModel, PartialModelMixin):
+class ImageCreate(PartialModelMixin, BaseModel):
     alt: str | None = None
     url: str
 
@@ -54,7 +54,7 @@ class _Product(BaseModel):
     description: str | None = None
 
 
-class ProductCreate(_Product, PartialModelMixin):
+class ProductCreate(PartialModelMixin, _Product):
     images: list[uuid.UUID] = []
 
 

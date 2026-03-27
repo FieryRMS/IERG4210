@@ -16,7 +16,6 @@ export function meta({ loaderData }: Route.MetaArgs) {
 }
 
 export async function loader({ params }: Route.LoaderArgs) {
-    console.log(params);
     const client = getClient();
     if (params.categoryId) {
         const { data: pdata, error: perror } = await client.GET(`/products/category/{category_id}`, {

@@ -46,14 +46,14 @@ class Role(str, enum.Enum):
 class _User(BaseModel):
     email: EmailStr = Field(unique=True)
     username: str = Field(unique=True)
-    role: Role = Role.user
 
 
-class UserCreate(_User, PartialModelMixin):
+class UserCreate(PartialModelMixin, _User):
     password: str
 
 
 class UserUpdate(UserCreate.as_partial(), BaseModel):
+    role: Role = Role.user
     pass
 
 
@@ -65,6 +65,7 @@ class UserLogin(BaseModel):
 class User(_User, SQLModel, table=True):
     __tablename__ = "users"  # pyright: ignore[reportAssignmentType]
 
+    role: Role = Role.user
     password_hash: str = Field(exclude=True, validation_alias="password")
     sessions: list["Session"] = Relationship(back_populates="user", cascade_delete=True)
 
@@ -87,9 +88,11 @@ class Session(SQLModel, table=True):
     token: str = Field(unique=True, default_factory=lambda: secrets.token_urlsafe(32))
     max_age: int = SESSION_COOKIE_SETTINGS["max_age"]
 
-    user: User = Relationship(back_populates="sessions")
+    user: User = Relationship(
+        back_populates="sessions", sa_relationship_kwargs={"lazy": "joined"}
+    )
 
     def is_expired(self) -> bool:
-        return self.created_at is not None and (
+        return (
             datetime.now(timezone.utc) - self.created_at
         ).total_seconds() > self.max_age
