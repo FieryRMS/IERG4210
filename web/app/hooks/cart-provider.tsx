@@ -1,5 +1,5 @@
 "use client";
-import type { Product } from"@/lib/client/types.gen";
+import type { Product } from"@/lib/generated/types.gen";
 import { createContext, useContext, useEffect, useState } from "react";
 
 type CartProviderState = {

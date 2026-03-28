@@ -1,6 +1,6 @@
 import type { Route } from "./+types/admin";
 import type { PageHandle } from "@/types";
-import type { Product, Category, Image, User, Session } from "@/lib/client/types.gen";
+import type { Product, Category, Image, User, Session } from "@/lib/generated/types.gen";
 import { z } from "zod";
 import { Input } from "@/components/ui/input";
 import { Any2FormData } from "@/lib/utils";

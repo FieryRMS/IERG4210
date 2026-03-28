@@ -1,4 +1,4 @@
-import { Sdk } from "./client/sdk.gen";
+import { Sdk } from "./generated/sdk.gen";
 import { sessionCookie } from "@/cookies.server";
 
 const getSdk = () => {

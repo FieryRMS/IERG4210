@@ -6,7 +6,7 @@ export default defineConfig({
         watch: process.env.EXE_MODE === "dev",
     },
     output: {
-        path: 'app/lib/client',
+        path: 'app/lib/generated',
         entryFile: false,
     },
     plugins: [

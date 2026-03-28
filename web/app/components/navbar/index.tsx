@@ -40,7 +40,7 @@ import { LoginForm } from "./login-form";
 import { Badge } from "@/components/ui/badge";
 import { ButtonGroup } from "@/components/ui/button-group";
 import type { LocationState, PageHandle } from "@/types";
-import type { Category } from "@/lib/client/types.gen";
+import type { Category } from "@/lib/generated/types.gen";
 import { useCart } from "@/hooks/cart-provider";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../ui/item";
 import { cn } from "@/lib/utils";
