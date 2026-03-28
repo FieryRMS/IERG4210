@@ -1,6 +1,6 @@
 import type { Route } from "./+types/admin";
 import type { PageHandle } from "@/types";
-import type { Product, Category, Image } from "@/lib/client/types.gen";
+import type { Product, Category, Image, User, Session } from "@/lib/client/types.gen";
 import { z } from "zod";
 import { Input } from "@/components/ui/input";
 import { Any2FormData } from "@/lib/utils";
@@ -14,7 +14,7 @@ import { CsrfContext } from "@/context.server";
 import { sdk, applyAuth } from "@/lib/server.utils";
 import { TableGenerator, type Config, FieldConfigDefaults } from "@/components/tablegenerator";
 
-export type TableTypes = "Product" | "Category" | "Image";
+export type TableTypes = "Product" | "Category" | "Image" | "User" | "Session";
 
 export const baseSchema = z.object({
     id: z.uuidv4().nullable().optional(),
@@ -44,20 +44,34 @@ export const imageSchema = baseSchema.extend({
     alt: z.string().nullable().optional(),
 });
 
+export const userSchema = baseSchema.extend({
+    email: z.string().nullable().optional(),
+    username: z.string().nullable().optional(),
+    role: z.enum(["admin", "user"]).nullable().optional(),
+    password: z.string().nullable().optional(),
+});
+
+export const sessionSchema = baseSchema;
+
 export async function loader({ request, context }: Route.LoaderArgs) {
     const auth = await applyAuth(request);
     const { data: products, error: perror } = await sdk.products.getProducts(auth);
     const { data: categories, error: cerror } = await sdk.categories.getCategories(auth);
     const { data: images, error: ierror } = await sdk.images.getImages(auth);
+    const { data: users, error: uerror } = await sdk.users.getUsers(auth);
     const csrf = context.get(CsrfContext);
-    if (perror || cerror || ierror || !csrf) {
+    if (perror || cerror || ierror || uerror || !csrf) {
         throw new Response("Failed to load data", { status: StatusCodes.INTERNAL_SERVER_ERROR });
     }
-    return { products, categories, images, csrf };
+    return { products, categories, images, users, csrf };
 }
 
 export default function Admin({ loaderData }: Route.ComponentProps) {
-    const onSubmit = async <T extends { id?: string }, K extends keyof T & string = keyof T & string>(
+    const onSubmit = async <
+        T extends { id?: string },
+        TableTypes extends string = string,
+        K extends keyof T & string = keyof T & string,
+    >(
         ...[{ config, method, value }]: Parameters<Config<T, TableTypes, K>["onSubmit"]>
     ) => {
         const form = Any2FormData(value);
@@ -83,7 +97,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     const PConfig: Config<Product, TableTypes> = {
         $schema: productSchema,
         TableType: "Product",
-        onSubmit: onSubmit<Product>,
+        onSubmit: onSubmit<Product, TableTypes>,
         fields: FieldConfigDefaults<Product>([
             { key: "id", disabled: true },
             { key: "created_at", disabled: true },
@@ -137,7 +151,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     const CConfig: Config<Category, TableTypes> = {
         $schema: categorySchema,
         TableType: "Category",
-        onSubmit: onSubmit<Category>,
+        onSubmit: onSubmit<Category, TableTypes>,
         fields: FieldConfigDefaults<Category>([
             { key: "id", disabled: true },
             { key: "created_at", disabled: true },
@@ -150,7 +164,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     const IConfig: Config<Image, TableTypes> = {
         TableType: "Image",
         $schema: imageSchema,
-        onSubmit: onSubmit<Image>,
+        onSubmit: onSubmit<Image, TableTypes>,
         fields: FieldConfigDefaults<Image>([
             { key: "id", disabled: true },
             { key: "created_at", disabled: true },
@@ -206,6 +220,46 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         ]),
     };
 
+    const allSessions = loaderData.users?.flatMap((u) => u.sessions ?? []) ?? [];
+
+    const UConfig: Config<User, TableTypes> = {
+        TableType: "User",
+        $schema: userSchema,
+        onSubmit: onSubmit<User, TableTypes>,
+        fields: FieldConfigDefaults<User, TableTypes>([
+            { key: "id", disabled: true },
+            { key: "created_at", disabled: true },
+            { key: "updated_at", disabled: true },
+            { key: "email" },
+            { key: "username" },
+            { key: "role" },
+            {
+                key: "sessions",
+                toSchemaType: (data) => (Array.isArray(data) ? data.map((d) => String((d as Session).id)) : []),
+                fromSchemaType: (value) =>
+                    Array.isArray(value)
+                        ? value.reduce((acc, id) => {
+                              const s = allSessions.find((sess) => sess.id === id);
+                              if (s) acc.push(s);
+                              return acc;
+                          }, [] as Session[])
+                        : [],
+                nested: {
+                    TableType: "Session",
+                    $schema: sessionSchema,
+                    disallowed_methods: { post: true, put: true },
+                    onSubmit: onSubmit<Session, TableTypes>,
+                    fields: FieldConfigDefaults<Session, TableTypes>([
+                        { key: "id", disabled: true },
+                        { key: "created_at", disabled: true },
+                        { key: "user_id", disabled: true },
+                        { key: "max_age", disabled: true },
+                    ]),
+                },
+            },
+        ]),
+    };
+
     return (
         <div className="p-4">
             <h1 className="text-2xl font-bold mb-4">Admin Dashboard</h1>
@@ -221,6 +275,10 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2 w-full text-center">Images</h2>
                     <TableGenerator data={loaderData.images ?? []} config={IConfig} />
+                </div>
+                <div className="p-4 rounded shadow">
+                    <h2 className="text-xl font-semibold mb-2 w-full text-center">Users</h2>
+                    <TableGenerator data={loaderData.users ?? []} config={UConfig} />
                 </div>
             </div>
         </div>

@@ -191,6 +191,17 @@ async def update_user(request: Request, user_id: uuid.UUID, user: UserUpdate) ->
     return db_user
 
 
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_session(request: Request, session_id: uuid.UUID) -> None:
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    db_session = state["session"]
+    user_session = db_session.get(UserSession, session_id)
+    if not user_session:
+        raise NotFoundException
+    db_session.delete(user_session)
+    db_session.commit()
+
+
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(request: Request, user_id: uuid.UUID) -> None:
     state: State = request.state  # pyright: ignore[reportAssignmentType]

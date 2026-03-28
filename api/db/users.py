@@ -5,7 +5,7 @@ import re
 
 from argon2.exceptions import VerificationError
 from argon2 import PasswordHasher
-from pydantic import EmailStr, StringConstraints
+from pydantic import EmailStr, StringConstraints, computed_field
 from pydantic.functional_validators import AfterValidator
 from typing import Annotated
 from sqlmodel import Field, Relationship
@@ -72,7 +72,16 @@ class User(_User, SQLModel, table=True):
 
     role: Role = Role.user
     password_hash: str = Field(exclude=True, default="")
-    sessions: list["Session"] = Relationship(back_populates="user", cascade_delete=True)
+    sessions: list["Session"] = Relationship(
+        back_populates="user",
+        cascade_delete=True,
+        sa_relationship_kwargs={"lazy": "selectin"},
+    )
+
+    @computed_field(alias="sessions")
+    @property
+    def _sessions(self) -> list["Session"]:
+        return self.sessions
 
     def set_password(self, password: str) -> None:
         self.password_hash = _ph.hash(password)
