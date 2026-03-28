@@ -144,8 +144,8 @@ export function Navbar({ categories }: { categories: Category[] }) {
                         </div>
                     </NavigationMenuTrigger>
                     <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
-                        <div className="flex w-full flex-col gap-6">
-                            <ItemGroup className="gap-2">
+                        <div className="flex w-full flex-col">
+                            <ItemGroup className="p-2 space-y-4">
                                 {Object.values(cart).map(({ p, q }) => (
                                     <Item key={p.id} variant="outline" role="listitem">
                                         <ItemMedia variant="image">
@@ -202,13 +202,13 @@ export function Navbar({ categories }: { categories: Category[] }) {
                                 {Object.keys(cart).length === 0 && (
                                     <Item
                                         variant="outline"
-                                        className="text-center flex justify-center items-center text-muted-foreground"
+                                        className="text-center flex justify-center items-center text-muted-foreground h-full"
                                     >
                                         No items in cart.
                                     </Item>
                                 )}
+                                <Button className="w-full mt-4">Checkout</Button>
                             </ItemGroup>
-                            <Button className="w-full mt-4">Checkout</Button>
                         </div>
                     </NavigationMenuContent>
                 </NavigationMenuItem>

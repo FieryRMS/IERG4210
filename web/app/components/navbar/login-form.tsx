@@ -12,9 +12,10 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/auth-provider";
 import type { User } from "@/lib/client/types.gen";
 import { Link } from "react-router";
-import { ChevronDown, ChevronUp, LayoutDashboard, LogOut } from "lucide-react";
+import { LayoutDashboard, LogOut } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
-
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../ui/item";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 const passwordRules = z
     .string()
     .min(8)
@@ -49,7 +50,6 @@ const schema = z.discriminatedUnion("type", [
 
 export function LoginForm() {
     const { user, setUser } = useAuth();
-    const [showChangePassword, setShowChangePassword] = useState(false);
 
     if (user) {
         const initials = user.username
@@ -60,60 +60,53 @@ export function LoginForm() {
             .slice(0, 2);
 
         return (
-            <div className="p-4 space-y-4">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-semibold">
-                        {initials}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold truncate">{user.username}</p>
-                            {user.role === "admin" && <Badge className="text-xs">Admin</Badge>}
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                    </div>
-                </div>
+            <div className="p-2 space-y-4">
+                <ItemGroup className="">
+                    <Item variant="outline" render={<a href="#" />} role="listitem">
+                        <ItemMedia
+                            variant="image"
+                            className="bg-primary items-center justify-center text-primary-foreground"
+                        >
+                            {initials}
+                        </ItemMedia>
+                        <ItemContent>
+                            <ItemTitle className="line-clamp-1">{user.username}</ItemTitle>
+                            <ItemDescription>{user.email}</ItemDescription>
+                        </ItemContent>
+                        <ItemContent className="flex-none text-center">
+                            <ItemDescription>
+                                <Badge variant={user.role === "admin" ? "destructive" : "secondary"}>{user.role}</Badge>
+                            </ItemDescription>
+                        </ItemContent>
+                    </Item>
+                </ItemGroup>
 
                 <Separator />
 
-                <div className="space-y-1.5">
+                <div className="grid w-full gap-3">
                     {user.role === "admin" && (
                         <Link to="/admin">
-                            <Button variant="secondary" size="sm" className="w-full justify-start gap-2">
-                                <LayoutDashboard className="size-3.5" />
+                            <Button className="w-full gap-2">
+                                <LayoutDashboard />
                                 Admin Panel
                             </Button>
                         </Link>
                     )}
 
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full justify-between"
-                        onClick={() => setShowChangePassword((v) => !v)}
-                    >
-                        <span>Change Password</span>
-                        {showChangePassword ? (
-                            <ChevronUp className="size-3.5 text-muted-foreground" />
-                        ) : (
-                            <ChevronDown className="size-3.5 text-muted-foreground" />
-                        )}
-                    </Button>
-
-                    {showChangePassword && (
-                        <div className="rounded-lg border bg-muted/30 p-3">
-                            <Form
-                                type="change"
-                                onSuccess={() => setShowChangePassword(false)}
-                                onCancel={() => setShowChangePassword(false)}
-                            />
-                        </div>
-                    )}
+                    <Accordion className="w-full mx-auto space-y-2">
+                        <AccordionItem value="change-password" className="last:border-b border rounded-md">
+                            <AccordionTrigger className="py-3 px-5 text-base items-center">
+                                Change Password
+                            </AccordionTrigger>
+                            <AccordionContent className="flex flex-col gap-4 px-5">
+                                <Form type="change" />
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
 
                     <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        variant="destructive"
+                        className="w-full gap-2"
                         onClick={async () => {
                             await fetch("/api/users", { method: "DELETE" });
                             setUser(null);
@@ -237,11 +230,22 @@ function Form({
                 <form.Subscribe selector={(state) => state.isSubmitting}>
                     {(isSubmitting) => (
                         <div className={onCancel ? "flex gap-2" : undefined}>
-                            <Button type="submit" className={onCancel ? "flex-1" : "w-full"} size="sm" disabled={isSubmitting}>
+                            <Button
+                                type="submit"
+                                className={onCancel ? "flex-1" : "w-full"}
+                                size="sm"
+                                disabled={isSubmitting}
+                            >
                                 {isSubmitting ? <Spinner /> : submitLabel}
                             </Button>
                             {onCancel && (
-                                <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={isSubmitting}>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={onCancel}
+                                    disabled={isSubmitting}
+                                >
                                     Cancel
                                 </Button>
                             )}
