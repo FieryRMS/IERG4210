@@ -127,7 +127,7 @@ function RowGenerator<
     const defaultValues: z.infer<typeof config.$schema> = useMemo(() => {
         const values = {} as Record<K, SchemaType>;
         config.fields.forEach((field) => {
-            values[field.key as K] = field.toSchemaType(row[field.key as K]);
+            values[field.key as K] = field.key in row ? field.toSchemaType(row[field.key as K]) : "";
         });
         return { ...values };
     }, [config, row]);

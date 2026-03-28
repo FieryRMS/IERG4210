@@ -185,6 +185,8 @@ async def update_user(request: Request, user_id: uuid.UUID, user: UserUpdate) ->
     if not db_user:
         raise NotFoundException
     db_user.update_model(user)
+    if user.password:
+        db_user.set_password(user.password)
     session.add(db_user)
     session.commit()
     session.refresh(db_user)

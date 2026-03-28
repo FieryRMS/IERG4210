@@ -233,6 +233,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             { key: "email" },
             { key: "username" },
             { key: "role" },
+            { key: "password" },
             {
                 key: "sessions",
                 toSchemaType: (data) => (Array.isArray(data) ? data.map((d) => String((d as Session).id)) : []),
@@ -259,7 +260,6 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             },
         ]),
     };
-
     return (
         <div className="p-4">
             <h1 className="text-2xl font-bold mb-4">Admin Dashboard</h1>

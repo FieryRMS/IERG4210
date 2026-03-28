@@ -92,6 +92,11 @@ class User(_User, SQLModel, table=True):
         except VerificationError:
             return False
 
+    # just to satisfy typescript
+    @computed_field(alias="password")
+    def _password(self) -> str:
+        return ""
+
 
 class Session(SQLModel, table=True):
     __tablename__ = "sessions"  # pyright: ignore[reportAssignmentType]
