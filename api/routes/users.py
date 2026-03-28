@@ -24,7 +24,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 _session_scheme = APIKeyHeader(name="X-Session-Token", auto_error=False)
 
 
-def _set_session_headers(response: Response, user_session: UserSession | None) -> None:
+def _set_session_headers(response: Response, user_session: UserSession | None):
     expires = (
         user_session.created_at + timedelta(seconds=user_session.max_age)
         if user_session
@@ -59,11 +59,13 @@ def with_session():
     return depends(session=dependency)
 
 
-@router.get("/", status_code=status.HTTP_200_OK)
-async def get_users(request: Request) -> list[User]:
-    state: State = request.state  # pyright: ignore[reportAssignmentType]
-    session = state["session"]
-    return list(session.exec(select(User)).all())
+def with_role(roles: list[str]):
+    @with_session()
+    def dependency(session: UserSession | None):
+        if session is None or session.user.role.value not in roles:
+            raise UnauthorizedException()
+
+    return depends(dependency)
 
 
 @router.get("/me", status_code=status.HTTP_200_OK)
@@ -156,7 +158,16 @@ async def change_password(
     return user
 
 
+@router.get("/", status_code=status.HTTP_200_OK)
+@with_role(["admin"])
+async def get_users(request: Request) -> list[User]:
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    session = state["session"]
+    return list(session.exec(select(User)).all())
+
+
 @router.get("/{user_id}", status_code=status.HTTP_200_OK)
+@with_role(["admin"])
 async def get_user(request: Request, user_id: uuid.UUID) -> User:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
@@ -167,6 +178,7 @@ async def get_user(request: Request, user_id: uuid.UUID) -> User:
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
+@with_role(["admin"])
 async def create_user(request: Request, user: UserCreate) -> User:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
@@ -178,6 +190,7 @@ async def create_user(request: Request, user: UserCreate) -> User:
 
 
 @router.put("/{user_id}", status_code=status.HTTP_200_OK)
+@with_role(["admin"])
 async def update_user(request: Request, user_id: uuid.UUID, user: UserUpdate) -> User:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
@@ -194,7 +207,8 @@ async def update_user(request: Request, user_id: uuid.UUID, user: UserUpdate) ->
 
 
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_session(request: Request, session_id: uuid.UUID) -> None:
+@with_role(["admin"])
+async def delete_session(request: Request, session_id: uuid.UUID):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
     user_session = db_session.get(UserSession, session_id)
@@ -205,7 +219,8 @@ async def delete_session(request: Request, session_id: uuid.UUID) -> None:
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(request: Request, user_id: uuid.UUID) -> None:
+@with_role(["admin"])
+async def delete_user(request: Request, user_id: uuid.UUID):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
     user = session.get(User, user_id)

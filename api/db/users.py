@@ -83,7 +83,7 @@ class User(_User, SQLModel, table=True):
     def _sessions(self) -> list["Session"]:
         return self.sessions
 
-    def set_password(self, password: str) -> None:
+    def set_password(self, password: str):
         self.password_hash = _ph.hash(password)
 
     def verify_password(self, password: str) -> bool:

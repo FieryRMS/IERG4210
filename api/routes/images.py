@@ -6,6 +6,7 @@ from sqlmodel import select
 from db import Image, ImageCreate, ImageUpdate
 from models.app import State
 from models.errors import NotFoundException
+from .users import with_role
 
 router = APIRouter(prefix="/images", tags=["Images"])
 
@@ -30,6 +31,7 @@ async def get_image(request: Request, image_id: uuid.UUID) -> Image:
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
+@with_role(["admin"])
 async def new_image(request: Request, image: ImageCreate) -> Image:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
@@ -41,6 +43,7 @@ async def new_image(request: Request, image: ImageCreate) -> Image:
 
 
 @router.put("/{image_id}", status_code=status.HTTP_200_OK)
+@with_role(["admin"])
 async def update_image(
     request: Request, image_id: uuid.UUID, image: ImageUpdate
 ) -> Image:
@@ -57,7 +60,8 @@ async def update_image(
 
 
 @router.delete("/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_image(request: Request, image_id: uuid.UUID) -> None:
+@with_role(["admin"])
+async def delete_image(request: Request, image_id: uuid.UUID):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
     image = session.get(Image, image_id)

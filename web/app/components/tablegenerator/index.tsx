@@ -55,6 +55,7 @@ type FieldConfig<T, TableTypes extends string = string> = {
     fromSchemaType: (value: SchemaType) => T;
     file: boolean;
     nested?: T extends (infer U)[] ? (U extends { id?: string } ? Config<U, TableTypes> : never) : never;
+    exclude?: boolean;
 };
 
 export type Config<
@@ -104,7 +105,7 @@ export function FieldConfigDefaults<
         },
         fromSchemaType: (value) => value as T[K],
         file: false,
-
+        exclude: false,
         ...field,
     }));
 }
@@ -161,7 +162,11 @@ function RowGenerator<
             const method = methodMap[bState]!;
             const dirtyFields = new Set(
                 (Object.keys(formApi.fieldInfo) as Array<keyof typeof formApi.fieldInfo>)
-                    .filter((key) => formApi.getFieldMeta(key)?.isDirty)
+                    .filter(
+                        (key) =>
+                            formApi.getFieldMeta(key)?.isDirty &&
+                            !config.fields.find((field) => field.key === key)?.exclude,
+                    )
                     .map(String),
             );
             const updatedValue: Partial<Record<K, SchemaType>> = {};

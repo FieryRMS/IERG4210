@@ -9,7 +9,6 @@ import { Img } from "@/components/img-wrapper";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { toast } from "sonner";
 import { fileStorageConfig, UPLOAD_URL } from "@/config";
-import { StatusCodes } from "http-status-codes";
 import { CsrfContext } from "@/context.server";
 import { sdk, applyAuth } from "@/lib/server.utils";
 import { TableGenerator, type Config, FieldConfigDefaults } from "@/components/tablegenerator";
@@ -60,10 +59,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const { data: images, error: ierror } = await sdk.images.getImages(auth);
     const { data: users, error: uerror } = await sdk.users.getUsers(auth);
     const csrf = context.get(CsrfContext);
-    if (perror || cerror || ierror || uerror || !csrf) {
-        throw new Response("Failed to load data", { status: StatusCodes.INTERNAL_SERVER_ERROR });
-    }
-    return { products, categories, images, users, csrf };
+
+    return {
+        products: { data: products, error: perror },
+        categories: { data: categories, error: cerror },
+        images: { data: images, error: ierror },
+        users: { data: users, error: uerror },
+        csrf,
+    };
 }
 
 export default function Admin({ loaderData }: Route.ComponentProps) {
@@ -112,7 +115,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 fromSchemaType: (value) =>
                     Array.isArray(value)
                         ? value.reduce((acc, id) => {
-                              const img = loaderData.images?.find((i) => i.id === id);
+                              const img = loaderData.images.data?.find((i) => i.id === id);
                               if (img) acc.push(img);
                               return acc;
                           }, [] as Image[])
@@ -121,7 +124,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     TableType: "Product Images",
                     $schema: baseSchema,
                     onSubmit: ({ value }) => {
-                        const img = loaderData.images?.find((i) => i.id === value.id);
+                        const img = loaderData.images.data?.find((i) => i.id === value.id);
                         if (!img) throw new Error("Image not found");
                         return img;
                     },
@@ -220,7 +223,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         ]),
     };
 
-    const allSessions = loaderData.users?.flatMap((u) => u.sessions ?? []) ?? [];
+    const allSessions = loaderData.users.data?.flatMap((u) => u.sessions ?? []) ?? [];
 
     const UConfig: Config<User, TableTypes> = {
         TableType: "User",
@@ -236,6 +239,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             { key: "password" },
             {
                 key: "sessions",
+                exclude: true,
                 toSchemaType: (data) => (Array.isArray(data) ? data.map((d) => String((d as Session).id)) : []),
                 fromSchemaType: (value) =>
                     Array.isArray(value)
@@ -262,23 +266,47 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     };
     return (
         <div className="p-4">
-            <h1 className="text-2xl font-bold mb-4">Admin Dashboard</h1>
+            <h1 className="text-2xl font-bold mb-4 w-full text-center">Admin Dashboard</h1>
             <div className="flex flex-col">
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2 w-full text-center">Products</h2>
-                    <TableGenerator data={loaderData.products ?? []} config={PConfig} />
+                    {loaderData.products.error ? (
+                        <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
+                            Failed to load products: {(loaderData.products.error as { detail: string }).detail}
+                        </p>
+                    ) : (
+                        <TableGenerator data={loaderData.products.data ?? []} config={PConfig} />
+                    )}
                 </div>
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2 w-full text-center">Categories</h2>
-                    <TableGenerator data={loaderData.categories ?? []} config={CConfig} />
+                    {loaderData.categories.error ? (
+                        <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
+                            Failed to load categories: {(loaderData.categories.error as { detail: string }).detail}
+                        </p>
+                    ) : (
+                        <TableGenerator data={loaderData.categories.data ?? []} config={CConfig} />
+                    )}
                 </div>
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2 w-full text-center">Images</h2>
-                    <TableGenerator data={loaderData.images ?? []} config={IConfig} />
+                    {loaderData.images.error ? (
+                        <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
+                            Failed to load images: {(loaderData.images.error as { detail: string }).detail}
+                        </p>
+                    ) : (
+                        <TableGenerator data={loaderData.images.data ?? []} config={IConfig} />
+                    )}
                 </div>
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2 w-full text-center">Users</h2>
-                    <TableGenerator data={loaderData.users ?? []} config={UConfig} />
+                    {loaderData.users.error ? (
+                        <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
+                            Failed to load users: {(loaderData.users.error as { detail: string }).detail}
+                        </p>
+                    ) : (
+                        <TableGenerator data={loaderData.users.data ?? []} config={UConfig} />
+                    )}
                 </div>
             </div>
         </div>
