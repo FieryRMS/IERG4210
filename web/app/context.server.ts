@@ -1,5 +1,5 @@
 import { createContext } from "react-router";
-import type { User } from "@/lib/client/types.gen";
+import type { User } from "@/lib/generated/types.gen";
 
 export const CsrfContext = createContext<string | null>(null);
 

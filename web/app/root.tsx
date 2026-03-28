@@ -87,7 +87,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
 export function Layout() {
     const nonce = useNonce();
-    const loaderData = useLoaderData<Route.ComponentProps["loaderData"]>();
+    const loaderData = useLoaderData<Route.ComponentProps["loaderData"] | undefined>();
     const location: Location<LocationState> = useLocation();
     const matches = useMatches();
     const breadcrumbs = (matches as UIMatch<unknown, PageHandle>[])
@@ -116,8 +116,8 @@ export function Layout() {
     useBlocker(shouldBlock);
 
     useEffect(() => {
-        window.__csrf = loaderData.csrfToken || "";
-    }, [loaderData.csrfToken]);
+        window.__csrf = loaderData?.csrfToken || "";
+    }, [loaderData?.csrfToken]);
 
     return (
         <html lang="en" className={`${loaderData?.theme} ${loaderData?.system} bg-background`}>
@@ -128,7 +128,7 @@ export function Layout() {
                 <Links nonce={nonce} />
                 <script nonce={nonce}>
                     {`
-                    window.__csrf = "${loaderData.csrfToken || ""}";
+                    window.__csrf = "${loaderData?.csrfToken || ""}";
                     const _f=window.fetch;
                     window.fetch=(i,o)=>_f(i,{...o,headers:{"X-CSRF-Token":window.__csrf,...o?.headers}});
                     const classList = document.documentElement.classList;

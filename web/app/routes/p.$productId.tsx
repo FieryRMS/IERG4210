@@ -13,7 +13,7 @@ import type { Route } from "./+types/p.$productId";
 import { ShoppingCartIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { PageHandle } from "@/types";
-import type { Product } from "@/lib/client/types.gen";
+import type { Product } from "@/lib/generated/types.gen";
 import { useCart } from "@/hooks/cart-provider";
 import { Img } from "@/components/img-wrapper";
 import { sdk, applyAuth } from "@/lib/server.utils";

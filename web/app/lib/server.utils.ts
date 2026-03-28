@@ -1,11 +1,17 @@
-import { Sdk } from "./client/sdk.gen";
+import { Sdk } from "./generated/sdk.gen";
 import { sessionCookie } from "@/cookies.server";
+import { createClient } from "./generated/client";
 
 const getSdk = () => {
     try {
         return Sdk.__registry.get();
     } catch {
-        return new Sdk();
+        const client = createClient({
+            baseUrl: process.env.API_URL,
+        });
+        client.interceptors.error.use(console.error);
+
+        return new Sdk({ client });
     }
 };
 

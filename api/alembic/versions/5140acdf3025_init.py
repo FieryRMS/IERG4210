@@ -29,7 +29,7 @@ def upgrade() -> None:
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('description', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id', name=op.f('categories_pkey'))
     )
     op.create_table('images',
     sa.Column('id', sa.Uuid(), nullable=False),
@@ -37,7 +37,7 @@ def upgrade() -> None:
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.Column('alt', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('url', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id', name=op.f('images_pkey'))
     )
     op.create_table('users',
     sa.Column('id', sa.Uuid(), nullable=False),
@@ -47,7 +47,7 @@ def upgrade() -> None:
     sa.Column('username', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('role', sa.Enum('admin', 'user', name='role'), nullable=False),
     sa.Column('password_hash', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id', name=op.f('users_pkey'))
     )
     op.create_table('products',
     sa.Column('id', sa.Uuid(), nullable=False),
@@ -57,8 +57,8 @@ def upgrade() -> None:
     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('price', sa.Float(), nullable=False),
     sa.Column('description', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-    sa.ForeignKeyConstraint(['catid'], ['categories.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.ForeignKeyConstraint(['catid'], ['categories.id'], name=op.f('products_catid_fkey')),
+    sa.PrimaryKeyConstraint('id', name=op.f('products_pkey'))
     )
     op.create_table('sessions',
     sa.Column('id', sa.Uuid(), nullable=False),
@@ -67,9 +67,9 @@ def upgrade() -> None:
     sa.Column('user_id', sa.Uuid(), nullable=False),
     sa.Column('token', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('expires_at', sa.DateTime(), nullable=False),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('token')
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], name=op.f('sessions_user_id_fkey')),
+    sa.PrimaryKeyConstraint('id', name=op.f('sessions_pkey')),
+    sa.UniqueConstraint('token', name=op.f('sessions_token_key'))
     )
     op.create_table('imageproductlink',
     sa.Column('id', sa.Uuid(), nullable=False),
@@ -77,9 +77,9 @@ def upgrade() -> None:
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.Column('image_id', sa.Uuid(), nullable=False),
     sa.Column('product_id', sa.Uuid(), nullable=False),
-    sa.ForeignKeyConstraint(['image_id'], ['images.id'], ),
-    sa.ForeignKeyConstraint(['product_id'], ['products.id'], ),
-    sa.PrimaryKeyConstraint('id', 'image_id', 'product_id')
+    sa.ForeignKeyConstraint(['image_id'], ['images.id'], name=op.f('imageproductlink_image_id_fkey')),
+    sa.ForeignKeyConstraint(['product_id'], ['products.id'], name=op.f('imageproductlink_product_id_fkey')),
+    sa.PrimaryKeyConstraint('id', 'image_id', 'product_id', name=op.f('imageproductlink_pkey'))
     )
     # ### end Alembic commands ###
 

@@ -9,17 +9,21 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
   web:
-    build: ./web
+    build:
+      context: .
+      target: web
     ports:
       - 3000:3000
     environment:
-      - API_URL=${API_URL}
+      - API_URL=http://api:8000
       - SIGNING_SECRET=${SIGNING_SECRET}
   api:
-    build: ./api
+    build:
+      context: .
+      target: api
     environment:
-      - POSTGRES_URL=${POSTGRES_URL}
-      - EXE_MODE=${EXE_MODE}
+      - POSTGRES_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - EXE_MODE=prod
 
 volumes:
   db_data:

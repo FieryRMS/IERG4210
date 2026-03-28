@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { onChangeAsync } from "@/lib/utils";
 import { useState } from "react";
 import { useAuth } from "@/hooks/auth-provider";
-import type { User } from "@/lib/client/types.gen";
+import type { User } from "@/lib/generated/types.gen";
 import { Link } from "react-router";
 import { LayoutDashboard, LogOut } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";

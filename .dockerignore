@@ -21,3 +21,9 @@ generated/
 
 *.zip
 .*.json
+
+
+# Docker
+*.md
+alembic/
+alembic.ini

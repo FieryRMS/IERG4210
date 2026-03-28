@@ -340,6 +340,11 @@ dependencies = [
     { name = "sqlmodel" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "alembic", extra = ["tz"] },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "alembic", extras = ["tz"], specifier = ">=1.18.4" },
@@ -352,6 +357,9 @@ requires-dist = [
     { name = "sqlalchemy", specifier = ">=2.0.47" },
     { name = "sqlmodel", specifier = ">=0.0.37" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "alembic", extras = ["tz"], specifier = ">=1.18.4" }]
 
 [[package]]
 name = "jinja2"

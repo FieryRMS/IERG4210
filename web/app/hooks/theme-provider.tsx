@@ -11,7 +11,7 @@ export enum Theme {
 
 type ThemeProviderProps = {
     children: React.ReactNode;
-    defaultTheme: Theme;
+    defaultTheme?: Theme;
 };
 
 type ThemeProviderState = {
@@ -38,8 +38,8 @@ function getPrefersColorScheme(): Theme.Dark | Theme.Light {
 
 export function ThemeProvider({ children, defaultTheme, ...props }: ThemeProviderProps) {
     const [theme, setTheme] = useState<Theme>(() => {
-        if (Object.values(Theme).includes(defaultTheme)) {
-            return defaultTheme;
+        if (Object.values(Theme).includes(defaultTheme as Theme)) {
+            return defaultTheme as Theme;
         }
         return Theme.System;
     });
