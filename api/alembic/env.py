@@ -21,7 +21,9 @@ dotenv.load_dotenv()  # Load environment variables from .env file
 # access to the values within the .ini file in use.
 config = context.config
 POSTGRES_URL = config.get_main_option("sqlalchemy.url", os.getenv("POSTGRES_URL"))
-assert POSTGRES_URL is not None, "sqlalchemy.url must be set in alembic.ini or POSTGRES_URL environment variable"
+assert (
+    POSTGRES_URL is not None
+), "sqlalchemy.url must be set in alembic.ini or POSTGRES_URL environment variable"
 config.set_main_option("sqlalchemy.url", POSTGRES_URL)
 
 # Interpret the config file for Python logging.
@@ -32,13 +34,6 @@ if config.config_file_name is not None:
 # add your model's MetaData object here
 # for 'autogenerate' support
 # from myapp import mymodel
-target_metadata = SQLModel.metadata
-
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
-
 
 naming_convention = {
     "ix": "ix_%(table_name)s_%(column_0_label)s",
@@ -47,6 +42,17 @@ naming_convention = {
     "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
     "pk": "pk_%(table_name)s",
 }
+
+SQLModel.metadata.naming_convention = naming_convention
+target_metadata = SQLModel.metadata
+
+# other values from the config, defined by the needs of env.py,
+# can be acquired:
+# my_important_option = config.get_main_option("my_important_option")
+# ... etc.
+
+
+from db import *  # noqa: E402, F401 — must import after metadata is set
 
 
 def run_migrations_offline() -> None:
