@@ -63,6 +63,11 @@ export type Config<
     K extends keyof T & string = keyof T & string,
 > = {
     TableType: TableTypes;
+    disallowed_methods?: {
+        post?: boolean;
+        put?: boolean;
+        delete?: boolean;
+    };
     onSubmit: (params: {
         config: Config<T, TableTypes, K>;
         method: HTMLFormMethod;
@@ -226,7 +231,8 @@ function RowGenerator<
                                                     (fieldconfig.file && !create) ||
                                                     fieldconfig.disabled ||
                                                     (!["edit", "save"].includes(bState) && !create) ||
-                                                    bState.includes("submit"),
+                                                    bState.includes("submit") ||
+                                                    (create && config.disallowed_methods?.post),
                                                 create,
                                             })
                                         ) : (
@@ -240,7 +246,8 @@ function RowGenerator<
                                                             disabled={
                                                                 fieldconfig.disabled ||
                                                                 (!["edit", "save"].includes(bState) && !create) ||
-                                                                bState.includes("submit")
+                                                                bState.includes("submit") ||
+                                                                (create && config.disallowed_methods?.post)
                                                             }
                                                         />
                                                     }
@@ -307,7 +314,10 @@ function RowGenerator<
                                                 setBState("csubmit");
                                             }
                                         }}
-                                        disabled={bState.includes("submit")}
+                                        disabled={
+                                            bState.includes("submit") ||
+                                            (bState === "idle" && config.disallowed_methods?.post)
+                                        }
                                     >
                                         {["idle", "create"].includes(bState) && (
                                             <ConfirmAnim
@@ -333,7 +343,10 @@ function RowGenerator<
                                                 }
                                                 setBState((prev) => (prev === "idle" ? "edit" : prev));
                                             }}
-                                            disabled={bState.includes("submit")}
+                                            disabled={
+                                                bState.includes("submit") ||
+                                                (bState === "idle" && config.disallowed_methods?.put)
+                                            }
                                         >
                                             {["edit", "save"].includes(bState) && (
                                                 <ConfirmAnim
@@ -377,7 +390,10 @@ function RowGenerator<
                                                     form.reset();
                                                 }
                                             }}
-                                            disabled={bState.includes("submit")}
+                                            disabled={
+                                                bState.includes("submit") ||
+                                                (bState === "idle" && config.disallowed_methods?.delete)
+                                            }
                                         >
                                             {["idle", "delete"].includes(bState) && (
                                                 <ConfirmAnim
