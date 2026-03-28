@@ -87,7 +87,7 @@ class User(_User, SQLModel, table=True):
 class Session(SQLModel, table=True):
     __tablename__ = "sessions"  # pyright: ignore[reportAssignmentType]
 
-    user_id: uuid.UUID = Field(foreign_key="users.id")
+    user_id: uuid.UUID = Field(foreign_key="users.id", ondelete="CASCADE")
     token: str = Field(unique=True, default_factory=lambda: secrets.token_urlsafe(32))
     max_age: int = 60 * 60 * 24 * 2  # 2 days in seconds
 

@@ -48,7 +48,7 @@ class Image(ImageCreate, SQLModel, table=True):
 
 
 class _Product(BaseModel):
-    catid: uuid.UUID = Field(foreign_key="categories.id")
+    catid: uuid.UUID = Field(foreign_key="categories.id", ondelete="CASCADE")
     name: str
     price: float
     description: str | None = None
