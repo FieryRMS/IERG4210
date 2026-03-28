@@ -5,7 +5,7 @@ import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
 import { cn, onChangeAsync } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useState, useMemo, type JSX, useEffect } from "react";
+import { useState, useMemo, type JSX } from "react";
 import { type HTMLFormMethod } from "react-router";
 import { Spinner } from "@/components/ui/spinner";
 import { Drawer, DrawerClose, DrawerContent, DrawerPopup, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
@@ -288,7 +288,7 @@ function RowGenerator<
                                                             }}
                                                         />
 
-                                                        <div className="flex items-center gap-2 w-full justify-center">
+                                                        <div className="flex items-center gap-2 w-full justify-center pt-3">
                                                             <DrawerClose data- render={<Button size="sm" />}>
                                                                 Close
                                                             </DrawerClose>
@@ -449,12 +449,7 @@ export function TableGenerator<
     T extends { id?: string },
     TableTypes extends string = string,
     K extends keyof T & string = keyof T & string,
->({ data, config, onSubmit }: { data: T[]; config: Config<T, TableTypes, K>; onSubmit?: (updatedRows: T[]) => void }) {
-    const [rows, setRows] = useState<T[]>(data);
-    useEffect(() => {
-        setRows(data);
-    }, [data]);
-
+>({ data, config, onSubmit }: { data: T[]; config: Config<T, TableTypes, K>; onSubmit: (updatedRows: T[]) => void }) {
     return (
         <Table className="px-10">
             <TableCaption className="text-center">{config.TableType} CRUD table</TableCaption>
@@ -469,7 +464,7 @@ export function TableGenerator<
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {rows.map((item) => (
+                {data.map((item) => (
                     <RowGenerator
                         key={item.id}
                         row={item}
@@ -478,19 +473,13 @@ export function TableGenerator<
                             const result = await config.onSubmit({ config, method, value });
 
                             if (method === "put") {
-                                setRows((prev) => {
-                                    const next = prev.map((row) =>
-                                        row.id === item.id ? ({ ...row, ...result, id: item.id } as T) : row,
-                                    );
-                                    onSubmit?.(next);
-                                    return next;
-                                });
+                                const next = data.map((row) =>
+                                    row.id === item.id ? ({ ...row, ...result, id: item.id } as T) : row,
+                                );
+                                onSubmit?.(next);
                             } else if (method === "delete") {
-                                setRows((prev) => {
-                                    const next = prev.filter((row) => row.id !== item.id);
-                                    onSubmit?.(next);
-                                    return next;
-                                });
+                                const next = data.filter((row) => row.id !== item.id);
+                                onSubmit?.(next);
                             }
 
                             return result;
@@ -504,11 +493,8 @@ export function TableGenerator<
                     onSubmit={async ({ config, method, value }) => {
                         const result = await config.onSubmit({ config, method, value });
                         if (method === "post") {
-                            setRows((prev) => {
-                                const next = [...prev, result];
-                                onSubmit?.(next);
-                                return next;
-                            });
+                            const next = [...data, result];
+                            onSubmit?.(next);
                         }
                         return result;
                     }}

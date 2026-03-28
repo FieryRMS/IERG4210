@@ -13,6 +13,7 @@ import { CsrfContext, UserContext } from "@/context.server";
 import { sdk, applyAuth } from "@/lib/server.utils";
 import { TableGenerator, type Config, FieldConfigDefaults } from "@/components/tablegenerator";
 import { redirect } from "react-router";
+import { useState } from "react";
 
 export type TableTypes = "Product" | "Category" | "Image" | "User" | "Session";
 
@@ -73,6 +74,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 }
 
 export default function Admin({ loaderData }: Route.ComponentProps) {
+    const [products, setProducts] = useState(loaderData.products.data ?? []);
+    const [categories, setCategories] = useState(loaderData.categories.data ?? []);
+    const [images, setImages] = useState(loaderData.images.data ?? []);
+    const [users, setUsers] = useState(loaderData.users.data ?? []);
+
     const onSubmit = async <
         T extends { id?: string },
         TableTypes extends string = string,
@@ -118,7 +124,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 fromSchemaType: (value) =>
                     Array.isArray(value)
                         ? value.reduce((acc, id) => {
-                              const img = loaderData.images.data?.find((i) => i.id === id);
+                              const img = images?.find((i) => i.id === id);
                               if (img) acc.push(img);
                               return acc;
                           }, [] as Image[])
@@ -127,7 +133,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     TableType: "Product Images",
                     $schema: baseSchema,
                     onSubmit: ({ value }) => {
-                        const img = loaderData.images.data?.find((i) => i.id === value.id);
+                        const img = images?.find((i) => i.id === value.id);
                         if (!img) throw new Error("Image not found");
                         return img;
                     },
@@ -226,7 +232,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         ]),
     };
 
-    const allSessions = loaderData.users.data?.flatMap((u) => u.sessions ?? []) ?? [];
+    const allSessions = users?.flatMap((u) => u.sessions ?? []) ?? [];
 
     const UConfig: Config<User, TableTypes> = {
         TableType: "User",
@@ -278,7 +284,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                             Failed to load products: {(loaderData.products.error as { detail: string }).detail}
                         </p>
                     ) : (
-                        <TableGenerator data={loaderData.products.data ?? []} config={PConfig} />
+                        <TableGenerator data={products ?? []} config={PConfig} onSubmit={setProducts} />
                     )}
                 </div>
                 <div className="p-4 rounded shadow">
@@ -288,7 +294,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                             Failed to load categories: {(loaderData.categories.error as { detail: string }).detail}
                         </p>
                     ) : (
-                        <TableGenerator data={loaderData.categories.data ?? []} config={CConfig} />
+                        <TableGenerator data={categories ?? []} config={CConfig} onSubmit={setCategories} />
                     )}
                 </div>
                 <div className="p-4 rounded shadow">
@@ -298,7 +304,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                             Failed to load images: {(loaderData.images.error as { detail: string }).detail}
                         </p>
                     ) : (
-                        <TableGenerator data={loaderData.images.data ?? []} config={IConfig} />
+                        <TableGenerator data={images ?? []} config={IConfig} onSubmit={setImages} />
                     )}
                 </div>
                 <div className="p-4 rounded shadow">
@@ -308,7 +314,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                             Failed to load users: {(loaderData.users.error as { detail: string }).detail}
                         </p>
                     ) : (
-                        <TableGenerator data={loaderData.users.data ?? []} config={UConfig} />
+                        <TableGenerator data={users ?? []} config={UConfig} onSubmit={setUsers} />
                     )}
                 </div>
             </div>
