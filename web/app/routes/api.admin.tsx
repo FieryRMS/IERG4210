@@ -121,6 +121,47 @@ export async function action({ request }: Route.ActionArgs) {
             }
             break;
         }
+        case "User": {
+            const namespace = sdk.users;
+            switch (request.method) {
+                case "POST": {
+                    const { data, error, response } = await namespace.postUsers({ body, ...auth });
+                    if (data) return Response.json(data, { status: response.status, headers: await applySessionCookie(response.headers) });
+                    err = error;
+                    break;
+                }
+                case "PUT": {
+                    if (!id) throw new Response("Bad Request", { status: StatusCodes.BAD_REQUEST });
+                    const { data, error, response } = await namespace.putUsersByUserId({ body, path: { user_id: id }, ...auth });
+                    if (data) return Response.json(data, { status: response.status, headers: await applySessionCookie(response.headers) });
+                    err = error;
+                    break;
+                }
+                case "DELETE": {
+                    if (!id) throw new Response("Bad Request", { status: StatusCodes.BAD_REQUEST });
+                    const { error, response } = await namespace.deleteUsersByUserId({ path: { user_id: id }, ...auth });
+                    if (!error) return new Response(null, { status: response.status, headers: await applySessionCookie(response.headers) });
+                    err = error;
+                    break;
+                }
+            }
+            break;
+        }
+        case "Session": {
+            const namespace = sdk.users;
+            switch (request.method) {
+                case "DELETE": {
+                    if (!id) throw new Response("Bad Request", { status: StatusCodes.BAD_REQUEST });
+                    const { error, response } = await namespace.deleteUsersSessionsBySessionId({ path: { session_id: id }, ...auth });
+                    if (!error) return new Response(null, { status: response.status, headers: await applySessionCookie(response.headers) });
+                    err = error;
+                    break;
+                }
+                default:
+                    throw new Response("Bad Request", { status: StatusCodes.BAD_REQUEST });
+            }
+            break;
+        }
         default:
             throw new Response("Bad Request", { status: StatusCodes.BAD_REQUEST });
     }
