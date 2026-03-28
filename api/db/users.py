@@ -3,7 +3,7 @@ import uuid
 
 from argon2.exceptions import VerificationError
 from argon2 import PasswordHasher
-from pydantic import EmailStr, field_validator
+from pydantic import EmailStr
 from sqlmodel import Field, Relationship
 from pydantic_partial import PartialModelMixin
 
@@ -35,7 +35,12 @@ class UserUpdate(UserCreate.as_partial(), BaseModel):
 
 
 class UserLogin(BaseModel):
-    identifier: str  # email or username
+    username: str  # email or username
+    password: str
+
+
+class UserChangePassword(BaseModel):
+    old_password: str
     password: str
 
 
@@ -43,13 +48,11 @@ class User(_User, SQLModel, table=True):
     __tablename__ = "users"  # pyright: ignore[reportAssignmentType]
 
     role: Role = Role.user
-    password_hash: str = Field(exclude=True, validation_alias="password")
+    password_hash: str = Field(exclude=True, default="")
     sessions: list["Session"] = Relationship(back_populates="user", cascade_delete=True)
 
-    @field_validator("password_hash", mode="after")
-    @classmethod
-    def hash_password(cls, v: str) -> str:
-        return _ph.hash(v)
+    def set_password(self, password: str) -> None:
+        self.password_hash = _ph.hash(password)
 
     def verify_password(self, password: str) -> bool:
         try:
@@ -65,9 +68,7 @@ class Session(SQLModel, table=True):
     token: str = Field(unique=True, default_factory=lambda: secrets.token_urlsafe(32))
     max_age: int = 60 * 60 * 24 * 7  # 7 days in seconds
 
-    user: User = Relationship(
-        back_populates="sessions", sa_relationship_kwargs={"lazy": "joined"}
-    )
+    user: User = Relationship(back_populates="sessions")
 
     def is_expired(self) -> bool:
         return (

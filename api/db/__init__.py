@@ -10,6 +10,14 @@ from .shop import (
     ProductCreate,
     ProductUpdate,
 )
-from .users import Role, Session, User, UserCreate, UserLogin, UserUpdate
+from .users import (
+    Role,
+    Session,
+    User,
+    UserCreate,
+    UserLogin,
+    UserUpdate,
+    UserChangePassword,
+)
 
 __all__ = ["Category", "Product", "Image", "User", "Session"]
