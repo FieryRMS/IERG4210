@@ -134,6 +134,7 @@ async def register(request: Request, response: Response, user: UserCreate) -> Us
 @with_session()
 async def change_password(
     request: Request,
+    response: Response,
     password_data: UserChangePassword,
     session: UserSession | None,
 ) -> User:
@@ -146,9 +147,12 @@ async def change_password(
         raise UnauthorizedException
     user.set_password(password_data.password)
     db_session.add(user)
+    for s in user.sessions:
+        db_session.delete(s)
     db_session.commit()
     db_session.refresh(user)
 
+    _set_session_headers(response, None)
     return user
 
 
