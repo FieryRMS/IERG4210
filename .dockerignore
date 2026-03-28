@@ -1,0 +1,29 @@
+# api
+__pycache__
+.mypy_cache
+.venv
+.env
+openapi.json
+
+# web
+uploads/
+openapi-ts-error-*.log
+.react-router/
+build/
+node_modules/
+generated/
+
+
+# General
+.DS_Store
+.env*
+!.env.example
+
+*.zip
+.*.json
+
+
+# Docker
+*.md
+alembic/
+alembic.ini
