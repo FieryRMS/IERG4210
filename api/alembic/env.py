@@ -12,7 +12,7 @@ from sqlalchemy import pool
 
 from alembic import context
 import dotenv
-from db import *
+from sqlalchemy import MetaData
 from sqlmodel import SQLModel
 
 dotenv.load_dotenv()  # Load environment variables from .env file
@@ -43,16 +43,11 @@ naming_convention = {
     "pk": "pk_%(table_name)s",
 }
 
-SQLModel.metadata.naming_convention = naming_convention
+SQLModel.metadata = MetaData(naming_convention=naming_convention)
+
+from db import *
+
 target_metadata = SQLModel.metadata
-
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
-
-
-from db import *  # noqa: E402, F401 — must import after metadata is set
 
 
 def run_migrations_offline() -> None:
