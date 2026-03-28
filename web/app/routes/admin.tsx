@@ -55,14 +55,14 @@ export const userSchema = baseSchema.extend({
 export const sessionSchema = baseSchema;
 
 export async function loader({ request, context }: Route.LoaderArgs) {
+    const user = context.get(UserContext);
+    if (!user || user.role !== "admin") throw redirect("/");
     const auth = await applyAuth(request);
     const { data: products, error: perror } = await sdk.products.getProducts(auth);
     const { data: categories, error: cerror } = await sdk.categories.getCategories(auth);
     const { data: images, error: ierror } = await sdk.images.getImages(auth);
     const { data: users, error: uerror } = await sdk.users.getUsers(auth);
     const csrf = context.get(CsrfContext);
-    const user = context.get(UserContext);
-    if (!user || user.role !== "admin") throw redirect("/");
 
     return {
         products: { data: products, error: perror },
@@ -109,6 +109,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     const PConfig: Config<Product, TableTypes> = {
         $schema: productSchema,
         TableType: "Product",
+        desc: "Product CRUD",
         onSubmit: onSubmit<Product, TableTypes>,
         fields: FieldConfigDefaults<Product>([
             { key: "id", disabled: true },
@@ -131,6 +132,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                         : [],
                 nested: {
                     TableType: "Product Images",
+                    desc: "Manage images associated with the product - Click submit on product to save",
                     $schema: baseSchema,
                     onSubmit: ({ value }) => {
                         const img = images?.find((i) => i.id === value.id);
@@ -163,6 +165,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     const CConfig: Config<Category, TableTypes> = {
         $schema: categorySchema,
         TableType: "Category",
+        desc: "Category CRUD",
         onSubmit: onSubmit<Category, TableTypes>,
         fields: FieldConfigDefaults<Category>([
             { key: "id", disabled: true },
@@ -176,6 +179,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     const IConfig: Config<Image, TableTypes> = {
         TableType: "Image",
         $schema: imageSchema,
+        desc: "Image CRUD",
         onSubmit: onSubmit<Image, TableTypes>,
         fields: FieldConfigDefaults<Image>([
             { key: "id", disabled: true },
@@ -237,6 +241,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     const UConfig: Config<User, TableTypes> = {
         TableType: "User",
         $schema: userSchema,
+        desc: "User CRUD",
         onSubmit: onSubmit<User, TableTypes>,
         fields: FieldConfigDefaults<User, TableTypes>([
             { key: "id", disabled: true },
@@ -260,6 +265,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                         : [],
                 nested: {
                     TableType: "Session",
+                    desc: "Manage user sessions - deletes sesion directly",
                     $schema: sessionSchema,
                     disallowed_methods: { post: true, put: true },
                     onSubmit: onSubmit<Session, TableTypes>,

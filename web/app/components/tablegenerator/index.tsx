@@ -64,6 +64,7 @@ export type Config<
     K extends keyof T & string = keyof T & string,
 > = {
     TableType: TableTypes;
+    desc: string;
     disallowed_methods?: {
         post?: boolean;
         put?: boolean;
@@ -452,7 +453,7 @@ export function TableGenerator<
 >({ data, config, onSubmit }: { data: T[]; config: Config<T, TableTypes, K>; onSubmit: (updatedRows: T[]) => void }) {
     return (
         <Table className="px-10">
-            <TableCaption className="text-center">{config.TableType} CRUD table</TableCaption>
+            <TableCaption className="text-center">{config.desc}</TableCaption>
             <TableHeader>
                 <TableRow>
                     {config.fields.map((field, index) => (
