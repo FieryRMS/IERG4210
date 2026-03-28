@@ -9,9 +9,10 @@ import { Img } from "@/components/img-wrapper";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { toast } from "sonner";
 import { fileStorageConfig, UPLOAD_URL } from "@/config";
-import { CsrfContext } from "@/context.server";
+import { CsrfContext, UserContext } from "@/context.server";
 import { sdk, applyAuth } from "@/lib/server.utils";
 import { TableGenerator, type Config, FieldConfigDefaults } from "@/components/tablegenerator";
+import { redirect } from "react-router";
 
 export type TableTypes = "Product" | "Category" | "Image" | "User" | "Session";
 
@@ -59,6 +60,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const { data: images, error: ierror } = await sdk.images.getImages(auth);
     const { data: users, error: uerror } = await sdk.users.getUsers(auth);
     const csrf = context.get(CsrfContext);
+    const user = context.get(UserContext);
+    if (!user || user.role !== "admin") throw redirect("/");
 
     return {
         products: { data: products, error: perror },
