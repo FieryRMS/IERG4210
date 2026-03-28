@@ -34,7 +34,6 @@ RUN npm ci --omit=dev
 FROM web-dev AS web-build
 COPY --from=api /app/openapi.json /app/openapi.json
 WORKDIR /app
-ENV API_URL=${API_URL}
 RUN npm run build
 
 FROM node:20-alpine AS web
