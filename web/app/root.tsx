@@ -13,6 +13,7 @@ import {
     type UIMatch,
     useLoaderData,
 } from "react-router";
+import { useNonce } from "@/context/nonce";
 import { ThemeProvider, Theme } from "@/hooks/theme-provider";
 
 import type { Route } from "./+types/root";
@@ -21,10 +22,42 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import type { LocationState, PageHandle } from "./types";
 import { CartProvider } from "./hooks/cart-provider";
-import { useCallback } from "react";
-import { prefsCookie } from "@/cookies";
+import { AuthProvider } from "./hooks/auth-provider";
+import { useCallback, useEffect } from "react";
+import { prefsCookie } from "@/prefs.cookies";
+import { csrfCookie } from "@/cookies.server";
 import { Toaster } from "@/components/ui/sonner";
-import { getClient } from "./lib/utils";
+import { cstfTokenGenerator } from "@/lib/security.server";
+import { CsrfContext, UserContext } from "./context.server";
+import { sdk, applyAuth, applySessionCookie } from "./lib/server.utils";
+
+const authMiddleware: Route.MiddlewareFunction = async ({ request, context }, next) => {
+    const { data, response: sdkResponse } = await sdk.users.getUsersMe(await applyAuth(request));
+    context.set(UserContext, data || null);
+    const response = await next();
+    await applySessionCookie(sdkResponse.headers, response.headers);
+    return response;
+};
+
+const csrfMiddleware: Route.MiddlewareFunction = async ({ request, context }, next) => {
+    const cookieHeader = request.headers.get("Cookie");
+    let csrfSalt = await csrfCookie.parse(cookieHeader);
+    if (["POST", "PUT", "DELETE"].includes(request.method)) {
+        const csrfToken = request.headers.get("X-CSRF-Token");
+        if (!csrfToken || !csrfSalt || !cstfTokenGenerator.verifySignedToken(csrfToken, csrfSalt)) {
+            return new Response("Invalid CSRF token", { status: 403 });
+        }
+    } else {
+        if (!csrfSalt) csrfSalt = cstfTokenGenerator.generateSalt();
+        const token = cstfTokenGenerator.generateSignedToken(csrfSalt);
+        context.set(CsrfContext, token);
+    }
+    const response = await next();
+    response.headers.append("Set-Cookie", await csrfCookie.serialize(csrfSalt));
+    return response;
+};
+
+export const middleware: Route.MiddlewareFunction[] = [authMiddleware, csrfMiddleware];
 
 export const links: Route.LinksFunction = () => [
     { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -39,17 +72,21 @@ export const links: Route.LinksFunction = () => [
     },
 ];
 
-export async function loader({ request }: Route.LoaderArgs) {
-    const client = getClient();
+export async function loader({ request, context }: Route.LoaderArgs) {
     const cookieHeader = request.headers.get("Cookie");
     const prefs = (await prefsCookie.parse(cookieHeader)) || {};
+    const theme: Theme = prefs.theme || Theme.System;
     return {
-        theme: prefs?.theme || Theme.System,
-        categories: (await client.GET("/categories/")).data || [],
+        theme,
+        system: theme === Theme.System ? request.headers.get("Sec-Ch-Prefers-Color-Scheme") || "" : "",
+        categories: (await sdk.categories.getCategories(await applyAuth(request))).data || [],
+        csrfToken: context.get(CsrfContext),
+        user: context.get(UserContext),
     };
 }
 
-export function Layout({ children }: { children: React.ReactNode }) {
+export function Layout() {
+    const nonce = useNonce();
     const loaderData = useLoaderData<Route.ComponentProps["loaderData"]>();
     const location: Location<LocationState> = useLocation();
     const matches = useMatches();
@@ -78,15 +115,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
     );
     useBlocker(shouldBlock);
 
+    useEffect(() => {
+        window.__csrf = loaderData.csrfToken || "";
+    }, [loaderData.csrfToken]);
+
     return (
-        <html lang="en" className={loaderData?.theme}>
+        <html lang="en" className={`${loaderData?.theme} ${loaderData?.system} bg-background`}>
             <head>
                 <meta charSet="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <Meta />
-                <Links />
-                <script>
+                <Links nonce={nonce} />
+                <script nonce={nonce}>
                     {`
+                    window.__csrf = "${loaderData.csrfToken || ""}";
+                    const _f=window.fetch;
+                    window.fetch=(i,o)=>_f(i,{...o,headers:{"X-CSRF-Token":window.__csrf,...o?.headers}});
                     const classList = document.documentElement.classList;
                     const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: ${Theme.Dark})");
                     function setSystemTheme() {
@@ -94,25 +138,28 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             classList.toggle("${Theme.Dark}", prefersDarkScheme.matches);
                     }
                     prefersDarkScheme.addEventListener("change", setSystemTheme);
-                    setSystemTheme();
                     `}
                 </script>
             </head>
             <ThemeProvider defaultTheme={loaderData?.theme}>
-                <CartProvider>
-                    <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden grid grid-rows-[auto_1fr_auto]">
-                        <header className="sticky top-0 z-50 w-full bg-background pb-2">
-                            <Navbar categories={loaderData?.categories || []} />
-                        </header>
-                        <main className="py-4 w-full h-full">{children}</main>
-                        <footer className="w-full py-6">
-                            <Footer />
-                        </footer>
-                        <ScrollRestoration />
-                        <Scripts />
-                        <Toaster theme={loaderData?.theme} />
-                    </body>
-                </CartProvider>
+                <AuthProvider user={loaderData?.user ?? null}>
+                    <CartProvider>
+                        <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden grid grid-rows-[auto_1fr_auto]">
+                            <header className="sticky top-0 z-50 w-full bg-background pb-2">
+                                <Navbar categories={loaderData?.categories || []} />
+                            </header>
+                            <main className="py-4 w-full h-full">
+                                <Outlet />
+                            </main>
+                            <footer className="w-full py-6">
+                                <Footer />
+                            </footer>
+                            <ScrollRestoration nonce={nonce} />
+                            <Scripts nonce={nonce} />
+                            <Toaster theme={loaderData?.theme} />
+                        </body>
+                    </CartProvider>
+                </AuthProvider>
             </ThemeProvider>
         </html>
     );

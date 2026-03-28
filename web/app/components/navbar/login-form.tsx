@@ -1,58 +1,150 @@
+"use client";
+
 import { z } from "zod";
 import { useAppForm } from "@/components/ui/form-tanstack";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { onChangeAsync } from "@/lib/utils";
+import { useState } from "react";
+import { useAuth } from "@/hooks/auth-provider";
+import type { User } from "@/lib/client/types.gen";
+import { Link } from "react-router";
+import { LayoutDashboard, LogOut } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../ui/item";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+const passwordRules = z
+    .string()
+    .min(8)
+    .max(100)
+    .regex(/[A-Z]/, "Must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Must contain at least one number")
+    .regex(/[^A-Za-z0-9]/, "Must contain at least one special character");
 
-// TODO: add descriptions "input-group"
-const temp = z.object({
-    type: z.literal("Register"),
-    Username: z.string().min(2).max(50),
-    Email: z.email(),
-    Password: z
-        .string()
-        .min(8)
-        .max(100)
-        .regex(/[A-Z]/, "Must contain at least one uppercase letter")
-        .regex(/[a-z]/, "Must contain at least one lowercase letter")
-        .regex(/[0-9]/, "Must contain at least one number")
-        .regex(/[^A-Za-z0-9]/, "Must contain at least one special character"),
-    Confirm_Password: z.string().min(8).max(100),
-});
-temp.refine((data) => data.Password === data.Confirm_Password, {
-    error: "Passwords do not match",
-    when(data) {
-        return temp.pick({ Password: true, Confirm_Password: true }).safeParse(data).success;
-    },
-});
+export type FormTypes = "login" | "register" | "change";
 
 const schema = z.discriminatedUnion("type", [
     z.object({
-        type: z.literal("Login"),
-        Username: z.string(),
-        Password: z.string(),
+        type: z.literal("login"),
+        username: z.string(),
+        password: z.string(),
     }),
-    temp,
+    z.object({
+        type: z.literal("register"),
+        username: z.string().min(2).max(50),
+        email: z.email(),
+        password: passwordRules,
+        confirm_password: z.string().min(8).max(100),
+    }),
+    z.object({
+        type: z.literal("change"),
+        old_password: z.string().min(1, "Required"),
+        password: passwordRules,
+        confirm_password: z.string(),
+    }),
 ]);
 
 export function LoginForm() {
+    const { user, setUser } = useAuth();
+
+    if (user) {
+        const initials = user.username
+            .split(/\s+/)
+            .map((w) => w[0])
+            .join("")
+            .toUpperCase()
+            .slice(0, 2);
+
+        return (
+            <div className="p-2 space-y-4">
+                <ItemGroup className="">
+                    <Item variant="outline" render={<a href="#" />} role="listitem">
+                        <ItemMedia
+                            variant="image"
+                            className="bg-primary items-center justify-center text-primary-foreground"
+                        >
+                            {initials}
+                        </ItemMedia>
+                        <ItemContent>
+                            <ItemTitle className="line-clamp-1">{user.username}</ItemTitle>
+                            <ItemDescription>{user.email}</ItemDescription>
+                        </ItemContent>
+                        <ItemContent className="flex-none text-center">
+                            <ItemDescription>
+                                <Badge variant={user.role === "admin" ? "destructive" : "secondary"}>{user.role}</Badge>
+                            </ItemDescription>
+                        </ItemContent>
+                    </Item>
+                </ItemGroup>
+
+                <Separator />
+
+                <div className="grid w-full gap-3">
+                    {user.role === "admin" && (
+                        <Link to="/admin">
+                            <Button className="w-full gap-2">
+                                <LayoutDashboard />
+                                Admin Panel
+                            </Button>
+                        </Link>
+                    )}
+
+                    <Accordion className="w-full mx-auto space-y-2">
+                        <AccordionItem value="change-password" className="last:border-b border rounded-md">
+                            <AccordionTrigger className="py-3 px-5 text-base items-center">
+                                Change Password
+                            </AccordionTrigger>
+                            <AccordionContent className="flex flex-col gap-4 px-5">
+                                <Form type="change" />
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
+
+                    <Button
+                        variant="destructive"
+                        className="w-full gap-2"
+                        onClick={async () => {
+                            await fetch("/api/users", { method: "DELETE" });
+                            setUser(null);
+                        }}
+                    >
+                        <LogOut className="size-3.5" />
+                        Sign Out
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <Tabs defaultValue="Login">
+        <Tabs defaultValue="login">
             <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="Login">Login</TabsTrigger>
-                <TabsTrigger value="Register">Register</TabsTrigger>
+                <TabsTrigger value="login">Sign In</TabsTrigger>
+                <TabsTrigger value="register">Register</TabsTrigger>
             </TabsList>
-            {["Login", "Register"].map((t) => (
-                <TabsContent key={t} value={t}>
-                    <Form type={t} />
+            {(["login", "register"] satisfies FormTypes[]).map((t) => (
+                <TabsContent key={t} value={t} className="mt-4">
+                    <Form type={t} onSuccess={setUser} />
                 </TabsContent>
             ))}
         </Tabs>
     );
 }
 
-function Form({ type }: { type: string; }) {
+function Form({
+    type,
+    onSuccess,
+    onCancel,
+}: {
+    type: FormTypes;
+    onSuccess?: (user: User | null) => void;
+    onCancel?: () => void;
+}) {
+    const [submitError, setSubmitError] = useState<string | null>(null);
     const fields = schema.options.find((opt) => opt.shape.type.value === type)!.shape;
     const form = useAppForm({
         defaultValues: Object.fromEntries(
@@ -63,11 +155,28 @@ function Form({ type }: { type: string; }) {
             onChangeAsyncDebounceMs: 300,
             onSubmit: schema,
         },
-        onSubmit: (data) => {
-            console.log(data);
-            // TODO: handle form submission
+        onSubmit: async ({ value }) => {
+            if ((value.type === "register" || value.type === "change") && value.password !== value.confirm_password) {
+                setSubmitError("Passwords do not match");
+                return;
+            }
+            setSubmitError(null);
+            const response = await fetch("/api/users", {
+                method: value.type === "change" ? "PUT" : "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(value),
+            });
+            if (response.ok) {
+                onSuccess?.(await response.json().catch(() => null));
+            } else {
+                const error = await response.json().catch(() => null);
+                setSubmitError(error?.detail?.[0]?.msg ?? error?.detail ?? `Failed to ${type.toLowerCase()}`);
+            }
         },
     });
+
+    const submitLabel = type === "login" ? "Sign In" : type === "register" ? "Create Account" : "Update Password";
+
     return (
         <form.AppForm>
             <form
@@ -75,7 +184,7 @@ function Form({ type }: { type: string; }) {
                     e.preventDefault();
                     form.handleSubmit();
                 }}
-                className="space-y-2"
+                className="space-y-3 px-1"
             >
                 {Object.keys(fields)
                     .filter((key) => key !== "type")
@@ -85,8 +194,25 @@ function Form({ type }: { type: string; }) {
                                 <form.Item>
                                     <field.Control>
                                         <Input
-                                            placeholder={key.replaceAll("_", " ")}
-                                            type={key.includes("Password") ? "password" : "text"}
+                                            placeholder={key
+                                                .replaceAll("_", " ")
+                                                .replace(/\b\w/g, (c) => c.toUpperCase())}
+                                            type={
+                                                key.includes("password")
+                                                    ? "password"
+                                                    : key === "email"
+                                                      ? "email"
+                                                      : "text"
+                                            }
+                                            autoComplete={
+                                                key === "username"
+                                                    ? "username"
+                                                    : key === "email"
+                                                      ? "email"
+                                                      : key === "old_password" || type === "login"
+                                                        ? "current-password"
+                                                        : "new-password"
+                                            }
                                             name={field.name}
                                             value={field.state.value}
                                             onBlur={field.handleBlur}
@@ -98,9 +224,34 @@ function Form({ type }: { type: string; }) {
                             )}
                         </form.AppField>
                     ))}
-                <Button type="submit" className="w-full mt-2">
-                    {type}
-                </Button>
+                {submitError && (
+                    <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{submitError}</p>
+                )}
+                <form.Subscribe selector={(state) => state.isSubmitting}>
+                    {(isSubmitting) => (
+                        <div className={onCancel ? "flex gap-2" : undefined}>
+                            <Button
+                                type="submit"
+                                className={onCancel ? "flex-1" : "w-full"}
+                                size="sm"
+                                disabled={isSubmitting}
+                            >
+                                {isSubmitting ? <Spinner /> : submitLabel}
+                            </Button>
+                            {onCancel && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={onCancel}
+                                    disabled={isSubmitting}
+                                >
+                                    Cancel
+                                </Button>
+                            )}
+                        </div>
+                    )}
+                </form.Subscribe>
             </form>
         </form.AppForm>
     );

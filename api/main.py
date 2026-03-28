@@ -7,8 +7,7 @@ from typing import Any
 import dotenv
 from fastapi import FastAPI, Request, Response
 from fastapi.routing import APIRoute
-from sqlalchemy import create_engine
-from sqlmodel import Session, SQLModel
+from sqlmodel import create_engine, Session as SQLSession
 
 import routes
 import routes.categories
@@ -18,16 +17,67 @@ dotenv.load_dotenv()  # Load environment variables from .env file
 
 from db import *
 
-DEBUG = os.getenv("API_MODE", "prod") == "dev"
+DEBUG = os.getenv("EXE_MODE", "prod") == "dev"
 POSTGRES_URL = os.getenv("POSTGRES_URL")
 
+
+class ColoredFormatter(logging.Formatter):
+    _LEVEL_COLORS = {
+        logging.DEBUG: ("\033[46m", "\033[36m"),  # cyan
+        logging.INFO: ("\033[42m", "\033[32m"),  # green
+        logging.WARNING: ("\033[43m", "\033[33m"),  # yellow
+        logging.ERROR: ("\033[41m", "\033[31m"),  # red
+        logging.CRITICAL: ("\033[1;41m", "\033[1;31m"),  # bold red
+    }
+    _RESET = "\033[0m"
+    _DIM = "\033[2m"
+    _NAME_COLORS = [
+        "\033[34m",  # blue
+        "\033[35m",  # magenta
+        "\033[36m",  # cyan
+        "\033[33m",  # yellow
+        "\033[32m",  # green
+        "\033[31m",  # red
+        "\033[95m",  # bright magenta
+        "\033[94m",  # bright blue
+        "\033[96m",  # bright cyan
+        "\033[93m",  # bright yellow
+    ]
+
+    def _name_color(self, name: str) -> str:
+        return self._NAME_COLORS[hash(name) % len(self._NAME_COLORS)]
+
+    def format(self, record: logging.LogRecord) -> str:
+        bcolor, fcolor = self._LEVEL_COLORS.get(record.levelno, (self._RESET, self._RESET))
+        ts = f"{self._DIM}[{self.formatTime(record, self.datefmt)}]{self._RESET}"
+        level = f"{bcolor}[{record.levelname}]{self._RESET}"
+        name = f"{self._name_color(record.name)}[{record.name}]{self._RESET}"
+        message = f"{fcolor}{record.getMessage()}{self._RESET}"
+        if record.exc_info:
+            message += "\n" + self.formatException(record.exc_info)
+        return f"{ts}{level}{name} {message}"
+
+
+_handler = logging.StreamHandler()
+_handler.setFormatter(ColoredFormatter())
 logging.basicConfig(
-    format="[%(asctime)s][%(levelname)s][%(name)s] %(message)s",
+    handlers=[_handler],
     level=logging.DEBUG if DEBUG else logging.INFO,
 )
 logging.getLogger("sqlalchemy.engine").setLevel(
     logging.DEBUG if DEBUG else logging.INFO
 )
+# disable propagation to uvicorn loggers to prevent duplicate logs
+logging.getLogger("uvicorn.error").propagate = False
+logging.getLogger("uvicorn.access").propagate = False
+
+
+class EndpointFilter(logging.Filter):
+    def __init__(self, excluded_paths: list[str]):
+        self.excluded_paths = excluded_paths
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return not any(path in record.getMessage() for path in self.excluded_paths)
 
 
 @asynccontextmanager
@@ -38,121 +88,11 @@ async def lifespan(app: FastAPI):
 
     assert POSTGRES_URL is not None, "POSTGRES_URL environment variable must be set"
     state["engine"] = create_engine(POSTGRES_URL)
-
-    if state["debug"]:
-        # so edits to the models will be reflected immediately without needing to restart the server
-        SQLModel.metadata.drop_all(state["engine"])
-
-    SQLModel.metadata.create_all(state["engine"])
-
-    if state["debug"]:
-        cats = [
-            Category(name="Electronics", description="Devices and gadgets"),
-            Category(name="Books", description="Printed and digital books"),
-            Category(name="Clothing", description="Apparel and accessories"),
-        ]
-        prods = [
-            Product(
-                name="Smartphone",
-                price=699.99,
-                description="Latest model smartphone with advanced features",
-                category=cats[0],
-                images=[
-                    Image(
-                        url="https://avatar.vercel.sh/smartphone.png",
-                        alt="Smartphone front view",
-                    ),
-                    Image(
-                        url="https://avatar.vercel.sh/smartphone-back.png",
-                        alt="Smartphone back view",
-                    ),
-                    Image(
-                        url="https://avatar.vercel.sh/smartphone-side.png",
-                        alt="Smartphone side view",
-                    ),
-                ],
-            ),
-            Product(
-                name="Laptop",
-                price=1299.99,
-                description="High-performance laptop for work and gaming",
-                category=cats[0],
-                images=[
-                    Image(
-                        url="https://avatar.vercel.sh/laptop.png",
-                        alt="Laptop front view",
-                    ),
-                    Image(
-                        url="https://avatar.vercel.sh/laptop-side.png",
-                        alt="Laptop side view",
-                    ),
-                ],
-            ),
-            Product(
-                name="Novel",
-                price=19.99,
-                description="Bestselling fiction novel",
-                category=cats[1],
-                images=[
-                    Image(
-                        url="https://avatar.vercel.sh/novel.png",
-                        alt="Novel cover",
-                    ),
-                ],
-            ),
-            Product(
-                name="Textbook",
-                price=89.99,
-                description="Comprehensive textbook for students",
-                category=cats[1],
-                images=[
-                    Image(
-                        url="https://avatar.vercel.sh/textbook.png",
-                        alt="Textbook cover",
-                    ),
-                ],
-            ),
-            Product(
-                name="T-shirt",
-                price=12.99,
-                description="Comfortable cotton t-shirt",
-                category=cats[2],
-                images=[
-                    Image(
-                        url="https://avatar.vercel.sh/tshirt.png",
-                        alt="T-shirt front view",
-                    ),
-                    Image(
-                        url="https://avatar.vercel.sh/tshirt-back.png",
-                        alt="T-shirt back view",
-                    ),
-                ],
-            ),
-            Product(
-                name="Jeans",
-                price=49.99,
-                description="Stylish denim jeans",
-                category=cats[2],
-                images=[
-                    Image(
-                        url="https://avatar.vercel.sh/jeans.png",
-                        alt="Jeans front view",
-                    ),
-                    Image(
-                        url="https://avatar.vercel.sh/jeans-back.png",
-                        alt="Jeans back view",
-                    ),
-                ],
-            ),
-        ]
-
-        with Session(state["engine"]) as session:
-            for prod in prods:
-                session.add(prod)
-            session.commit()
-
+    if DEBUG:
+        EF = EndpointFilter(["/openapi.json"])
+        logging.getLogger("uvicorn.access").addFilter(EF)
+        state["logger"].addFilter(EF)
     yield
-
     state["engine"].dispose()
 
 
@@ -169,20 +109,30 @@ app = FastAPI(
 async def log_requests(
     request: Request[State], call_next: Callable[..., Any]
 ) -> Response:
-    appstate: State = request.app.state
-    logger = appstate["logger"].getChild(f"{request.url.path}")
+    request.state["logger"].debug(f"Request: {request.method} {request.url.path}")
+    response: Response = await call_next(request)
+    request.state["logger"].debug(
+        f"Response: {request.method} {request.url.path} {response.status_code}"
+    )
+    return response
 
-    request.state["logger"] = logger
+
+@app.middleware("http")
+async def inject_state(
+    request: Request[State], call_next: Callable[..., Any]
+) -> Response:
+    appstate: State = request.app.state
+    request.state["logger"] = appstate["logger"]
     request.state["debug"] = appstate["debug"]
     request.state["engine"] = appstate["engine"]
-
-    logger.debug(f"Request: {request.method} {request.url.path}")
-    response: Response = await call_next(request)
-    logger.debug(f"Response: {response.status_code} {request.url.path}")
-    return response
+    request.state["session"] = SQLSession(appstate["engine"])
+    res = await call_next(request)
+    request.state["session"].close()
+    return res
 
 
 app.include_router(routes.root.router)
 app.include_router(routes.categories.router)
 app.include_router(routes.products.router)
 app.include_router(routes.images.router)
+app.include_router(routes.users.router)

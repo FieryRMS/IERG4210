@@ -1,12 +1,23 @@
 # pyright: reportUnusedImport=false
 from .shop import (
     Category,
-    CategoryBase,
+    CategoryCreate,
+    CategoryUpdate,
     Image,
-    ImageBase,
+    ImageCreate,
+    ImageUpdate,
     Product,
-    ProductBase,
+    ProductCreate,
     ProductUpdate,
 )
+from .users import (
+    Role,
+    Session,
+    User,
+    UserCreate,
+    UserLogin,
+    UserUpdate,
+    UserChangePassword,
+)
 
-__all__ = ["Category", "Product", "Image"]
+__all__ = ["Category", "Product", "Image", "User", "Session"]

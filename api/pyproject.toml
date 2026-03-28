@@ -4,9 +4,13 @@ version = "0.1.0"
 description = "API for IERG4210 project"
 requires-python = ">=3.14"
 dependencies = [
+    "alembic[tz]>=1.18.4",
+    "argon2-cffi>=25.1.0",
+    "fastapi-decorators>=1.0.19",
     "fastapi[standard-no-fastapi-cloud-cli]>=0.134.0",
     "psycopg2-binary>=2.9.11",
-    "pydantic>=2.12.5",
+    "pydantic[email]>=2.12.5",
+    "pydantic-partial>=0.10.2",
     "sqlalchemy>=2.0.47",
     "sqlmodel>=0.0.37",
 ]

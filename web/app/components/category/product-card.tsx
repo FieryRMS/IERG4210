@@ -4,7 +4,7 @@ import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "@/components/link-wrapper";
-import type { Product } from "@/types";
+import type { Product } from"@/lib/client/types.gen";
 import { useCart } from "@/hooks/cart-provider";
 import { Img } from "@/components/img-wrapper";
 import { Skeleton } from "../ui/skeleton";

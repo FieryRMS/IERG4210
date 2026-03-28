@@ -1,2 +1,6 @@
-api.d.ts
-uploads/*
+uploads/
+openapi-ts-error-*.log
+.react-router/
+build/
+node_modules/
+app/lib/client/

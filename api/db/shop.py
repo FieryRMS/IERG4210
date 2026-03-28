@@ -5,14 +5,19 @@ from sqlmodel import Field, Relationship
 
 from db.base import SQLModel
 from models import BaseModel
+from pydantic_partial import PartialModelMixin
 
 
-class CategoryBase(BaseModel):
+class CategoryCreate(PartialModelMixin, BaseModel):
     name: str
     description: str | None = None
 
 
-class Category(CategoryBase, SQLModel, table=True):
+class CategoryUpdate(CategoryCreate.as_partial(), BaseModel):
+    pass
+
+
+class Category(CategoryCreate, SQLModel, table=True):
     __tablename__ = "categories"  # pyright: ignore[reportAssignmentType]
 
     products: list[Product] = Relationship(
@@ -25,12 +30,16 @@ class ImageProductLink(SQLModel, table=True):
     product_id: uuid.UUID = Field(foreign_key="products.id", primary_key=True)
 
 
-class ImageBase(BaseModel):
+class ImageCreate(PartialModelMixin, BaseModel):
     alt: str | None = None
     url: str
 
 
-class Image(ImageBase, SQLModel, table=True):
+class ImageUpdate(ImageCreate.as_partial(), BaseModel):
+    pass
+
+
+class Image(ImageCreate, SQLModel, table=True):
     __tablename__ = "images"  # pyright: ignore[reportAssignmentType]
 
     products: list["Product"] = Relationship(
@@ -38,20 +47,23 @@ class Image(ImageBase, SQLModel, table=True):
     )
 
 
-class ProductBase(BaseModel):
-    catid: uuid.UUID = Field(foreign_key="categories.id")
+class _Product(BaseModel):
+    catid: uuid.UUID = Field(foreign_key="categories.id", ondelete="CASCADE")
     name: str
     price: float
     description: str | None = None
 
 
-class ProductUpdate(ProductBase):
+class ProductCreate(PartialModelMixin, _Product):
     images: list[uuid.UUID] = []
 
 
-class Product(ProductBase, SQLModel, table=True):
+class ProductUpdate(ProductCreate.as_partial(), BaseModel):
+    pass
+
+
+class Product(_Product, SQLModel, table=True):
     __tablename__ = "products"  # pyright: ignore[reportAssignmentType]
-    UPSERT_EXCLUDE_FIELDS = {"images"}
 
     category: Category = Relationship(back_populates="products")
     images: list[Image] = Relationship(
