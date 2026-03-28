@@ -17,14 +17,12 @@ export const applyAuth = async (request: Request) => {
 export const applySessionCookie = async (
     sdkHeaders: Headers,
     headers: Headers = new Headers()
-): Promise<Headers> => {
+) => {
     const tokenHeader = sdkHeaders.get("x-session-token");
     if (!tokenHeader) return headers;
-    const colonIdx = tokenHeader.indexOf(":");
-    if (colonIdx === -1) return headers;
-    const token = tokenHeader.slice(0, colonIdx);
-    const expires = new Date(tokenHeader.slice(colonIdx + 1));
-    headers.append("Set-Cookie", await sessionCookie.serialize(token, { expires }));
+    const [token, expires] = tokenHeader.split("#");
+    if (!expires) return headers;
+    headers.append("Set-Cookie", await sessionCookie.serialize(token, { expires: new Date(expires) }));
     return headers;
 };
 

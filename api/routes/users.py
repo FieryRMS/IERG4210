@@ -31,7 +31,7 @@ def _set_session_headers(response: Response, user_session: UserSession | None) -
         else datetime.now(timezone.utc)
     ).strftime("%a, %d %b %Y %H:%M:%S GMT")
     response.headers[_session_scheme.model.name] = (
-        f"{user_session.token if user_session else ''}:{expires}"
+        f"{user_session.token if user_session else ''}#{expires}"
     )
 
 
@@ -41,7 +41,6 @@ def with_session():
         token: Annotated[str | None, Depends(_session_scheme)] = None,
     ) -> None | UserSession:
         state: State = request.state  # pyright: ignore[reportAssignmentType]
-        state["logger"].debug(f"Session token from header: {token}")
         if not token:
             return None
 
@@ -69,13 +68,9 @@ async def get_users(request: Request) -> list[User]:
 
 @router.get("/me", status_code=status.HTTP_200_OK)
 @with_session()
-async def get_current_user(
-    request: Request, session: UserSession | None
-) -> User | None:
-    state: State = request.state  # pyright: ignore[reportAssignmentType]
-    state["logger"].debug(f"Getting current user for session: {session}")
+async def get_current_user(session: UserSession | None) -> User | None:
     if session is None:
-        raise NotFoundException
+        return None
     return session.user
 
 

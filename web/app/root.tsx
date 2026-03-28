@@ -22,7 +22,8 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import type { LocationState, PageHandle } from "./types";
 import { CartProvider } from "./hooks/cart-provider";
-import { useCallback } from "react";
+import { AuthProvider } from "./hooks/auth-provider";
+import { useCallback, useEffect } from "react";
 import { prefsCookie } from "@/prefs.cookies";
 import { csrfCookie } from "@/cookies.server";
 import { Toaster } from "@/components/ui/sonner";
@@ -114,6 +115,10 @@ export function Layout() {
     );
     useBlocker(shouldBlock);
 
+    useEffect(() => {
+        window.__csrf = loaderData.csrfToken || "";
+    }, [loaderData.csrfToken]);
+
     return (
         <html lang="en" className={`${loaderData?.theme} ${loaderData?.system} bg-background`}>
             <head>
@@ -123,6 +128,9 @@ export function Layout() {
                 <Links nonce={nonce} />
                 <script nonce={nonce}>
                     {`
+                    window.__csrf = "${loaderData.csrfToken || ""}";
+                    const _f=window.fetch;
+                    window.fetch=(i,o)=>_f(i,{...o,headers:{"X-CSRF-Token":window.__csrf,...o?.headers}});
                     const classList = document.documentElement.classList;
                     const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: ${Theme.Dark})");
                     function setSystemTheme() {
@@ -134,22 +142,24 @@ export function Layout() {
                 </script>
             </head>
             <ThemeProvider defaultTheme={loaderData?.theme}>
-                <CartProvider>
-                    <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden grid grid-rows-[auto_1fr_auto]">
-                        <header className="sticky top-0 z-50 w-full bg-background pb-2">
-                            <Navbar categories={loaderData?.categories || []} />
-                        </header>
-                        <main className="py-4 w-full h-full">
-                            <Outlet />
-                        </main>
-                        <footer className="w-full py-6">
-                            <Footer />
-                        </footer>
-                        <ScrollRestoration nonce={nonce} />
-                        <Scripts nonce={nonce} />
-                        <Toaster theme={loaderData?.theme} />
-                    </body>
-                </CartProvider>
+                <AuthProvider user={loaderData?.user ?? null}>
+                    <CartProvider>
+                        <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden grid grid-rows-[auto_1fr_auto]">
+                            <header className="sticky top-0 z-50 w-full bg-background pb-2">
+                                <Navbar categories={loaderData?.categories || []} />
+                            </header>
+                            <main className="py-4 w-full h-full">
+                                <Outlet />
+                            </main>
+                            <footer className="w-full py-6">
+                                <Footer />
+                            </footer>
+                            <ScrollRestoration nonce={nonce} />
+                            <Scripts nonce={nonce} />
+                            <Toaster theme={loaderData?.theme} />
+                        </body>
+                    </CartProvider>
+                </AuthProvider>
             </ThemeProvider>
         </html>
     );

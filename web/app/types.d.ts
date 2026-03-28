@@ -10,3 +10,7 @@ interface PageHandle<T = unknown> {
 interface LocationState {
     breadcrumbs?: Breadcrumb[];
 }
+
+declare global {
+    interface Window { __csrf: string; }
+}

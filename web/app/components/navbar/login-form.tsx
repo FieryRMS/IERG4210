@@ -4,9 +4,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { onChangeAsync } from "@/lib/utils";
-import { useRouteLoaderData, useRevalidator } from "react-router";
 import { useState } from "react";
-import type { loader as rootLoader } from "@/root";
+import { useAuth } from "@/hooks/auth-provider";
+import type { User } from "@/lib/client/types.gen";
 
 // TODO: add descriptions "input-group"
 const temp = z.object({
@@ -39,25 +39,22 @@ const schema = z.discriminatedUnion("type", [
     temp,
 ]);
 
-
 export function LoginForm() {
-    const rootData = useRouteLoaderData<typeof rootLoader>("root");
-    const { revalidate } = useRevalidator();
+    const { user, setUser } = useAuth();
 
-    if (rootData?.user) {
+    if (user) {
         return (
             <div className="p-4 space-y-2">
-                <p className="text-sm font-medium">Welcome, {rootData.user.username}</p>
-                <p className="text-xs text-muted-foreground">{rootData.user.email}</p>
+                <p className="text-sm font-medium">Welcome, {user.username}</p>
+                <p className="text-xs text-muted-foreground">{user.email}</p>
                 <Button
                     className="w-full"
                     variant="outline"
                     onClick={async () => {
                         await fetch("/api/users", {
                             method: "DELETE",
-                            headers: { "X-CSRF-Token": rootData.csrfToken ?? "" },
                         });
-                        revalidate();
+                        setUser(null);
                     }}
                 >
                     Logout
@@ -74,7 +71,7 @@ export function LoginForm() {
             </TabsList>
             {(["Login", "Register"] satisfies FormTypes[]).map((t) => (
                 <TabsContent key={t} value={t}>
-                    <Form type={t} csrfToken={rootData?.csrfToken ?? null} onSuccess={revalidate} />
+                    <Form type={t} onSuccess={setUser} />
                 </TabsContent>
             ))}
         </Tabs>
@@ -82,15 +79,7 @@ export function LoginForm() {
 }
 type FormTypes = "Login" | "Register";
 
-function Form({
-    type,
-    csrfToken,
-    onSuccess,
-}: {
-    type: FormTypes;
-    csrfToken: string | null;
-    onSuccess: () => void;
-}) {
+function Form({ type, onSuccess }: { type: FormTypes; onSuccess: (user: User | null) => void }) {
     const [submitError, setSubmitError] = useState<string | null>(null);
     const fields = schema.options.find((opt) => opt.shape.type.value === type)!.shape;
     const form = useAppForm({
@@ -108,17 +97,14 @@ function Form({
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "X-CSRF-Token": csrfToken ?? "",
                 },
                 body: JSON.stringify(value),
             });
             if (response.ok) {
-                onSuccess();
+                onSuccess(await response.json().catch(() => null));
             } else {
                 const error = await response.json().catch(() => null);
-                setSubmitError(
-                    error?.detail?.[0]?.msg ?? error?.detail ?? `Failed to ${type.toLowerCase()}`,
-                );
+                setSubmitError(error?.detail?.[0]?.msg ?? error?.detail ?? `Failed to ${type.toLowerCase()}`);
             }
         },
     });

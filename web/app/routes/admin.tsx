@@ -547,9 +547,6 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         const response = await fetch("/api/admin", {
             method,
             body: form,
-            headers: {
-                "X-CSRF-Token": loaderData.csrf,
-            },
         });
         if (!response.ok) {
             const error = await response.text();
