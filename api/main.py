@@ -8,6 +8,7 @@ import dotenv
 from fastapi import FastAPI, Request, Response
 from fastapi.routing import APIRoute
 from sqlalchemy import create_engine
+import json
 
 import routes
 import routes.categories
@@ -17,7 +18,7 @@ dotenv.load_dotenv()  # Load environment variables from .env file
 
 from db import *
 
-DEBUG = os.getenv("API_MODE", "prod") == "dev"
+DEBUG = os.getenv("EXE_MODE", "prod") == "dev"
 POSTGRES_URL = os.getenv("POSTGRES_URL")
 
 logging.basicConfig(
@@ -29,6 +30,14 @@ logging.getLogger("sqlalchemy.engine").setLevel(
 )
 
 
+class EndpointFilter(logging.Filter):
+    def __init__(self, excluded_paths: list[str]):
+        self.excluded_paths = excluded_paths
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return not any(path in record.getMessage() for path in self.excluded_paths)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.debug = DEBUG
@@ -37,6 +46,12 @@ async def lifespan(app: FastAPI):
 
     assert POSTGRES_URL is not None, "POSTGRES_URL environment variable must be set"
     state["engine"] = create_engine(POSTGRES_URL)
+    if DEBUG:
+        EF = EndpointFilter(["/openapi.json"])
+        logging.getLogger("uvicorn.access").addFilter(EF)
+        state["logger"].addFilter(EF)
+        with open("openapi.json", "w") as f:
+            json.dump(app.openapi(), f)
     yield
     state["engine"].dispose()
 
@@ -54,9 +69,9 @@ app = FastAPI(
 async def log_requests(
     request: Request[State], call_next: Callable[..., Any]
 ) -> Response:
-    request.state["logger"].debug(f"Request: {request.method}")
+    request.state["logger"].debug(f"Request: {request.method} {request.url.path}")
     response: Response = await call_next(request)
-    request.state["logger"].debug(f"Response: {response.status_code}")
+    request.state["logger"].debug(f"Response: {request.method} {request.url.path} {response.status_code}")
     return response
 
 
@@ -65,7 +80,7 @@ async def inject_state(
     request: Request[State], call_next: Callable[..., Any]
 ) -> Response:
     appstate: State = request.app.state
-    request.state["logger"] = appstate["logger"].getChild(f"{request.url.path}")
+    request.state["logger"] = appstate["logger"]
     request.state["debug"] = appstate["debug"]
     request.state["engine"] = appstate["engine"]
     return await call_next(request)

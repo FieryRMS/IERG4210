@@ -19,7 +19,7 @@ services:
     build: ./api
     environment:
       - POSTGRES_URL=${POSTGRES_URL}
-      - API_MODE=${API_MODE}
+      - EXE_MODE=${EXE_MODE}
 
 volumes:
   db_data:

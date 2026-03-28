@@ -1,9 +1,8 @@
-import { getClient } from "@/lib/utils";
 import type { PageHandle } from "@/types";
-
 import type { Route } from "./+types/c.$categoryId";
 import { Category } from "@/components/category";
 import { StatusCodes } from "http-status-codes";
+import { sdk, applyAuth } from "@/lib/server.utils";
 
 export function meta({ loaderData }: Route.MetaArgs) {
     return [
@@ -15,33 +14,27 @@ export function meta({ loaderData }: Route.MetaArgs) {
     ];
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
-    const client = getClient();
+export async function loader({ params, request }: Route.LoaderArgs) {
+    const auth = await applyAuth(request);
     if (params.categoryId) {
-        const { data: pdata, error: perror } = await client.GET(`/products/category/{category_id}`, {
-            params: {
-                path: {
-                    category_id: params.categoryId,
-                },
-            },
+        const { data: products, error: perror } = await sdk.products.getProductsCategoryByCategoryId({
+            path: { category_id: params.categoryId },
+            ...auth,
         });
-        const { data: cdata, error: cerror } = await client.GET(`/categories/{category_id}`, {
-            params: {
-                path: {
-                    category_id: params.categoryId,
-                },
-            },
+        const { data: category, error: cerror } = await sdk.categories.getCategoriesByCategoryId({
+            path: { category_id: params.categoryId },
+            ...auth,
         });
         if (cerror || perror) {
             throw new Response("Not Found", { status: StatusCodes.NOT_FOUND });
         }
-        return { products: pdata, category: cdata };
+        return { products, category };
     } else {
-        const { data, error } = await client.GET(`/products/`);
+        const { data: products, error } = await sdk.products.getProducts(auth);
         if (error) {
             throw new Response("Not Found", { status: StatusCodes.NOT_FOUND });
         }
-        return { products: data, category: null };
+        return { products: products ?? [], category: null };
     }
 }
 

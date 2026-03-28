@@ -1,8 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { FormAsyncValidateOrFn, StandardSchemaV1 } from "@tanstack/form-core";
-import type { paths } from "./api";
-import createClient from "openapi-fetch";
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -36,14 +34,6 @@ export const onChangeAsync = <TFormData,>(schema: StandardSchemaV1<TFormData, un
 };
 
 
-export function getClient() {
-    return createClient<paths>({ baseUrl: process.env.API_URL });
-}
-
-export function isPrimitive(value: unknown): boolean {
-    const type = typeof value;
-    return type === "string" || type === "number" || type === "boolean";
-}
 
 function buildChildIndex(formData: FormData): Map<string, Set<string>> {
     const index = new Map<string, Set<string>>();
@@ -65,16 +55,14 @@ function buildChildIndex(formData: FormData): Map<string, Set<string>> {
     return index;
 }
 
-export function Any2FormData(data: unknown, parentKey = "root", result = new FormData()) {
-    if (typeof data === 'symbol' || typeof data === 'bigint' || typeof data === 'function') {
-        throw new Error(`Any2FormData does not support data of type ${typeof data} at key "${parentKey}"`);
-    }
-    if (data === undefined) return result;
+type JSONLikeType = string | number | boolean | File | null | { [key: string]: JSONLikeType; } | JSONLikeType[];
+
+export function Any2FormData(data: unknown, parentKey = "root", result = new FormData()): FormData {
     if (data === null) {
         result.append(`${parentKey}.__type`, "null");
         return result;
     }
-    if (isPrimitive(data)) {
+    if (typeof data === "string" || typeof data === "number" || typeof data === "boolean") {
         result.append(parentKey, String(data));
         return result;
     }
@@ -94,7 +82,7 @@ export function Any2FormData(data: unknown, parentKey = "root", result = new For
     return result;
 }
 
-function deserialize(formData: FormData, parentKey: string, index: Map<string, Set<string>>): unknown {
+function deserialize(formData: FormData, parentKey: string, index: Map<string, Set<string>>): JSONLikeType {
     const type = formData.get(`${parentKey}.__type`);
 
     if (type === "null") return null;
@@ -113,14 +101,13 @@ function deserialize(formData: FormData, parentKey: string, index: Map<string, S
         );
     }
 
-    if (type !== null) {
-        throw new Error(`FormData2Any: unknown __type "${type}" at key "${parentKey}"`);
-    }
+    if (type !== null) throw new Error(`FormData2Any: unknown __type "${type}" at key "${parentKey}"`);
 
-    // Primitive or File — null means the key was absent (undefined in original)
-    return formData.get(parentKey) ?? undefined;
+    const value = formData.get(parentKey);
+    if (value === null) throw new Error(`FormData2Any: missing key "${parentKey}"`);
+    return value;
 }
 
-export function FormData2Any(formData: FormData, parentKey = "root"): unknown {
+export function FormData2Any(formData: FormData, parentKey = "root"): JSONLikeType {
     return deserialize(formData, parentKey, buildChildIndex(formData));
 }

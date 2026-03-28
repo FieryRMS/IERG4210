@@ -12,11 +12,11 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import type { Route } from "./+types/p.$productId";
 import { ShoppingCartIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { PageHandle, Product } from "@/types";
+import type { PageHandle } from "@/types";
+import type { Product } from "@/lib/client/types.gen";
 import { useCart } from "@/hooks/cart-provider";
 import { Img } from "@/components/img-wrapper";
-import type { paths } from "@/lib/api";
-import createClient from "openapi-fetch";
+import { sdk, applyAuth } from "@/lib/server.utils";
 
 export function meta({ loaderData }: Route.MetaArgs) {
     return [
@@ -25,22 +25,13 @@ export function meta({ loaderData }: Route.MetaArgs) {
     ];
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
-    const client = createClient<paths>({ baseUrl: process.env.API_URL });
-    if (params.productId) {
-        const { data, error } = await client.GET(`/products/{product_id}`, {
-            params: {
-                path: {
-                    product_id: params.productId,
-                },
-            },
-        });
-        if (error) {
-            throw new Response("Not Found", { status: 404 });
-        }
-        return data;
-    }
-    throw new Response("Not Found", { status: 404 });
+export async function loader({ params, request }: Route.LoaderArgs) {
+    const { data, error } = await sdk.products.getProductsByProductId({
+        path: { product_id: params.productId },
+        ...await applyAuth(request),
+    });
+    if (error || !data) throw new Response("Not Found", { status: 404 });
+    return data;
 }
 
 export default function ({ params, loaderData }: Route.ComponentProps) {

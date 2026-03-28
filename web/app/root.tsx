@@ -24,29 +24,17 @@ import type { LocationState, PageHandle } from "./types";
 import { CartProvider } from "./hooks/cart-provider";
 import { useCallback } from "react";
 import { prefsCookie } from "@/prefs.cookies";
-import { csrfCookie, sessionCookie } from "@/cookies.server";
+import { csrfCookie } from "@/cookies.server";
 import { Toaster } from "@/components/ui/sonner";
-import { getClient } from "./lib/utils";
 import { cstfTokenGenerator } from "@/lib/security.server";
-import { CsrfContext, UserContext } from "./context";
+import { CsrfContext, UserContext } from "./context.server";
+import { sdk, applyAuth, applySessionCookie } from "./lib/server.utils";
 
 const authMiddleware: Route.MiddlewareFunction = async ({ request, context }, next) => {
-    const client = getClient();
-    const cookieHeader = request.headers.get("Cookie");
-    const session = await sessionCookie.parse(cookieHeader);
-    const user = session
-        ? ((
-              await client.GET("/users/me", {
-                  params: {
-                      header: {
-                          "X-Session-Token": session,
-                      }
-                  },
-              })
-          ).data ?? null)
-        : null;
-    context.set(UserContext, user);
+    const { data, response: sdkResponse } = await sdk.users.getUsersMe(await applyAuth(request));
+    context.set(UserContext, data || null);
     const response = await next();
+    await applySessionCookie(sdkResponse.headers, response.headers);
     return response;
 };
 
@@ -84,14 +72,13 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-    const client = getClient();
     const cookieHeader = request.headers.get("Cookie");
     const prefs = (await prefsCookie.parse(cookieHeader)) || {};
     const theme: Theme = prefs.theme || Theme.System;
     return {
         theme,
         system: theme === Theme.System ? request.headers.get("Sec-Ch-Prefers-Color-Scheme") || "" : "",
-        categories: (await client.GET("/categories/")).data || [],
+        categories: (await sdk.categories.getCategories(await applyAuth(request))).data || [],
         csrfToken: context.get(CsrfContext),
         user: context.get(UserContext),
     };

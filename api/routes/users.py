@@ -1,5 +1,5 @@
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from typing import Annotated
 
@@ -24,11 +24,15 @@ router = APIRouter(prefix="/users", tags=["Users"])
 _session_scheme = APIKeyHeader(name="X-Session-Token", auto_error=False)
 
 
-def _set_session_headers(response: Response, user_session: UserSession) -> None:
+def _set_session_headers(response: Response, user_session: UserSession | None) -> None:
     expires = (
         user_session.created_at + timedelta(seconds=user_session.max_age)
+        if user_session
+        else datetime.now(timezone.utc)
     ).strftime("%a, %d %b %Y %H:%M:%S GMT")
-    response.headers[_session_scheme.model.name] = f"{user_session.token}:{expires}"
+    response.headers[_session_scheme.model.name] = (
+        f"{user_session.token if user_session else ''}:{expires}"
+    )
 
 
 def with_session():
@@ -107,7 +111,7 @@ async def login(request: Request, response: Response, credentials: UserLogin) ->
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 @with_session()
-async def logout(request: Request, session: UserSession | None):
+async def logout(request: Request, response: Response, session: UserSession | None):
     if session is None:
         raise NotFoundException
     state: State = request.state  # pyright: ignore[reportAssignmentType]
@@ -116,6 +120,7 @@ async def logout(request: Request, session: UserSession | None):
         if db_session:
             sql_session.delete(db_session)
             sql_session.commit()
+        _set_session_headers(response, None)
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)

@@ -1,23 +1,24 @@
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Route } from "./+types/admin";
 import { Check, Pencil, Plus, Trash, X } from "lucide-react";
-import type { Product, Category, PageHandle, Image } from "@/types";
+import type { PageHandle } from "@/types";
+import type { Product, Category, Image } from "@/lib/client/types.gen";
 import { z } from "zod";
 import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
-import { Any2FormData, cn, getClient, onChangeAsync } from "@/lib/utils";
+import { Any2FormData, cn, onChangeAsync } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useEffect, useState, useMemo, type JSX } from "react";
+import { useState, useMemo, type JSX, useEffect } from "react";
 import { type HTMLFormMethod } from "react-router";
 import { Spinner } from "@/components/ui/spinner";
-import { useStore } from "@tanstack/react-form";
 import { Img } from "@/components/img-wrapper";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Drawer, DrawerClose, DrawerContent, DrawerPopup, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { toast } from "sonner";
 import { fileStorageConfig, UPLOAD_URL } from "@/config";
 import { StatusCodes } from "http-status-codes";
-import { CsrfContext } from "@/context";
+import { CsrfContext } from "@/context.server";
+import { sdk, applyAuth } from "@/lib/server.utils";
 
 export type SchemaType = string | number | null | File | undefined | (string | number | null)[];
 export type TableTypes = "Product" | "Category" | "Image" | "Product Images";
@@ -201,16 +202,11 @@ function RowGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T & 
             } catch {
                 form.reset();
             }
-        },
-    });
-    const isSubmitted = useStore(form.store, (state) => state.isSubmitted);
 
-    useEffect(() => {
-        if (isSubmitted && bState.includes("submit")) {
             setBState("idle");
             form.reset(defaultValues);
-        }
-    }, [bState, defaultValues, form, isSubmitted, row]);
+        },
+    });
     return (
         <form.AppForm>
             <form onSubmit={(e) => e.preventDefault()} className={TableRow({}).props.className}>
@@ -530,11 +526,11 @@ function TableGenerator<T extends z.infer<typeof baseSchema>, K extends keyof T 
     );
 }
 
-export async function loader({ context }: Route.LoaderArgs) {
-    const client = getClient();
-    const { data: products, error: perror } = await client.GET("/products/");
-    const { data: categories, error: cerror } = await client.GET("/categories/");
-    const { data: images, error: ierror } = await client.GET("/images/");
+export async function loader({ request, context }: Route.LoaderArgs) {
+    const auth = await applyAuth(request);
+    const { data: products, error: perror } = await sdk.products.getProducts(auth);
+    const { data: categories, error: cerror } = await sdk.categories.getCategories(auth);
+    const { data: images, error: ierror } = await sdk.images.getImages(auth);
     const csrf = context.get(CsrfContext);
     if (perror || cerror || ierror || !csrf) {
         throw new Response("Failed to load data", { status: StatusCodes.INTERNAL_SERVER_ERROR });
@@ -587,7 +583,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 fromSchemaType: (value) =>
                     Array.isArray(value)
                         ? value.reduce((acc, id) => {
-                              const img = loaderData.images.find((i) => i.id === id);
+                              const img = loaderData.images?.find((i) => i.id === id);
                               if (img) acc.push(img);
                               return acc;
                           }, [] as Image[])
@@ -596,7 +592,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     TableType: "Product Images",
                     $schema: baseSchema,
                     onSubmit: ({ value }) => {
-                        const img = loaderData.images.find((i) => i.id === value.id);
+                        const img = loaderData.images?.find((i) => i.id === value.id);
                         if (!img) throw new Error("Image not found");
                         return img;
                     },
@@ -701,15 +697,15 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             <div className="flex flex-col">
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2 w-full text-center">Products</h2>
-                    <TableGenerator data={loaderData.products} config={PConfig} />
+                    <TableGenerator data={loaderData.products ?? []} config={PConfig} />
                 </div>
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2 w-full text-center">Categories</h2>
-                    <TableGenerator data={loaderData.categories} config={CConfig} />
+                    <TableGenerator data={loaderData.categories ?? []} config={CConfig} />
                 </div>
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2 w-full text-center">Images</h2>
-                    <TableGenerator data={loaderData.images} config={IConfig} />
+                    <TableGenerator data={loaderData.images ?? []} config={IConfig} />
                 </div>
             </div>
         </div>
