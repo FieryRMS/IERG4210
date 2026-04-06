@@ -47,22 +47,20 @@ function ConfirmAnim({
 }
 
 type FieldConfig<T, TableTypes extends string = string> = {
-    key: string;
-    name: string;
-    disabled: boolean;
-    Render: (props: React.ComponentProps<typeof Input> & { create?: boolean }) => JSX.Element;
-    toSchemaType: (data: T) => SchemaType;
-    fromSchemaType: (value: SchemaType) => T;
-    file: boolean;
-    nested?: T extends (infer U)[] ? (U extends { id?: string } ? Config<U, TableTypes> : never) : never;
-    exclude?: boolean;
-};
+    [K in keyof T]: {
+        key: K;
+        name: string;
+        disabled: boolean;
+        Render: (props: React.ComponentProps<typeof Input> & { create?: boolean }) => JSX.Element;
+        toSchemaType: (data: T[K]) => SchemaType;
+        fromSchemaType: (value: SchemaType) => T[K];
+        file: boolean;
+        nested?: T[K] extends (infer U)[] ? (U extends { id?: string } ? Config<U, TableTypes> : never) : never;
+        exclude?: boolean;
+    };
+}[keyof T];
 
-export type Config<
-    T extends { id?: string },
-    TableTypes extends string = string,
-    K extends keyof T & string = keyof T & string,
-> = {
+export type Config<T extends { id?: string }, TableTypes extends string = string, K extends keyof T = keyof T> = {
     TableType: TableTypes;
     desc: string;
     methods: {
@@ -75,16 +73,16 @@ export type Config<
         method: HTMLFormMethod;
         value: Partial<Record<K, SchemaType>>;
     }) => T | Promise<T>;
-    fields: FieldConfig<T[K], TableTypes>[];
+    fields: FieldConfig<T, TableTypes>[];
 };
 
 export function FieldConfigDefaults<
     T extends { id?: string },
     TableTypes extends string = string,
-    K extends keyof T & string = keyof T & string,
->(fields: (Partial<FieldConfig<T[K], TableTypes>> & { key: K })[]): FieldConfig<T[K], TableTypes>[] {
+    K extends keyof T = keyof T,
+>(fields: (Partial<FieldConfig<T, TableTypes>> & { key: K })[]): FieldConfig<T, TableTypes>[] {
     return fields.map((field) => ({
-        name: field.key,
+        name: field.key as string,
         disabled: false,
         Render: ({ create, ...props }) => {
             void create;
@@ -216,7 +214,7 @@ function RowGenerator<
             <form onSubmit={(e) => e.preventDefault()} className={TableRow({}).props.className}>
                 {config.fields.map((fieldconfig, index) => (
                     <TableCell className="text-center" key={index}>
-                        <form.AppField name={fieldconfig.key}>
+                        <form.AppField name={String(fieldconfig.key)}>
                             {(field) => (
                                 <field.Control>
                                     <form.Item>

@@ -30,7 +30,7 @@ import {
     zUserUpdate,
 } from "@/lib/generated/zod.gen";
 
-export type TableTypes = "Product" | "Category" | "Image" | "User" | "Session";
+export type TableTypes = "Product" | "Category" | "Image" | "User" | "Session" | "Product Images";
 const url = z.union([
     z.url({
         protocol: /^https?$/,
@@ -101,7 +101,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             delete: zDeleteProductsByIdData.shape.path,
         },
         onSubmit: onSubmit<Product, TableTypes>,
-        fields: FieldConfigDefaults<Product>([
+        fields: FieldConfigDefaults<Product, TableTypes>([
             { key: "id", disabled: true },
             { key: "created_at", disabled: true },
             { key: "updated_at", disabled: true },
@@ -255,7 +255,10 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             { key: "email" },
             { key: "username" },
             { key: "role" },
-            { key: "password" },
+            {
+                key: "password",
+                toSchemaType: (data) => (Array.isArray(data) ? data.map((d) => String((d as Session).id)) : []),
+            },
             {
                 key: "sessions",
                 exclude: true,
