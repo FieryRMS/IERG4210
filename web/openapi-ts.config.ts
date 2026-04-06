@@ -1,7 +1,7 @@
 import { defineConfig } from '@hey-api/openapi-ts';
 
 export default defineConfig({
-    input: process.env.EXE_MODE === "dev" ? 'http://localhost:8000/openapi.json' : './openapi.json',
+    input: './openapi.json',
     output: {
         path: 'app/lib/generated',
         entryFile: false,
