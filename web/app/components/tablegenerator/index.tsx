@@ -50,7 +50,7 @@ type FieldConfig<T, TableTypes extends string = string> = {
     key: string;
     name: string;
     disabled: boolean;
-    render: (props: React.ComponentProps<typeof Input> & { create?: boolean }) => JSX.Element;
+    Render: (props: React.ComponentProps<typeof Input> & { create?: boolean }) => JSX.Element;
     toSchemaType: (data: T) => SchemaType;
     fromSchemaType: (value: SchemaType) => T;
     file: boolean;
@@ -86,7 +86,7 @@ export function FieldConfigDefaults<
     return fields.map((field) => ({
         name: field.key,
         disabled: false,
-        render: ({ create, ...props }) => {
+        Render: ({ create, ...props }) => {
             void create;
             return <Input {...props} />;
         },
@@ -221,15 +221,16 @@ function RowGenerator<
                                 <field.Control>
                                     <form.Item>
                                         {!fieldconfig.nested ? (
-                                            fieldconfig.render({
-                                                type: "text",
-                                                inputMode: "numeric",
-                                                value:
+                                            <fieldconfig.Render
+                                                type="text"
+                                                inputMode="numeric"
+                                                value={
                                                     field.state.value instanceof File
                                                         ? field.state.value.name
-                                                        : String(field.state.value ?? ""),
-                                                name: fieldconfig.name,
-                                                onChange: (e) => {
+                                                        : String(field.state.value ?? "")
+                                                }
+                                                name={fieldconfig.name}
+                                                onChange={(e) => {
                                                     if (e.target.files) {
                                                         const file = e.target.files[0];
                                                         if (file) {
@@ -253,16 +254,16 @@ function RowGenerator<
                                                         }
                                                     }
                                                     field.handleChange(e.target.value as typeof field.state.value);
-                                                },
-                                                className:
-                                                    "text-center read-only:opacity-80! border-primary/50 read-only:border-primary/10",
-                                                readOnly:
+                                                }}
+                                                className="text-center read-only:opacity-80! border-primary/50 read-only:border-primary/10"
+                                                readOnly={
                                                     fieldconfig.disabled ||
                                                     (!["edit", "save"].includes(bState) && !create) ||
                                                     bState.includes("submit") ||
-                                                    config.methods.post === undefined,
-                                                create,
-                                            })
+                                                    config.methods.post === undefined
+                                                }
+                                                create={create}
+                                            />
                                         ) : (
                                             <Drawer swipeDirection="down" snapPoints={["65rem", 1]}>
                                                 <DrawerTrigger

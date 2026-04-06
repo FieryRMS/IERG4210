@@ -138,12 +138,12 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                             key: "url",
                             name: "preview",
                             disabled: true,
-                            render: ({ create, value }) => {
+                            Render: ({ create, value }) => {
                                 return !create ? (
                                     <Img
                                         src={`${value}?thumbnail=true`}
                                         alt="Image preview"
-                                        className="h-20 w-20 object-cover m-auto"
+                                        className="h-20 w-20 object-cover m-auto rounded-md"
                                     />
                                 ) : (
                                     <> </>
@@ -191,12 +191,12 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 key: "url",
                 name: "preview",
                 disabled: true,
-                render: ({ create, value }) => {
+                Render: ({ create, value }) => {
                     return !create ? (
                         <Img
                             src={`${value}?thumbnail=true`}
                             alt="Image preview"
-                            className="h-20 w-20 object-cover m-auto"
+                            className="h-20 w-20 object-cover m-auto rounded-md"
                         />
                     ) : (
                         <> </>
@@ -206,7 +206,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             {
                 key: "url",
                 file: true,
-                render: ({ create: _creates, onChange, ...props }) => {
+                Render: ({ create: _creates, onChange, ...props }) => {
                     return (
                         <ButtonGroup className="w-full">
                             <Input {...props} onChange={onChange} />

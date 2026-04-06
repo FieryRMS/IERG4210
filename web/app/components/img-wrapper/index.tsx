@@ -9,6 +9,7 @@ export function Img({ src, onLoad, ...props }: React.ImgHTMLAttributes<HTMLImage
             setLoaded(false);
             setSrc(src);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [src]);
     const showSkeleton = src === undefined || src !== currSrc || !loaded;
     return (
