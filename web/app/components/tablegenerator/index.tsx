@@ -232,7 +232,7 @@ function RowGenerator<
                                                     if (e.target.files) {
                                                         const file = e.target.files[0];
                                                         if (file) {
-                                                            // Active bug in Tanstack: https://github.com/TanStack/form/issues/1932#issuecomment-3656323010
+                                                            // TODO: Active bug in Tanstack: https://github.com/TanStack/form/issues/1932#issuecomment-3656323010
                                                             Object.defineProperties(file, {
                                                                 name: {
                                                                     value: file.name,
