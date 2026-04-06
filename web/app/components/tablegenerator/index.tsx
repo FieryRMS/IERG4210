@@ -257,7 +257,6 @@ function RowGenerator<
                                                 className:
                                                     "text-center read-only:opacity-80! border-primary/50 read-only:border-primary/10",
                                                 readOnly:
-                                                    (fieldconfig.file && !create) ||
                                                     fieldconfig.disabled ||
                                                     (!["edit", "save"].includes(bState) && !create) ||
                                                     bState.includes("submit") ||

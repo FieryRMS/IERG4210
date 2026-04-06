@@ -162,7 +162,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         methods: {
             post: zCategoryCreate,
             put: zCategoryUpdate,
-            delete: zDeleteCategoriesByIdData.shape.path
+            delete: zDeleteCategoriesByIdData.shape.path,
         },
         onSubmit: onSubmit<Category, TableTypes>,
         fields: FieldConfigDefaults<Category>([
@@ -206,30 +206,29 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             {
                 key: "url",
                 file: true,
-                render: ({ create, onChange, ...props }) => {
+                render: ({ create: _creates, onChange, ...props }) => {
                     return (
                         <ButtonGroup className="w-full">
                             <Input {...props} onChange={onChange} />
-                            {create && (
-                                <Button
-                                    type="button"
-                                    onClick={(e) => {
-                                        const child = e.currentTarget?.children[0] as HTMLInputElement | null;
-                                        child?.click();
+                            <Button
+                                type="button"
+                                onClick={(e) => {
+                                    const child = e.currentTarget?.children[0] as HTMLInputElement | null;
+                                    child?.click();
+                                }}
+                                disabled={props.disabled || props.readOnly}
+                            >
+                                <Input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                        onChange?.(e);
+                                        e.currentTarget.value = "";
                                     }}
-                                >
-                                    <Input
-                                        type="file"
-                                        accept="image/*"
-                                        className="hidden"
-                                        onChange={(e) => {
-                                            onChange?.(e);
-                                            e.currentTarget.value = "";
-                                        }}
-                                    />
-                                    File
-                                </Button>
-                            )}
+                                />
+                                File
+                            </Button>
                         </ButtonGroup>
                     );
                 },
