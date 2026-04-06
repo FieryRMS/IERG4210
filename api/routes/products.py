@@ -56,14 +56,14 @@ async def new_product(request: Request, product: ProductCreate) -> Product:
     return db_product
 
 
-@router.put("/{product_id}", status_code=status.HTTP_200_OK)
+@router.put("/", status_code=status.HTTP_200_OK)
 @with_role(["admin"])
 async def update_product(
-    request: Request, product_id: uuid.UUID, product: ProductUpdate
+    request: Request, product: ProductUpdate
 ) -> Product:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
-    db_product = session.get(Product, product_id)
+    db_product = session.get(Product, product.id)
     if not db_product:
         raise NotFoundException
     db_product.update_model(product)
@@ -77,12 +77,12 @@ async def update_product(
     return db_product
 
 
-@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 @with_role(["admin"])
-async def delete_product(request: Request, product_id: uuid.UUID):
+async def delete_product(request: Request, id: uuid.UUID):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
-    product = session.get(Product, product_id)
+    product = session.get(Product, id)
     if not product:
         raise NotFoundException
     session.delete(product)

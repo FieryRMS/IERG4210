@@ -44,14 +44,14 @@ async def new_category(request: Request, category: CategoryCreate) -> Category:
     return db_category
 
 
-@router.put("/{category_id}", status_code=status.HTTP_200_OK)
+@router.put("/", status_code=status.HTTP_200_OK)
 @with_role(["admin"])
 async def update_category(
-    request: Request, category_id: uuid.UUID, category: CategoryUpdate
+    request: Request, category: CategoryUpdate
 ) -> Category:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
-    db_category = session.get(Category, category_id)
+    db_category = session.get(Category, category.id)
     if not db_category:
         raise NotFoundException
     db_category.update_model(category)
@@ -61,12 +61,12 @@ async def update_category(
     return db_category
 
 
-@router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 @with_role(["admin"])
-async def delete_category(request: Request, category_id: uuid.UUID):
+async def delete_category(request: Request, id: uuid.UUID):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
-    category = session.get(Category, category_id)
+    category = session.get(Category, id)
     if not category:
         raise NotFoundException
     session.delete(category)

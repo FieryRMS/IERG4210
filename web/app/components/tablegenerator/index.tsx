@@ -3,7 +3,7 @@ import { Check, Pencil, Plus, Trash, X } from "lucide-react";
 import { z } from "zod";
 import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
-import { cn, onChangeAsync } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useState, useMemo, type JSX } from "react";
 import { type HTMLFormMethod } from "react-router";
@@ -65,10 +65,10 @@ export type Config<
 > = {
     TableType: TableTypes;
     desc: string;
-    disallowed_methods?: {
-        post?: boolean;
-        put?: boolean;
-        delete?: boolean;
+    methods: {
+        post?: z.ZodObject;
+        put?: z.ZodObject;
+        delete?: z.ZodObject;
     };
     onSubmit: (params: {
         config: Config<T, TableTypes, K>;
@@ -76,7 +76,6 @@ export type Config<
         value: Partial<Record<K, SchemaType>>;
     }) => T | Promise<T>;
     fields: FieldConfig<T[K], TableTypes>[];
-    $schema: z.ZodType<Partial<Record<K, SchemaType>>, Partial<Record<K, SchemaType>>>;
 };
 
 export function FieldConfigDefaults<
@@ -126,10 +125,10 @@ function RowGenerator<
     create?: boolean;
     onSubmit: Config<T, TableTypes, K>["onSubmit"];
 }) {
-    const defaultValues: z.infer<typeof config.$schema> = useMemo(() => {
-        const values = {} as Record<K, SchemaType>;
+    const defaultValues = useMemo(() => {
+        const values = {} as Record<K, unknown>;
         config.fields.forEach((field) => {
-            values[field.key as K] = field.key in row ? field.toSchemaType(row[field.key as K]) : null;
+            if (field.key in row) values[field.key as K] = field.toSchemaType(row[field.key as K]);
         });
         return { ...values };
     }, [config, row]);
@@ -140,10 +139,33 @@ function RowGenerator<
     const form = useAppForm({
         defaultValues,
         validators: {
-            onChangeAsync: onChangeAsync(config.$schema),
+            onChangeAsync: ({ formApi }) => {
+                let schema: z.ZodObject | undefined;
+                if (create) schema = config.methods.post;
+                else schema = config.methods.put;
+                if (!schema) return;
+                const errors = formApi.parseValuesWithSchema(schema);
+                if (!errors) return errors;
+
+                const dirtyFields = Object.keys(formApi.fieldInfo).filter(
+                    (key) => formApi.getFieldMeta(key as keyof typeof formApi.fieldInfo)!.isDirty,
+                );
+                return {
+                    form: Object.fromEntries(Object.entries(errors.form).filter(([key]) => dirtyFields.includes(key))),
+                    fields: Object.fromEntries(
+                        Object.entries(errors.fields).filter(([key]) => dirtyFields.includes(key)),
+                    ),
+                };
+            },
             onChangeAsyncDebounceMs: 300,
             onSubmit: ({ formApi }) => {
-                const errors = formApi.parseValuesWithSchema(config.$schema);
+                let schema: z.ZodObject | undefined;
+                if (bState === "csubmit") schema = config.methods.post;
+                else if (bState === "ssubmit") schema = config.methods.put;
+                else if (bState === "dsubmit") schema = config.methods.delete;
+                if (!schema) throw new Error("No schema for method");
+                const errors = formApi.parseValuesWithSchema(schema);
+                console.log(errors, schema.shape, formApi.state.values);
                 if (!errors) return errors;
                 setBState((prev) => {
                     if (prev === "dsubmit") return "idle";
@@ -155,6 +177,7 @@ function RowGenerator<
             },
         },
         onSubmit: async ({ value, formApi }) => {
+            console.log("Submitting with value", value);
             const methodMap: Partial<Record<typeof bState, HTMLFormMethod>> = {
                 csubmit: "post",
                 ssubmit: "put",
@@ -173,7 +196,7 @@ function RowGenerator<
             const updatedValue: Partial<Record<K, SchemaType>> = {};
             for (const key of Object.keys(value) as K[]) {
                 if (dirtyFields.has(key) || (key === "id" && method !== "post")) {
-                    updatedValue[key] = value[key];
+                    updatedValue[key] = value[key] as SchemaType;
                 }
             }
 
@@ -238,7 +261,7 @@ function RowGenerator<
                                                     fieldconfig.disabled ||
                                                     (!["edit", "save"].includes(bState) && !create) ||
                                                     bState.includes("submit") ||
-                                                    (create && config.disallowed_methods?.post),
+                                                    config.methods.post === undefined,
                                                 create,
                                             })
                                         ) : (
@@ -253,7 +276,7 @@ function RowGenerator<
                                                                 fieldconfig.disabled ||
                                                                 (!["edit", "save"].includes(bState) && !create) ||
                                                                 bState.includes("submit") ||
-                                                                (create && config.disallowed_methods?.post)
+                                                                config.methods.post === undefined
                                                             }
                                                         />
                                                     }
@@ -316,14 +339,11 @@ function RowGenerator<
                                         type="button"
                                         onClick={() => {
                                             if (!isSubmitting && bState === "create" && canSubmit) {
-                                                form.handleSubmit();
                                                 setBState("csubmit");
+                                                form.handleSubmit();
                                             }
                                         }}
-                                        disabled={
-                                            bState.includes("submit") ||
-                                            (bState === "idle" && config.disallowed_methods?.post)
-                                        }
+                                        disabled={bState.includes("submit") || config.methods.post === undefined}
                                     >
                                         {["idle", "create"].includes(bState) && (
                                             <ConfirmAnim
@@ -344,15 +364,12 @@ function RowGenerator<
                                             type="button"
                                             onClick={() => {
                                                 if (!isSubmitting && bState === "save" && canSubmit) {
-                                                    form.handleSubmit();
                                                     setBState("ssubmit");
+                                                    form.handleSubmit();
                                                 }
                                                 setBState((prev) => (prev === "idle" ? "edit" : prev));
                                             }}
-                                            disabled={
-                                                bState.includes("submit") ||
-                                                (bState === "idle" && config.disallowed_methods?.put)
-                                            }
+                                            disabled={bState.includes("submit") || config.methods.put === undefined}
                                         >
                                             {["edit", "save"].includes(bState) && (
                                                 <ConfirmAnim
@@ -396,10 +413,7 @@ function RowGenerator<
                                                     form.reset();
                                                 }
                                             }}
-                                            disabled={
-                                                bState.includes("submit") ||
-                                                (bState === "idle" && config.disallowed_methods?.delete)
-                                            }
+                                            disabled={bState.includes("submit") || config.methods.delete === undefined}
                                         >
                                             {["idle", "delete"].includes(bState) && (
                                                 <ConfirmAnim

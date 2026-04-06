@@ -14,7 +14,7 @@ class CategoryCreate(PartialModelMixin, BaseModel):
 
 
 class CategoryUpdate(CategoryCreate.as_partial(), BaseModel):
-    pass
+    id: uuid.UUID
 
 
 class Category(CategoryCreate, SQLModel, table=True):
@@ -36,7 +36,7 @@ class ImageCreate(PartialModelMixin, BaseModel):
 
 
 class ImageUpdate(ImageCreate.as_partial(), BaseModel):
-    pass
+    id: uuid.UUID
 
 
 class Image(ImageCreate, SQLModel, table=True):
@@ -59,7 +59,7 @@ class ProductCreate(PartialModelMixin, _Product):
 
 
 class ProductUpdate(ProductCreate.as_partial(), BaseModel):
-    pass
+    id: uuid.UUID
 
 
 class Product(_Product, SQLModel, table=True):

@@ -53,6 +53,7 @@ class UserCreate(PartialModelMixin, _User):
 
 
 class UserUpdate(UserCreate.as_partial(), BaseModel):
+    id: uuid.UUID
     role: Role = Role.user
     pass
 

@@ -14,45 +14,31 @@ import { sdk, applyAuth } from "@/lib/server.utils";
 import { TableGenerator, type Config, FieldConfigDefaults } from "@/components/tablegenerator";
 import { redirect } from "react-router";
 import { useState } from "react";
+import {
+    zCategoryCreate,
+    zCategoryUpdate,
+    zDeleteCategoriesByIdData,
+    zDeleteImagesByIdData,
+    zDeleteProductsByIdData,
+    zDeleteUsersByIdData,
+    zDeleteUsersSessionsByIdData,
+    zImageCreate,
+    zImageUpdate,
+    zProductCreate,
+    zProductUpdate,
+    zUserCreate,
+    zUserUpdate,
+} from "@/lib/generated/zod.gen";
 
 export type TableTypes = "Product" | "Category" | "Image" | "User" | "Session";
-
-export const baseSchema = z.object({
-    id: z.uuidv4().nullable().optional(),
-});
-export const productSchema = baseSchema.extend({
-    name: z.string(),
-    description: z.string().nullable(),
-    price: z.coerce.number<number>().min(0.01),
-    catid: z.uuidv4(),
-    images: z.array(z.uuidv4()),
-});
-
-export const categorySchema = baseSchema.extend({
-    name: z.string(),
-    description: z.string().nullable(),
-});
-
-export const imageSchema = baseSchema.extend({
-    url: z.union([
-        z.url({
-            protocol: /^https?$/,
-            hostname: z.regexes.domain,
-        }),
-        z.string().regex(new RegExp(`^${UPLOAD_URL}`)),
-        z.file().max(fileStorageConfig.maxFileSize!),
-    ]),
-    alt: z.string().nullable().optional(),
-});
-
-export const userSchema = baseSchema.extend({
-    email: z.string().nullable().optional(),
-    username: z.string().nullable().optional(),
-    role: z.enum(["admin", "user"]).nullable().optional(),
-    password: z.string().nullable().optional(),
-});
-
-export const sessionSchema = baseSchema;
+const url = z.union([
+    z.url({
+        protocol: /^https?$/,
+        hostname: z.regexes.domain,
+    }),
+    z.string().regex(new RegExp(`^${UPLOAD_URL}`)),
+    z.file().max(fileStorageConfig.maxFileSize!),
+]);
 
 export async function loader({ request, context }: Route.LoaderArgs) {
     const user = context.get(UserContext);
@@ -86,9 +72,9 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     >(
         ...[{ config, method, value }]: Parameters<Config<T, TableTypes, K>["onSubmit"]>
     ) => {
+        console.log("Submitting", { config, method, value });
         const form = Any2FormData(value);
-        form.append("TableType", config.TableType);
-        const response = await fetch("/api/admin", {
+        const response = await fetch(`/api/admin/${config.TableType}`, {
             method,
             body: form,
         });
@@ -107,9 +93,13 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     };
 
     const PConfig: Config<Product, TableTypes> = {
-        $schema: productSchema,
         TableType: "Product",
         desc: "Product CRUD",
+        methods: {
+            post: zProductCreate.extend({ price: z.coerce.number().positive() }),
+            put: zProductUpdate.extend({ price: z.coerce.number().positive().optional() }),
+            delete: zDeleteProductsByIdData.shape.path,
+        },
         onSubmit: onSubmit<Product, TableTypes>,
         fields: FieldConfigDefaults<Product>([
             { key: "id", disabled: true },
@@ -125,17 +115,21 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 fromSchemaType: (value) =>
                     Array.isArray(value)
                         ? value.reduce((acc, id) => {
-                              const img = images?.find((i) => i.id === id);
+                              const img = images?.find((i: Image) => i.id === id);
                               if (img) acc.push(img);
                               return acc;
                           }, [] as Image[])
                         : [],
                 nested: {
                     TableType: "Product Images",
+                    methods: {
+                        post: zDeleteImagesByIdData.shape.path,
+                        put: zDeleteImagesByIdData.shape.path,
+                        delete: zDeleteImagesByIdData.shape.path,
+                    },
                     desc: "Manage images associated with the product - Click submit on product to save",
-                    $schema: baseSchema,
                     onSubmit: ({ value }) => {
-                        const img = images?.find((i) => i.id === value.id);
+                        const img = images?.find((i: Image) => i.id === value.id);
                         if (!img) throw new Error("Image not found");
                         return img;
                     },
@@ -163,9 +157,13 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         ]),
     };
     const CConfig: Config<Category, TableTypes> = {
-        $schema: categorySchema,
         TableType: "Category",
         desc: "Category CRUD",
+        methods: {
+            post: zCategoryCreate,
+            put: zCategoryUpdate,
+            delete: zDeleteCategoriesByIdData.shape.path
+        },
         onSubmit: onSubmit<Category, TableTypes>,
         fields: FieldConfigDefaults<Category>([
             { key: "id", disabled: true },
@@ -178,7 +176,11 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
 
     const IConfig: Config<Image, TableTypes> = {
         TableType: "Image",
-        $schema: imageSchema,
+        methods: {
+            post: zImageCreate.extend({ url }),
+            put: zImageUpdate.extend({ url: url.optional() }),
+            delete: zDeleteImagesByIdData.shape.path,
+        },
         desc: "Image CRUD",
         onSubmit: onSubmit<Image, TableTypes>,
         fields: FieldConfigDefaults<Image>([
@@ -236,11 +238,15 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         ]),
     };
 
-    const allSessions = users?.flatMap((u) => u.sessions ?? []) ?? [];
+    const allSessions = users?.flatMap((u: User) => u.sessions ?? []) ?? [];
 
     const UConfig: Config<User, TableTypes> = {
         TableType: "User",
-        $schema: userSchema,
+        methods: {
+            post: zUserCreate,
+            put: zUserUpdate,
+            delete: zDeleteUsersByIdData.shape.path,
+        },
         desc: "User CRUD",
         onSubmit: onSubmit<User, TableTypes>,
         fields: FieldConfigDefaults<User, TableTypes>([
@@ -258,7 +264,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 fromSchemaType: (value) =>
                     Array.isArray(value)
                         ? value.reduce((acc, id) => {
-                              const s = allSessions.find((sess) => sess.id === id);
+                              const s = allSessions.find((sess: Session) => sess.id === id);
                               if (s) acc.push(s);
                               return acc;
                           }, [] as Session[])
@@ -266,8 +272,9 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 nested: {
                     TableType: "Session",
                     desc: "Manage user sessions - deletes sesion directly",
-                    $schema: sessionSchema,
-                    disallowed_methods: { post: true, put: true },
+                    methods: {
+                        delete: zDeleteUsersSessionsByIdData.shape.path,
+                    },
                     onSubmit: onSubmit<Session, TableTypes>,
                     fields: FieldConfigDefaults<Session, TableTypes>([
                         { key: "id", disabled: true },

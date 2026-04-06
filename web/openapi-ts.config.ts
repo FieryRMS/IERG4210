@@ -11,6 +11,9 @@ export default defineConfig({
             name: "@hey-api/client-fetch",
         },
         {
+            name: "zod"
+        },
+        {
             name: "@hey-api/sdk",
             auth: true,
             operations: {

@@ -189,12 +189,12 @@ async def create_user(request: Request, user: UserCreate) -> User:
     return db_user
 
 
-@router.put("/{user_id}", status_code=status.HTTP_200_OK)
+@router.put("/", status_code=status.HTTP_200_OK)
 @with_role(["admin"])
-async def update_user(request: Request, user_id: uuid.UUID, user: UserUpdate) -> User:
+async def update_user(request: Request, user: UserUpdate) -> User:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
-    db_user = session.get(User, user_id)
+    db_user = session.get(User, user.id)
     if not db_user:
         raise NotFoundException
     db_user.update_model(user)
@@ -206,24 +206,24 @@ async def update_user(request: Request, user_id: uuid.UUID, user: UserUpdate) ->
     return db_user
 
 
-@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/sessions/{id}", status_code=status.HTTP_204_NO_CONTENT)
 @with_role(["admin"])
-async def delete_session(request: Request, session_id: uuid.UUID):
+async def delete_session(request: Request, id: uuid.UUID):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
-    user_session = db_session.get(UserSession, session_id)
+    user_session = db_session.get(UserSession, id)
     if not user_session:
         raise NotFoundException
     db_session.delete(user_session)
     db_session.commit()
 
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 @with_role(["admin"])
-async def delete_user(request: Request, user_id: uuid.UUID):
+async def delete_user(request: Request, id: uuid.UUID):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
-    user = session.get(User, user_id)
+    user = session.get(User, id)
     if not user:
         raise NotFoundException
     session.delete(user)

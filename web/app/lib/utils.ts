@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { FormAsyncValidateOrFn, StandardSchemaV1 } from "@tanstack/form-core";
+import type { FormValidateAsyncFn, StandardSchemaV1 } from "@tanstack/form-core";
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -16,7 +16,7 @@ export class EnumX {
     }
 }
 
-export const onChangeAsync = <TFormData,>(schema: StandardSchemaV1<TFormData, unknown>): FormAsyncValidateOrFn<TFormData> => {
+export const onChangeAsync = <TFormData,>(schema: StandardSchemaV1<TFormData, unknown>): FormValidateAsyncFn<TFormData> => {
     return ({ formApi }) => {
         const errors = formApi.parseValuesWithSchema(schema);
         if (!errors) return errors;
