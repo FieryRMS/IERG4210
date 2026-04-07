@@ -47,11 +47,16 @@ function ConfirmAnim({
     );
 }
 
-type FieldConfig<T, TableTypes extends string = string> = {
+type FieldConfig<T extends { id?: string }, TableTypes extends string = string> = {
     [K in keyof T]: {
         key: K;
         name: string;
-        disabled: boolean;
+        disabled: (params: {
+            isEditing: boolean;
+            create: boolean;
+            isSubmitting: boolean;
+            methods: Config<T, TableTypes>["methods"];
+        }) => boolean;
         Render: (props: {
             create?: boolean;
             disabled: boolean;
@@ -62,7 +67,11 @@ type FieldConfig<T, TableTypes extends string = string> = {
         toSchemaType: (data: T[K]) => SchemaType;
         fromSchemaType: (value: SchemaType) => T[K];
         file: boolean;
-        nested?: T[K] extends (infer U)[] ? (U extends { id?: string } ? Config<U, TableTypes> : never) : never;
+        nested?: T[K] extends (infer U)[]
+            ? U extends { id?: string }
+                ? Config<U, TableTypes> & { saveOnSubmit?: boolean }
+                : never
+            : never;
         exclude?: boolean;
     };
 }[keyof T];
@@ -90,7 +99,9 @@ export function FieldConfigDefaults<
 >(fields: (Partial<FieldConfig<T, TableTypes>> & { key: K })[]): FieldConfig<T, TableTypes>[] {
     return fields.map((field) => ({
         name: field.key as string,
-        disabled: false,
+
+        disabled: ({ isEditing, create, isSubmitting, methods }) =>
+            (!isEditing && !create) || isSubmitting || methods.post === undefined,
         Render: ({ disabled, field, className }) => {
             return (
                 <Input
@@ -104,20 +115,8 @@ export function FieldConfigDefaults<
                 />
             );
         },
-        toSchemaType: (data) => {
-            if (Array.isArray(data))
-                return data.map((item) => {
-                    if (item === null || item === undefined) return null;
-                    if (typeof item === "object") return JSON.stringify(item);
-                    if (typeof item === "number") return item;
-                    return String(item);
-                });
-            if (data === null || data === undefined) return null;
-            if (typeof data === "object") return JSON.stringify(data);
-            if (typeof data === "number") return data;
-            return String(data);
-        },
-        fromSchemaType: (value) => value as T[K],
+        toSchemaType: (data) => data,
+        fromSchemaType: (value) => value,
         file: false,
         exclude: false,
         ...field,
@@ -150,6 +149,18 @@ function RowGenerator<
     const [bState, setBState] = useState<
         "idle" | "edit" | "save" | "delete" | "create" | "ssubmit" | "dsubmit" | "csubmit"
     >("idle");
+    const state2method = (state: typeof bState): HTMLFormMethod | null => {
+        if (state === "ssubmit") return "put";
+        if (state === "dsubmit") return "delete";
+        if (state === "csubmit") return "post";
+        return null;
+    };
+    const method2schema = (method: ReturnType<typeof state2method>) => {
+        if (method === "post") return config.methods.post;
+        if (method === "put") return config.methods.put;
+        if (method === "delete") return config.methods.delete;
+        return null;
+    };
     const form = useAppForm({
         defaultValues,
         validators: {
@@ -172,15 +183,21 @@ function RowGenerator<
                 };
             },
             onChangeAsyncDebounceMs: 300,
-            onSubmit: ({ formApi }) => {
-                let schema: z.ZodObject | undefined;
-                if (bState === "csubmit") schema = config.methods.post;
-                else if (bState === "ssubmit") schema = config.methods.put;
-                else if (bState === "dsubmit") schema = config.methods.delete;
-                if (!schema) throw new Error("No schema for method");
+            onSubmit: ({ formApi }): ReturnType<typeof formApi.parseValuesWithSchema> => {
+                const schema = method2schema(state2method(bState));
+                if (!schema)
+                    return {
+                        fields: {},
+                        form: {
+                            form: [
+                                {
+                                    message: "Invalid method",
+                                },
+                            ],
+                        },
+                    };
                 const errors = formApi.parseValuesWithSchema(schema);
-                console.log(errors, schema.shape, formApi.state.values);
-                if (!errors) return errors;
+                if (!errors) return;
                 setBState((prev) => {
                     if (prev === "dsubmit") return "idle";
                     if (prev === "ssubmit") return "edit";
@@ -191,13 +208,10 @@ function RowGenerator<
             },
         },
         onSubmit: async ({ value, formApi }) => {
-            console.log("Submitting with value", value);
-            const methodMap: Partial<Record<typeof bState, HTMLFormMethod>> = {
-                csubmit: "post",
-                ssubmit: "put",
-                dsubmit: "delete",
-            };
-            const method = methodMap[bState]!;
+            const method = state2method(bState);
+            const schema = method2schema(method);
+            if (!schema || !method) return;
+            value = schema.parse(value);
             const dirtyFields = new Set(
                 (Object.keys(formApi.fieldInfo) as Array<keyof typeof formApi.fieldInfo>)
                     .filter(
@@ -237,12 +251,12 @@ function RowGenerator<
                                         {!fieldconfig.nested ? (
                                             <fieldconfig.Render
                                                 create={create}
-                                                disabled={
-                                                    fieldconfig.disabled ||
-                                                    (!["edit", "save"].includes(bState) && !create) ||
-                                                    bState.includes("submit") ||
-                                                    config.methods.post === undefined
-                                                }
+                                                disabled={fieldconfig.disabled({
+                                                    isEditing: ["edit", "save"].includes(bState),
+                                                    create: create || false,
+                                                    isSubmitting: bState.includes("submit"),
+                                                    methods: config.methods,
+                                                })}
                                                 field={field}
                                                 form={form}
                                                 className="text-center read-only:opacity-80! border-primary/50 read-only:border-primary/10"
@@ -255,12 +269,12 @@ function RowGenerator<
                                                             type="button"
                                                             variant="outline"
                                                             className="text-center disabled:opacity-80! border-primary/50 disabled:border-primary/10 disabled:bg-transparent"
-                                                            disabled={
-                                                                fieldconfig.disabled ||
-                                                                (!["edit", "save"].includes(bState) && !create) ||
-                                                                bState.includes("submit") ||
-                                                                config.methods.post === undefined
-                                                            }
+                                                            disabled={fieldconfig.disabled({
+                                                                isEditing: ["edit", "save"].includes(bState),
+                                                                create: create || false,
+                                                                isSubmitting: bState.includes("submit"),
+                                                                methods: config.methods,
+                                                            })}
                                                         />
                                                     }
                                                 >
@@ -274,12 +288,7 @@ function RowGenerator<
                                                         </DrawerTitle>
 
                                                         <TableGenerator
-                                                            config={
-                                                                fieldconfig.nested as Config<
-                                                                    { id?: string },
-                                                                    TableTypes
-                                                                >
-                                                            }
+                                                            config={fieldconfig.nested}
                                                             data={
                                                                 fieldconfig.fromSchemaType(
                                                                     field.state.value as SchemaType,
@@ -292,6 +301,16 @@ function RowGenerator<
                                                                 field.handleChange(
                                                                     updatedValue as typeof field.state.value,
                                                                 );
+                                                                // @ts-expect-error it exists dont worry 🫩
+                                                                if (fieldconfig.nested?.saveOnSubmit) {
+                                                                    onSubmit({
+                                                                        config,
+                                                                        method: "put",
+                                                                        value: {
+                                                                            id: row.id,
+                                                                        } as Partial<Record<K, SchemaType>>,
+                                                                    });
+                                                                }
                                                             }}
                                                         />
 
@@ -472,8 +491,9 @@ export function TableGenerator<
 
                             if (method === "put") {
                                 const next = data.map((row) =>
-                                    row.id === item.id ? ({ ...row, ...result, id: item.id } as T) : row,
+                                    row.id === item.id ? ({ ...row, ...result } as T) : row,
                                 );
+                                console.log({ next });
                                 onSubmit?.(next);
                             } else if (method === "delete") {
                                 const next = data.filter((row) => row.id !== item.id);

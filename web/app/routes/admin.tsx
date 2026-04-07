@@ -84,7 +84,6 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     >(
         ...[{ config, method, value }]: Parameters<Config<T, TableTypes, K>["onSubmit"]>
     ) => {
-        console.log("Submitting", { config, method, value });
         const form = Any2FormData(value);
         const response = await fetch(`/api/admin/${config.TableType}`, {
             method,
@@ -101,7 +100,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         toast.success(
             `${config.TableType} ${method === "post" ? "created" : method === "put" ? "updated" : "deleted"} successfully`,
         );
-        return responseData as T;
+        return responseData;
     };
 
     const PConfig: Config<Product, TableTypes> = {
@@ -114,9 +113,9 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         },
         onSubmit: onSubmit<Product, TableTypes>,
         fields: FieldConfigDefaults<Product, TableTypes>([
-            { key: "id", disabled: true },
-            { key: "created_at", disabled: true },
-            { key: "updated_at", disabled: true },
+            { key: "id", disabled: () => true },
+            { key: "created_at", disabled: () => true },
+            { key: "updated_at", disabled: () => true },
             { key: "name" },
             { key: "description" },
             { key: "price" },
@@ -202,7 +201,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                         {
                             key: "url",
                             name: "preview",
-                            disabled: true,
+                            disabled: () => true,
                             Render: ({ create, field }) => {
                                 return !create ? (
                                     <Img
@@ -231,9 +230,9 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         },
         onSubmit: onSubmit<Category, TableTypes>,
         fields: FieldConfigDefaults<Category>([
-            { key: "id", disabled: true },
-            { key: "created_at", disabled: true },
-            { key: "updated_at", disabled: true },
+            { key: "id", disabled: () => true },
+            { key: "created_at", disabled: () => true },
+            { key: "updated_at", disabled: () => true },
             { key: "name" },
             { key: "description" },
         ]),
@@ -249,13 +248,13 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         desc: "Image CRUD",
         onSubmit: onSubmit<Image, TableTypes>,
         fields: FieldConfigDefaults<Image>([
-            { key: "id", disabled: true },
-            { key: "created_at", disabled: true },
-            { key: "updated_at", disabled: true },
+            { key: "id", disabled: () => true },
+            { key: "created_at", disabled: () => true },
+            { key: "updated_at", disabled: () => true },
             {
                 key: "url",
                 name: "preview",
-                disabled: true,
+                disabled: () => true,
                 Render: ({ create, field }) => {
                     return !create ? (
                         <Img
@@ -317,8 +316,6 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         ]),
     };
 
-    const allSessions = users?.flatMap((u: User) => u.sessions ?? []) ?? [];
-
     const UConfig: Config<User, TableTypes> = {
         TableType: "User",
         methods: {
@@ -329,40 +326,32 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         desc: "User CRUD",
         onSubmit: onSubmit<User, TableTypes>,
         fields: FieldConfigDefaults<User, TableTypes>([
-            { key: "id", disabled: true },
-            { key: "created_at", disabled: true },
-            { key: "updated_at", disabled: true },
+            { key: "id", disabled: () => true },
+            { key: "created_at", disabled: () => true },
+            { key: "updated_at", disabled: () => true },
             { key: "email" },
             { key: "username" },
             { key: "role" },
             {
                 key: "password",
-                toSchemaType: (data) => (Array.isArray(data) ? data.map((d) => String((d as Session).id)) : []),
             },
             {
                 key: "sessions",
                 exclude: true,
-                toSchemaType: (data) => (Array.isArray(data) ? data.map((d) => String((d as Session).id)) : []),
-                fromSchemaType: (value) =>
-                    Array.isArray(value)
-                        ? value.reduce((acc, id) => {
-                              const s = allSessions.find((sess: Session) => sess.id === id);
-                              if (s) acc.push(s);
-                              return acc;
-                          }, [] as Session[])
-                        : [],
+                disabled: ({ isEditing, isSubmitting, create }) => isSubmitting || isEditing || create,
                 nested: {
                     TableType: "Session",
+                    saveOnSubmit: true,
                     desc: "Manage user sessions - deletes sesion directly",
                     methods: {
                         delete: zDeleteUsersSessionsByIdData.shape.path,
                     },
                     onSubmit: onSubmit<Session, TableTypes>,
                     fields: FieldConfigDefaults<Session, TableTypes>([
-                        { key: "id", disabled: true },
-                        { key: "created_at", disabled: true },
-                        { key: "user_id", disabled: true },
-                        { key: "max_age", disabled: true },
+                        { key: "id", disabled: () => true },
+                        { key: "created_at", disabled: () => true },
+                        { key: "user_id", disabled: () => true },
+                        { key: "max_age", disabled: () => true },
                     ]),
                 },
             },
