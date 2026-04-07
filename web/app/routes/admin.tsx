@@ -3,7 +3,7 @@ import type { PageHandle } from "@/types";
 import type { Product, Category, Image, User, Session } from "@/lib/generated/types.gen";
 import { z } from "zod";
 import { Input } from "@/components/ui/input";
-import { Any2FormData } from "@/lib/utils";
+import { Any2FormData, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Img } from "@/components/img-wrapper";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -13,7 +13,7 @@ import { CsrfContext, UserContext } from "@/context.server";
 import { sdk, applyAuth } from "@/lib/server.utils";
 import { TableGenerator, type Config, FieldConfigDefaults } from "@/components/tablegenerator";
 import { redirect } from "react-router";
-import { useState } from "react";
+import React, { useState } from "react";
 import {
     zCategoryCreate,
     zCategoryUpdate,
@@ -29,6 +29,18 @@ import {
     zUserCreate,
     zUserUpdate,
 } from "@/lib/generated/zod.gen";
+import {
+    Combobox,
+    ComboboxEmpty,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxItemIndicator,
+    ComboboxList,
+    ComboboxPopup,
+    ComboboxPositioner,
+} from "@/components/ui/combobox";
+import { XIcon } from "lucide-react";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 
 export type TableTypes = "Product" | "Category" | "Image" | "User" | "Session" | "Product Images";
 const url = z.union([
@@ -108,7 +120,60 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             { key: "name" },
             { key: "description" },
             { key: "price" },
-            { key: "catid" },
+            {
+                key: "catid",
+
+                Render: ({ disabled, field, className, form }) => {
+                    const id = React.useId();
+                    return (
+                        <Combobox
+                            items={categories}
+                            value={field.state.value ?? ""}
+                            onValueChange={(e) => field.handleChange(e)}
+                            readOnly={disabled}
+                        >
+                            <InputGroup
+                                className={cn(
+                                    "text-center border-primary/50",
+                                    disabled && "opacity-80 border-primary/10",
+                                )}
+                            >
+                                <ComboboxInput
+                                    placeholder="Category ID"
+                                    id={id}
+                                    className={cn(className, " pr-0! px-1")}
+                                    render={<InputGroupInput />}
+                                    readOnly={disabled}
+                                />
+                                <InputGroupAddon align="inline-end" className={cn(disabled && "opacity-80")}>
+                                    <button
+                                        onClick={() => form.resetField(field.name)}
+                                        className="enabled:hover:text-primary"
+                                        disabled={disabled}
+                                    >
+                                        <XIcon className={cn("size-4", !field.state.value && "invisible")} />
+                                    </button>
+                                </InputGroupAddon>
+                            </InputGroup>
+                            <ComboboxPositioner sideOffset={6}>
+                                <ComboboxPopup>
+                                    <ComboboxEmpty>{field.name} not found.</ComboboxEmpty>
+                                    <ComboboxList>
+                                        {(item: Category) => (
+                                            <ComboboxItem key={item.id} value={item.id} className="w-full">
+                                                <ComboboxItemIndicator />
+                                                <div className="col-start-2 text-nowrap text-center w-full">
+                                                    {item.name}
+                                                </div>
+                                            </ComboboxItem>
+                                        )}
+                                    </ComboboxList>
+                                </ComboboxPopup>
+                            </ComboboxPositioner>
+                        </Combobox>
+                    );
+                },
+            },
             {
                 key: "images",
                 toSchemaType: (data) => (Array.isArray(data) ? data.map((d) => String(d.id)) : []),
@@ -138,10 +203,10 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                             key: "url",
                             name: "preview",
                             disabled: true,
-                            Render: ({ create, value }) => {
+                            Render: ({ create, field }) => {
                                 return !create ? (
                                     <Img
-                                        src={`${value}?thumbnail=true`}
+                                        src={`${field.state.value}?thumbnail=true`}
                                         alt="Image preview"
                                         className="h-20 w-20 object-cover m-auto rounded-md"
                                     />
@@ -191,10 +256,10 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 key: "url",
                 name: "preview",
                 disabled: true,
-                Render: ({ create, value }) => {
+                Render: ({ create, field }) => {
                     return !create ? (
                         <Img
-                            src={`${value}?thumbnail=true`}
+                            src={`${field.state.value}?thumbnail=true`}
                             alt="Image preview"
                             className="h-20 w-20 object-cover m-auto rounded-md"
                         />
@@ -206,25 +271,40 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             {
                 key: "url",
                 file: true,
-                Render: ({ create: _creates, onChange, ...props }) => {
+                Render: ({ disabled, field, className }) => {
                     return (
                         <ButtonGroup className="w-full">
-                            <Input {...props} onChange={onChange} />
+                            <Input
+                                onChange={(e) => field.handleChange(e.target.value)}
+                                readOnly={disabled}
+                                className={className}
+                                value={field.state.value instanceof File ? field.state.value.name : field.state.value}
+                            />
                             <Button
                                 type="button"
                                 onClick={(e) => {
                                     const child = e.currentTarget?.children[0] as HTMLInputElement | null;
                                     child?.click();
                                 }}
-                                disabled={props.disabled || props.readOnly}
+                                disabled={disabled}
                             >
                                 <Input
                                     type="file"
                                     accept="image/*"
                                     className="hidden"
                                     onChange={(e) => {
-                                        onChange?.(e);
-                                        e.currentTarget.value = "";
+                                        if (e.target.files) {
+                                            const file = e.target.files[0];
+                                            if (file) {
+                                                // TODO: Active bug in Tanstack: https://github.com/TanStack/form/issues/1932#issuecomment-3656323010
+                                                Object.defineProperties(file, {
+                                                    name: { value: file.name, enumerable: true },
+                                                    size: { value: file.size, enumerable: true },
+                                                    type: { value: file.type, enumerable: true },
+                                                });
+                                                field.handleChange(file);
+                                            }
+                                        }
                                     }}
                                 />
                                 File

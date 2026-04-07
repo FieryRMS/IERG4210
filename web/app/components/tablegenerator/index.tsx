@@ -9,6 +9,7 @@ import { useState, useMemo, type JSX } from "react";
 import { type HTMLFormMethod } from "react-router";
 import { Spinner } from "@/components/ui/spinner";
 import { Drawer, DrawerClose, DrawerContent, DrawerPopup, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
+import type { AnyFieldApi, AnyFormApi } from "@tanstack/react-form";
 
 type SchemaType = string | number | null | File | undefined | (string | number | null)[];
 
@@ -51,7 +52,13 @@ type FieldConfig<T, TableTypes extends string = string> = {
         key: K;
         name: string;
         disabled: boolean;
-        Render: (props: React.ComponentProps<typeof Input> & { create?: boolean }) => JSX.Element;
+        Render: (props: {
+            create?: boolean;
+            disabled: boolean;
+            field: AnyFieldApi;
+            className?: string;
+            form: AnyFormApi;
+        }) => JSX.Element;
         toSchemaType: (data: T[K]) => SchemaType;
         fromSchemaType: (value: SchemaType) => T[K];
         file: boolean;
@@ -84,9 +91,18 @@ export function FieldConfigDefaults<
     return fields.map((field) => ({
         name: field.key as string,
         disabled: false,
-        Render: ({ create, ...props }) => {
-            void create;
-            return <Input {...props} />;
+        Render: ({ disabled, field, className }) => {
+            return (
+                <Input
+                    type="text"
+                    inputMode="numeric"
+                    value={field.state.value}
+                    name={field.name}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    className={className}
+                    disabled={disabled}
+                />
+            );
         },
         toSchemaType: (data) => {
             if (Array.isArray(data))
@@ -220,47 +236,16 @@ function RowGenerator<
                                     <form.Item>
                                         {!fieldconfig.nested ? (
                                             <fieldconfig.Render
-                                                type="text"
-                                                inputMode="numeric"
-                                                value={
-                                                    field.state.value instanceof File
-                                                        ? field.state.value.name
-                                                        : String(field.state.value ?? "")
-                                                }
-                                                name={fieldconfig.name}
-                                                onChange={(e) => {
-                                                    if (e.target.files) {
-                                                        const file = e.target.files[0];
-                                                        if (file) {
-                                                            // TODO: Active bug in Tanstack: https://github.com/TanStack/form/issues/1932#issuecomment-3656323010
-                                                            Object.defineProperties(file, {
-                                                                name: {
-                                                                    value: file.name,
-                                                                    enumerable: true,
-                                                                },
-                                                                size: {
-                                                                    value: file.size,
-                                                                    enumerable: true,
-                                                                },
-                                                                type: {
-                                                                    value: file.type,
-                                                                    enumerable: true,
-                                                                },
-                                                            });
-                                                            field.handleChange(file as typeof field.state.value);
-                                                            return;
-                                                        }
-                                                    }
-                                                    field.handleChange(e.target.value as typeof field.state.value);
-                                                }}
-                                                className="text-center read-only:opacity-80! border-primary/50 read-only:border-primary/10"
-                                                readOnly={
+                                                create={create}
+                                                disabled={
                                                     fieldconfig.disabled ||
                                                     (!["edit", "save"].includes(bState) && !create) ||
                                                     bState.includes("submit") ||
                                                     config.methods.post === undefined
                                                 }
-                                                create={create}
+                                                field={field}
+                                                form={form}
+                                                className="text-center read-only:opacity-80! border-primary/50 read-only:border-primary/10"
                                             />
                                         ) : (
                                             <Drawer swipeDirection="down" snapPoints={["65rem", 1]}>
@@ -269,7 +254,7 @@ function RowGenerator<
                                                         <Button
                                                             type="button"
                                                             variant="outline"
-                                                            className="text-center disabled:opacity-70! border-primary/50 disabled:border-primary/10 disabled:bg-transparent"
+                                                            className="text-center disabled:opacity-80! border-primary/50 disabled:border-primary/10 disabled:bg-transparent"
                                                             disabled={
                                                                 fieldconfig.disabled ||
                                                                 (!["edit", "save"].includes(bState) && !create) ||
