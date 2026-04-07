@@ -41,8 +41,70 @@ import {
 } from "@/components/ui/combobox";
 import { XIcon } from "lucide-react";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import type { AnyFieldApi, AnyFormApi } from "@tanstack/react-form";
 
 export type TableTypes = "Product" | "Category" | "Image" | "User" | "Session" | "Product Images";
+
+function ForeignKeyCombobox<T extends { id?: string }>({
+    items,
+    getLabel,
+    placeholder,
+    disabled,
+    field,
+    className,
+    form,
+}: {
+    items: T[];
+    getLabel: (item: T) => string;
+    placeholder?: string;
+    disabled: boolean;
+    field: AnyFieldApi;
+    className?: string;
+    form: AnyFormApi;
+}) {
+    const id = React.useId();
+    return (
+        <Combobox
+            items={items}
+            value={field.state.value ?? ""}
+            onValueChange={(e) => field.handleChange(e)}
+            readOnly={disabled}
+        >
+            <InputGroup className={cn("text-center border-primary/50", disabled && "opacity-80 border-primary/10")}>
+                <ComboboxInput
+                    placeholder={placeholder}
+                    id={id}
+                    className={cn(className, "pr-0! px-1")}
+                    render={<InputGroupInput />}
+                    readOnly={disabled}
+                />
+                <InputGroupAddon align="inline-end" className={cn(disabled && "opacity-80")}>
+                    <button
+                        onClick={() => form.resetField(field.name)}
+                        className="enabled:hover:text-primary"
+                        disabled={disabled}
+                    >
+                        <XIcon className={cn("size-4", !field.state.value && "invisible")} />
+                    </button>
+                </InputGroupAddon>
+            </InputGroup>
+            <ComboboxPositioner sideOffset={6}>
+                <ComboboxPopup>
+                    <ComboboxEmpty>{field.name} not found.</ComboboxEmpty>
+                    <ComboboxList>
+                        {(item: T) => (
+                            <ComboboxItem key={item.id} value={item.id ?? ""} className="w-full">
+                                <ComboboxItemIndicator />
+                                <div className="col-start-2 text-nowrap text-center w-full">{getLabel(item)}</div>
+                            </ComboboxItem>
+                        )}
+                    </ComboboxList>
+                </ComboboxPopup>
+            </ComboboxPositioner>
+        </Combobox>
+    );
+}
+
 const url = z.union([
     z.url({
         protocol: /^https?$/,
@@ -76,6 +138,13 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     const [categories, setCategories] = useState(loaderData.categories.data ?? []);
     const [images, setImages] = useState(loaderData.images.data ?? []);
     const [users, setUsers] = useState(loaderData.users.data ?? []);
+    const imageMap = React.useMemo(() => {
+        const map = new Map<unknown, Image>();
+        images.forEach((img) => {
+            if (img.id) map.set(img.id, img);
+        });
+        return map;
+    }, [images]);
 
     const onSubmit = async <
         T extends { id?: string },
@@ -122,56 +191,17 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             {
                 key: "catid",
 
-                Render: ({ disabled, field, className, form }) => {
-                    const id = React.useId();
-                    return (
-                        <Combobox
-                            items={categories}
-                            value={field.state.value ?? ""}
-                            onValueChange={(e) => field.handleChange(e)}
-                            readOnly={disabled}
-                        >
-                            <InputGroup
-                                className={cn(
-                                    "text-center border-primary/50",
-                                    disabled && "opacity-80 border-primary/10",
-                                )}
-                            >
-                                <ComboboxInput
-                                    placeholder="Category ID"
-                                    id={id}
-                                    className={cn(className, " pr-0! px-1")}
-                                    render={<InputGroupInput />}
-                                    readOnly={disabled}
-                                />
-                                <InputGroupAddon align="inline-end" className={cn(disabled && "opacity-80")}>
-                                    <button
-                                        onClick={() => form.resetField(field.name)}
-                                        className="enabled:hover:text-primary"
-                                        disabled={disabled}
-                                    >
-                                        <XIcon className={cn("size-4", !field.state.value && "invisible")} />
-                                    </button>
-                                </InputGroupAddon>
-                            </InputGroup>
-                            <ComboboxPositioner sideOffset={6}>
-                                <ComboboxPopup>
-                                    <ComboboxEmpty>{field.name} not found.</ComboboxEmpty>
-                                    <ComboboxList>
-                                        {(item: Category) => (
-                                            <ComboboxItem key={item.id} value={item.id} className="w-full">
-                                                <ComboboxItemIndicator />
-                                                <div className="col-start-2 text-nowrap text-center w-full">
-                                                    {item.name}
-                                                </div>
-                                            </ComboboxItem>
-                                        )}
-                                    </ComboboxList>
-                                </ComboboxPopup>
-                            </ComboboxPositioner>
-                        </Combobox>
-                    );
-                },
+                Render: ({ disabled, field, className, form }) => (
+                    <ForeignKeyCombobox
+                        items={categories}
+                        getLabel={(item) => item.name ?? item.id!}
+                        placeholder="Category ID"
+                        disabled={disabled}
+                        field={field}
+                        className={className}
+                        form={form}
+                    />
+                ),
             },
             {
                 key: "images",
@@ -179,7 +209,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 fromSchemaType: (value) =>
                     Array.isArray(value)
                         ? value.reduce((acc, id) => {
-                              const img = images?.find((i: Image) => i.id === id);
+                              const img = imageMap.get(id);
                               if (img) acc.push(img);
                               return acc;
                           }, [] as Image[])
@@ -193,19 +223,21 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     },
                     desc: "Manage images associated with the product - Click submit on product to save",
                     onSubmit: ({ value }) => {
-                        const img = images?.find((i: Image) => i.id === value.id);
+                        const img = imageMap.get(value.id);
                         if (!img) throw new Error("Image not found");
                         return img;
                     },
                     fields: FieldConfigDefaults<Image>([
                         {
-                            key: "url",
+                            key: "id",
                             name: "preview",
                             disabled: () => true,
                             Render: ({ create, field }) => {
+                                const image = imageMap.get(field.state.value);
+                                if (!image) return <> </>;
                                 return !create ? (
                                     <Img
-                                        src={`${field.state.value}?thumbnail=true`}
+                                        src={`${image.url}?thumbnail=true`}
                                         alt="Image preview"
                                         className="h-20 w-20 object-cover m-auto rounded-md"
                                     />
@@ -214,7 +246,20 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                                 );
                             },
                         },
-                        { key: "id" },
+                        {
+                            key: "id",
+                            Render: ({ disabled, field, className, form }) => (
+                                <ForeignKeyCombobox
+                                    items={images}
+                                    getLabel={(item) => item.alt ?? item.id!}
+                                    placeholder="Image ID"
+                                    disabled={disabled}
+                                    field={field}
+                                    className={className}
+                                    form={form}
+                                />
+                            ),
+                        },
                     ]),
                 },
             },
