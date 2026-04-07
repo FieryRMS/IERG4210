@@ -107,7 +107,7 @@ export function FieldConfigDefaults<
                 <Input
                     type="text"
                     inputMode="numeric"
-                    value={field.state.value}
+                    value={field.state.value ?? ""}
                     name={field.name}
                     onChange={(e) => field.handleChange(e.target.value)}
                     className={className}
@@ -204,6 +204,7 @@ function RowGenerator<
                     if (prev === "csubmit") return "idle";
                     return prev;
                 });
+                console.log({ errors });
                 return errors;
             },
         },

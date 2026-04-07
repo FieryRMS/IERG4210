@@ -322,7 +322,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                                 onChange={(e) => field.handleChange(e.target.value)}
                                 readOnly={disabled}
                                 className={className}
-                                value={field.state.value instanceof File ? field.state.value.name : field.state.value}
+                                value={field.state.value instanceof File ? field.state.value.name : field.state.value ?? ""}
                             />
                             <Button
                                 type="button"
