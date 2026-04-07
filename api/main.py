@@ -6,9 +6,12 @@ from typing import Any
 
 import dotenv
 from fastapi import FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from sqlmodel import create_engine, Session as SQLSession
-
+from models.errors import HTTPException
+from models.errors import *
+from pydantic import TypeAdapter
 import routes
 import routes.categories
 from models.app import State
@@ -48,7 +51,9 @@ class ColoredFormatter(logging.Formatter):
         return self._NAME_COLORS[hash(name) % len(self._NAME_COLORS)]
 
     def format(self, record: logging.LogRecord) -> str:
-        bcolor, fcolor = self._LEVEL_COLORS.get(record.levelno, (self._RESET, self._RESET))
+        bcolor, fcolor = self._LEVEL_COLORS.get(
+            record.levelno, (self._RESET, self._RESET)
+        )
         ts = f"{self._DIM}[{self.formatTime(record, self.datefmt)}]{self._RESET}"
         level = f"{bcolor}[{record.levelname}]{self._RESET}"
         name = f"{self._name_color(record.name)}[{record.name}]{self._RESET}"
@@ -100,9 +105,66 @@ def custom_generate_unique_id(route: APIRoute):
     return f"{route.tags[0]}-{route.name}"
 
 
+errs: list[type[HTTPException]] = HTTPException.__subclasses__()
+
+responses: dict[int | str, dict[str, Any]] = {
+    err.status_code: {"description": err.desc, "model": err} for err in errs
+}
+
 app = FastAPI(
-    lifespan=lifespan, debug=DEBUG, generate_unique_id=custom_generate_unique_id
+    lifespan=lifespan,
+    debug=DEBUG,
+    generate_unique_id=custom_generate_unique_id,
+    responses=responses,
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> Response:
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    logger = state["logger"]
+    logger.error(f"Validation error: {exc.errors()}")
+    errs = exc.errors()
+    errdict: dict[str, list[Any]] = {}
+    for err in errs:
+        path = [
+            f"[{l}]" if isinstance(l, int) else l for l in err["loc"] if l != "body"
+        ]
+        err["loc"] = path
+        loc = ".".join(err["loc"])
+        if loc not in errdict:
+            errdict[loc] = []
+        errdict[loc].append(err)
+
+    adapter = TypeAdapter(HTTPValidationException)
+    obj = adapter.validate_python(
+        {
+            "errors": {
+                "form": errdict,
+                "fields": errdict,
+            }
+        }
+    )
+    return Response(
+        content=adapter.dump_json(obj),
+        status_code=HTTPValidationException.status_code,
+        media_type="application/json",
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> Response:
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    logger = state["logger"]
+    logger.error(f"HTTP error: {exc}")
+    adapter = TypeAdapter(exc.__class__)
+    return Response(
+        content=adapter.dump_json(exc),
+        status_code=exc.status_code,
+        media_type="application/json",
+    )
 
 
 @app.middleware("http")

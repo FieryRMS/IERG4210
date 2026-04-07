@@ -5,7 +5,7 @@ from sqlmodel import select
 
 from db import Image, ImageCreate, ImageUpdate
 from models.app import State
-from models.errors import NotFoundException
+from models.errors import HTTPNotFoundException
 from .users import with_role
 
 router = APIRouter(prefix="/images", tags=["Images"])
@@ -26,7 +26,7 @@ async def get_image(request: Request, image_id: uuid.UUID) -> Image:
     session = state["session"]
     image = session.get(Image, image_id)
     if not image:
-        raise NotFoundException
+        raise HTTPNotFoundException
     return image
 
 
@@ -51,7 +51,7 @@ async def update_image(
     session = state["session"]
     db_image = session.get(Image, image.id)
     if not db_image:
-        raise NotFoundException
+        raise HTTPNotFoundException
     db_image.update_model(image)
     session.add(db_image)
     session.commit()
@@ -66,6 +66,6 @@ async def delete_image(request: Request, id: uuid.UUID):
     session = state["session"]
     image = session.get(Image, id)
     if not image:
-        raise NotFoundException
+        raise HTTPNotFoundException
     session.delete(image)
     session.commit()
