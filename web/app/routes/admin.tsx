@@ -301,16 +301,12 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 key: "url",
                 name: "preview",
                 disabled: () => true,
-                Render: ({ create, field }) => {
-                    return !create ? (
-                        <Img
-                            src={`${field.state.value}?thumbnail=true`}
-                            alt="Image preview"
-                            className="h-20 w-20 object-cover m-auto rounded-md"
-                        />
-                    ) : (
-                        <> </>
-                    );
+                Render: ({ field }) => {
+                    const src =
+                        field.state.value instanceof File
+                            ? URL.createObjectURL(field.state.value)
+                            : `${field.state.value}?thumbnail=true`;
+                    return <Img src={src} alt="Image preview" className="h-20 w-20 object-cover m-auto rounded-md" />;
                 },
             },
             {
@@ -354,6 +350,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                                                 field.handleChange(file);
                                             }
                                         }
+                                        e.currentTarget.value = "";
                                     }}
                                 />
                                 File

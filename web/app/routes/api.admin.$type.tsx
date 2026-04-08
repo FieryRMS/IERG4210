@@ -24,7 +24,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     const type = params.type;
     const object = FormData2Any(form);
 
-    // TODO: better error handling and validation
+    console.log("Received admin request", { type, object });
+
     if (
         !type ||
         typeof type !== "string" ||
