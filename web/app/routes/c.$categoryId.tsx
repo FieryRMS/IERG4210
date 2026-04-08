@@ -1,8 +1,8 @@
 import type { PageHandle } from "@/types";
 import type { Route } from "./+types/c.$categoryId";
 import { Category } from "@/components/category";
-import { StatusCodes } from "http-status-codes";
 import { sdk, applyAuth } from "@/lib/server.utils";
+import { ServerNotFoundException } from "@/lib/errors";
 
 export function meta({ loaderData }: Route.MetaArgs) {
     return [
@@ -26,13 +26,13 @@ export async function loader({ params, request }: Route.LoaderArgs) {
             ...auth,
         });
         if (cerror || perror) {
-            throw new Response("Not Found", { status: StatusCodes.NOT_FOUND });
+            throw new ServerNotFoundException();
         }
         return { products, category };
     } else {
         const { data: products, error } = await sdk.products.getProducts(auth);
         if (error) {
-            throw new Response("Not Found", { status: StatusCodes.NOT_FOUND });
+            throw new ServerNotFoundException();
         }
         return { products: products ?? [], category: null };
     }

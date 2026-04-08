@@ -16,7 +16,7 @@ from db import (
     Session as UserSession,
     UserChangePassword,
 )
-from models import State, HTTPNotFoundException, HTTPUnauthorizedException
+from models import State, ServerNotFoundException, ServerUnauthorizedException
 from fastapi_decorators import depends
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -63,7 +63,7 @@ def with_role(roles: list[str]):
     @with_session()
     def dependency(session: UserSession | None):
         if session is None or session.user.role.value not in roles:
-            raise HTTPUnauthorizedException()
+            raise ServerUnauthorizedException()
 
     return depends(dependency)
 
@@ -91,7 +91,7 @@ async def login(request: Request, response: Response, credentials: UserLogin) ->
         ).first()
 
     if not db_user or not db_user.verify_password(credentials.password):
-        raise HTTPUnauthorizedException()
+        raise ServerUnauthorizedException()
 
     user_session = UserSession(user_id=db_user.id)
     session.add(user_session)
@@ -106,7 +106,7 @@ async def login(request: Request, response: Response, credentials: UserLogin) ->
 @with_session()
 async def logout(request: Request, response: Response, session: UserSession | None):
     if session is None:
-        raise HTTPNotFoundException
+        raise ServerNotFoundException
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
     db_session.delete(session)
@@ -141,12 +141,12 @@ async def change_password(
     session: UserSession | None,
 ) -> User:
     if session is None:
-        raise HTTPNotFoundException
+        raise ServerNotFoundException
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
     user = session.user
     if not user.verify_password(password_data.old_password):
-        raise HTTPUnauthorizedException
+        raise ServerUnauthorizedException
     user.set_password(password_data.password)
     db_session.add(user)
     for s in user.sessions:
@@ -173,7 +173,7 @@ async def get_user(request: Request, user_id: uuid.UUID) -> User:
     session = state["session"]
     user = session.get(User, user_id)
     if not user:
-        raise HTTPNotFoundException
+        raise ServerNotFoundException
     return user
 
 
@@ -196,7 +196,7 @@ async def update_user(request: Request, user: UserUpdate) -> User:
     session = state["session"]
     db_user = session.get(User, user.id)
     if not db_user:
-        raise HTTPNotFoundException
+        raise ServerNotFoundException
     db_user.update_model(user)
     if user.password:
         db_user.set_password(user.password)
@@ -213,7 +213,7 @@ async def delete_session(request: Request, id: uuid.UUID):
     db_session = state["session"]
     user_session = db_session.get(UserSession, id)
     if not user_session:
-        raise HTTPNotFoundException
+        raise ServerNotFoundException
     db_session.delete(user_session)
     db_session.commit()
 
@@ -225,6 +225,6 @@ async def delete_user(request: Request, id: uuid.UUID):
     session = state["session"]
     user = session.get(User, id)
     if not user:
-        raise HTTPNotFoundException
+        raise ServerNotFoundException
     session.delete(user)
     session.commit()

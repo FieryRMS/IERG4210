@@ -9,7 +9,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from sqlmodel import create_engine, Session as SQLSession
-from models.errors import HTTPException
+from models.errors import ServerException
 from models.errors import *
 from pydantic import TypeAdapter
 import routes
@@ -105,10 +105,10 @@ def custom_generate_unique_id(route: APIRoute):
     return f"{route.tags[0]}-{route.name}"
 
 
-errs: list[type[HTTPException]] = [*HTTPException.__subclasses__(), HTTPException]
+errs: list[type[ServerException]] = [*ServerException.__subclasses__(), ServerException]
 
 responses: dict[int | str, dict[str, Any]] = {
-    err.status_code: {"description": err.desc, "model": err} for err in errs
+    err.STATUS_CODE: {"description": err.reason(), "model": err} for err in errs
 }
 
 app = FastAPI(
@@ -135,7 +135,7 @@ async def validation_exception_handler(
             errdict[loc] = []
         errdict[loc].append(err)
 
-    adapter = TypeAdapter(HTTPValidationException)
+    adapter = TypeAdapter(ServerValidationException)
     obj = adapter.validate_python(
         {
             "errors": {
@@ -146,17 +146,17 @@ async def validation_exception_handler(
     )
     return Response(
         content=adapter.dump_json(obj),
-        status_code=HTTPValidationException.status_code,
+        status_code=obj.code,
         media_type="application/json",
     )
 
 
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException) -> Response:
+@app.exception_handler(ServerException)
+async def http_exception_handler(request: Request, exc: ServerException) -> Response:
     adapter = TypeAdapter(exc.__class__)
     return Response(
         content=adapter.dump_json(exc),
-        status_code=exc.status_code,
+        status_code=exc.code,
         media_type="application/json",
     )
 
@@ -165,11 +165,11 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> Respon
 async def generic_exception_handler(request: Request, exc: Exception) -> Response:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     state["logger"].error(f"Unhandled exception: {exc}", exc_info=exc)
-    adapter = TypeAdapter(HTTPException)
-    obj = HTTPException()
+    adapter = TypeAdapter(ServerException)
+    obj = ServerException()
     return Response(
         content=adapter.dump_json(obj),
-        status_code=obj.status_code,
+        status_code=obj.code,
         media_type="application/json",
     )
 

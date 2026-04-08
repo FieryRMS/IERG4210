@@ -4,7 +4,7 @@ import { z } from "zod";
 import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { HttpValidationException } from "@/lib/errors";
+import { ServerValidationException } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { useState, useMemo, type JSX } from "react";
 import { type HTMLFormMethod } from "react-router";
@@ -227,13 +227,13 @@ function RowGenerator<
                 try {
                     await onSubmit({ config, method, value: updatedValue });
                 } catch (e) {
-                    let ret: HttpValidationException["errors"] = {
+                    let ret: ServerValidationException["errors"] = {
                         form: {
                             _errors: [{ message: "Server Error", code: "SERVER_ERROR", path: [] }],
                         },
                         fields: {},
                     };
-                    if (e instanceof HttpValidationException) {
+                    if (e instanceof ServerValidationException) {
                         ret = e.errors;
                     }
                     rollback();

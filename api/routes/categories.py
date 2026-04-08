@@ -5,7 +5,7 @@ from sqlmodel import select
 
 from db import Category, CategoryCreate, CategoryUpdate
 from models.app import State
-from models.errors import HTTPNotFoundException
+from models.errors import ServerNotFoundException
 from .users import with_role
 
 router = APIRouter(prefix="/categories", tags=["Categories"])
@@ -28,7 +28,7 @@ async def get_category(request: Request, category_id: uuid.UUID) -> Category:
     session = state["session"]
     category = session.get(Category, category_id)
     if not category:
-        raise HTTPNotFoundException
+        raise ServerNotFoundException
     return category
 
 
@@ -53,7 +53,7 @@ async def update_category(
     session = state["session"]
     db_category = session.get(Category, category.id)
     if not db_category:
-        raise HTTPNotFoundException
+        raise ServerNotFoundException
     db_category.update_model(category)
     session.add(db_category)
     session.commit()
@@ -68,6 +68,6 @@ async def delete_category(request: Request, id: uuid.UUID):
     session = state["session"]
     category = session.get(Category, id)
     if not category:
-        raise HTTPNotFoundException
+        raise ServerNotFoundException
     session.delete(category)
     session.commit()

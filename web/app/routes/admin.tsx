@@ -42,7 +42,7 @@ import {
 import { XIcon } from "lucide-react";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import type { AnyFieldApi, AnyFormApi } from "@tanstack/react-form";
-import { HttpException } from "@/lib/errors";
+import { ServerException } from "@/lib/errors";
 
 export type TableTypes = "Product" | "Category" | "Image" | "User" | "Session" | "Product Images";
 
@@ -160,9 +160,9 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             body: form,
         });
         if (!response.ok) {
-            const error = HttpException.fromJson(await response.json().catch(() => null));
+            const error = ServerException.fromJson(await response.json().catch(() => null));
             toast.error(
-                `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.TableType}: ${error.message}`,
+                `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.TableType}: ${error.detail}`,
             );
             throw error;
         }
@@ -416,7 +416,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     {loaderData.products.error ? (
                         <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
                             Failed to load products:{" "}
-                            {`${loaderData.products.error.type} - ${loaderData.products.error.msg}`}
+                            {`${loaderData.products.error.type} - ${loaderData.products.error.detail}`}
                         </p>
                     ) : (
                         <TableGenerator data={products ?? []} config={PConfig} onSubmit={setProducts} />
@@ -427,7 +427,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     {loaderData.categories.error ? (
                         <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
                             Failed to load categories:{" "}
-                            {`${loaderData.categories.error.type} - ${loaderData.categories.error.msg}`}
+                            {`${loaderData.categories.error.type} - ${loaderData.categories.error.detail}`}
                         </p>
                     ) : (
                         <TableGenerator data={categories ?? []} config={CConfig} onSubmit={setCategories} />
@@ -437,7 +437,8 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     <h2 className="text-xl font-semibold mb-2 w-full text-center">Images</h2>
                     {loaderData.images.error ? (
                         <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
-                            Failed to load images: {`${loaderData.images.error.type} - ${loaderData.images.error.msg}`}
+                            Failed to load images:{" "}
+                            {`${loaderData.images.error.type} - ${loaderData.images.error.detail}`}
                         </p>
                     ) : (
                         <TableGenerator data={images ?? []} config={IConfig} onSubmit={setImages} />
@@ -447,7 +448,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     <h2 className="text-xl font-semibold mb-2 w-full text-center">Users</h2>
                     {loaderData.users.error ? (
                         <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
-                            Failed to load users: {`${loaderData.users.error.type} - ${loaderData.users.error.msg}`}
+                            Failed to load users: {`${loaderData.users.error.type} - ${loaderData.users.error.detail}`}
                         </p>
                     ) : (
                         <TableGenerator data={users ?? []} config={UConfig} onSubmit={setUsers} />

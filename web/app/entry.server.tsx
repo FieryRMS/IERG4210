@@ -1,13 +1,14 @@
 import { PassThrough } from "node:stream";
 
-import type { RouterContextProvider, EntryContext } from "react-router";
+import type { RouterContextProvider, EntryContext, LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { createReadableStreamFromReadable } from "@react-router/node";
-import { ServerRouter, type HandleErrorFunction } from "react-router";
+import { isRouteErrorResponse, ServerRouter } from "react-router";
 import { isbot } from "isbot";
 import type { RenderToPipeableStreamOptions } from "react-dom/server";
 import { renderToPipeableStream } from "react-dom/server";
 import { generateNonce, buildSecurityHeaders } from "@/lib/security.server";
 import { NonceContext } from "@/context/nonce";
+import { ServerException } from "./lib/errors";
 
 export const streamTimeout = 5_000;
 
@@ -88,6 +89,7 @@ export default function handleRequest(
                     // errors encountered during initial shell rendering since they'll
                     // reject and get logged in handleDocumentRequest.
                     if (shellRendered) {
+                        console.error("Error during streaming render:", error);
                         console.error(error);
                     }
                 },
@@ -96,14 +98,14 @@ export default function handleRequest(
     });
 }
 
-export const handleError: HandleErrorFunction = (
-  error,
-  { request },
-) => {
-  // React Router may abort some interrupted requests, don't log those
-  if (!request.signal.aborted) {
-
-    // make sure to still log the error so you can see it
-    console.error(error);
-  }
-};
+export function handleError(error: unknown, { request }: LoaderFunctionArgs | ActionFunctionArgs) {
+    if (!request.signal.aborted && !isRouteErrorResponse(error)) {
+        if (error instanceof ServerException) throw Response.json(error.toJson(), { status: error.code });
+        else {
+            console.error("Unexpected error in loader/action:", error);
+            if (import.meta.env.DEV) throw error; // Let the error boundary handle it in development for better debugging
+            const err = new ServerException();
+            throw Response.json(err.toJson(), { status: err.code });
+        }
+    }
+}

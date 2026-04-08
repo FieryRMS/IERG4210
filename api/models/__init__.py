@@ -2,12 +2,14 @@
 from .app import State
 from .base import BaseModel
 from .errors import (
-    HTTPException,
-    HTTPNotFoundException,
-    HTTPUnauthorizedException,
-    HTTPForbiddenException,
-    HTTPValidationException,
+    ServerException,
+    ServerNotFoundException,
+    ServerUnauthorizedException,
+    ServerBadRequestException,
+    ServerValidationException,
     ValidationError,
     FormValidationError,
+    ServerForbiddenException,
+    ServerMethodNotAllowedException,
 )
 from .root import Health
