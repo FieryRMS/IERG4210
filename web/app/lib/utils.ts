@@ -38,18 +38,16 @@ export const onChangeAsync = <TFormData,>(schema: StandardSchemaV1<TFormData, un
 function buildChildIndex(formData: FormData): Map<string, Set<string>> {
     const index = new Map<string, Set<string>>();
     for (const key of formData.keys()) {
-        let pos = 0;
-        while (true) {
-            const open = key.indexOf('[', pos);
-            if (open === -1) break;
-            const close = key.indexOf(']', open);
-            if (close === -1) break;
-            const parent = key.slice(0, open);
-            const child = key.slice(open + 1, close);
+        const parts = key.split(".");
+        for (let i = 0; i < parts.length - 1; i++) {
+            const parent = parts.slice(0, i + 1).join(".");
+            const child = parts[i + 1]!;
             let set = index.get(parent);
-            if (!set) { set = new Set(); index.set(parent, set); }
+            if (!set) {
+                set = new Set();
+                index.set(parent, set);
+            }
             set.add(child);
-            pos = close + 1;
         }
     }
     return index;
@@ -78,7 +76,7 @@ export function Any2FormData(data: unknown, parentKey = "root", result = new For
     result.append(`${parentKey}.__type`, isArray ? "array" : "object");
 
     for (const [key, value] of Object.entries(data))
-        Any2FormData(value, `${parentKey}[${key}]`, result);
+        Any2FormData(value, `${parentKey}.${key}`, result);
     return result;
 }
 
@@ -94,10 +92,10 @@ function deserialize(formData: FormData, parentKey: string, index: Map<string, S
                 .map(Number)
                 .filter((n) => !isNaN(n))
                 .sort((a, b) => a - b)
-                .map((i) => deserialize(formData, `${parentKey}[${i}]`, index));
+                .map((i) => deserialize(formData, `${parentKey}.${i}`, index));
         }
         return Object.fromEntries(
-            childKeys.map((key) => [key, deserialize(formData, `${parentKey}[${key}]`, index)])
+            childKeys.map((key) => [key, deserialize(formData, `${parentKey}.${key}`, index)])
         );
     }
 
