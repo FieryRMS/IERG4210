@@ -16,7 +16,7 @@ from db import (
     Session as UserSession,
     UserChangePassword,
 )
-from models import State, NotFoundException, UnauthorizedException
+from models import State, ServerNotFoundException, ServerUnauthorizedException
 from fastapi_decorators import depends
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -63,7 +63,7 @@ def with_role(roles: list[str]):
     @with_session()
     def dependency(session: UserSession | None):
         if session is None or session.user.role.value not in roles:
-            raise UnauthorizedException()
+            raise ServerUnauthorizedException()
 
     return depends(dependency)
 
@@ -91,7 +91,7 @@ async def login(request: Request, response: Response, credentials: UserLogin) ->
         ).first()
 
     if not db_user or not db_user.verify_password(credentials.password):
-        raise UnauthorizedException()
+        raise ServerUnauthorizedException()
 
     user_session = UserSession(user_id=db_user.id)
     session.add(user_session)
@@ -106,7 +106,7 @@ async def login(request: Request, response: Response, credentials: UserLogin) ->
 @with_session()
 async def logout(request: Request, response: Response, session: UserSession | None):
     if session is None:
-        raise NotFoundException
+        raise ServerNotFoundException
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
     db_session.delete(session)
@@ -141,12 +141,12 @@ async def change_password(
     session: UserSession | None,
 ) -> User:
     if session is None:
-        raise NotFoundException
+        raise ServerNotFoundException
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
     user = session.user
     if not user.verify_password(password_data.old_password):
-        raise UnauthorizedException
+        raise ServerUnauthorizedException
     user.set_password(password_data.password)
     db_session.add(user)
     for s in user.sessions:
@@ -173,7 +173,7 @@ async def get_user(request: Request, user_id: uuid.UUID) -> User:
     session = state["session"]
     user = session.get(User, user_id)
     if not user:
-        raise NotFoundException
+        raise ServerNotFoundException
     return user
 
 
@@ -189,14 +189,14 @@ async def create_user(request: Request, user: UserCreate) -> User:
     return db_user
 
 
-@router.put("/{user_id}", status_code=status.HTTP_200_OK)
+@router.put("/", status_code=status.HTTP_200_OK)
 @with_role(["admin"])
-async def update_user(request: Request, user_id: uuid.UUID, user: UserUpdate) -> User:
+async def update_user(request: Request, user: UserUpdate) -> User:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
-    db_user = session.get(User, user_id)
+    db_user = session.get(User, user.id)
     if not db_user:
-        raise NotFoundException
+        raise ServerNotFoundException
     db_user.update_model(user)
     if user.password:
         db_user.set_password(user.password)
@@ -206,25 +206,25 @@ async def update_user(request: Request, user_id: uuid.UUID, user: UserUpdate) ->
     return db_user
 
 
-@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/sessions/{id}", status_code=status.HTTP_204_NO_CONTENT)
 @with_role(["admin"])
-async def delete_session(request: Request, session_id: uuid.UUID):
+async def delete_session(request: Request, id: uuid.UUID):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
-    user_session = db_session.get(UserSession, session_id)
+    user_session = db_session.get(UserSession, id)
     if not user_session:
-        raise NotFoundException
+        raise ServerNotFoundException
     db_session.delete(user_session)
     db_session.commit()
 
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 @with_role(["admin"])
-async def delete_user(request: Request, user_id: uuid.UUID):
+async def delete_user(request: Request, id: uuid.UUID):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
-    user = session.get(User, user_id)
+    user = session.get(User, id)
     if not user:
-        raise NotFoundException
+        raise ServerNotFoundException
     session.delete(user)
     session.commit()

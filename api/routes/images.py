@@ -5,7 +5,7 @@ from sqlmodel import select
 
 from db import Image, ImageCreate, ImageUpdate
 from models.app import State
-from models.errors import NotFoundException
+from models.errors import ServerNotFoundException
 from .users import with_role
 
 router = APIRouter(prefix="/images", tags=["Images"])
@@ -26,7 +26,7 @@ async def get_image(request: Request, image_id: uuid.UUID) -> Image:
     session = state["session"]
     image = session.get(Image, image_id)
     if not image:
-        raise NotFoundException
+        raise ServerNotFoundException
     return image
 
 
@@ -42,16 +42,16 @@ async def new_image(request: Request, image: ImageCreate) -> Image:
     return db_image
 
 
-@router.put("/{image_id}", status_code=status.HTTP_200_OK)
+@router.put("/", status_code=status.HTTP_200_OK)
 @with_role(["admin"])
 async def update_image(
-    request: Request, image_id: uuid.UUID, image: ImageUpdate
+    request: Request, image: ImageUpdate
 ) -> Image:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
-    db_image = session.get(Image, image_id)
+    db_image = session.get(Image, image.id)
     if not db_image:
-        raise NotFoundException
+        raise ServerNotFoundException
     db_image.update_model(image)
     session.add(db_image)
     session.commit()
@@ -59,13 +59,13 @@ async def update_image(
     return db_image
 
 
-@router.delete("/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 @with_role(["admin"])
-async def delete_image(request: Request, image_id: uuid.UUID):
+async def delete_image(request: Request, id: uuid.UUID):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
-    image = session.get(Image, image_id)
+    image = session.get(Image, id)
     if not image:
-        raise NotFoundException
+        raise ServerNotFoundException
     session.delete(image)
     session.commit()

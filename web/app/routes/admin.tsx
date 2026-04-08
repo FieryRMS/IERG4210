@@ -3,7 +3,7 @@ import type { PageHandle } from "@/types";
 import type { Product, Category, Image, User, Session } from "@/lib/generated/types.gen";
 import { z } from "zod";
 import { Input } from "@/components/ui/input";
-import { Any2FormData } from "@/lib/utils";
+import { Any2FormData, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Img } from "@/components/img-wrapper";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -13,46 +13,107 @@ import { CsrfContext, UserContext } from "@/context.server";
 import { sdk, applyAuth } from "@/lib/server.utils";
 import { TableGenerator, type Config, FieldConfigDefaults } from "@/components/tablegenerator";
 import { redirect } from "react-router";
-import { useState } from "react";
+import React, { useState } from "react";
+import {
+    zCategoryCreate,
+    zCategoryUpdate,
+    zDeleteCategoriesByIdData,
+    zDeleteImagesByIdData,
+    zDeleteProductsByIdData,
+    zDeleteUsersByIdData,
+    zDeleteUsersSessionsByIdData,
+    zImageCreate,
+    zImageUpdate,
+    zProductCreate,
+    zProductUpdate,
+    zUserCreate,
+    zUserUpdate,
+} from "@/lib/generated/zod.gen";
+import {
+    Combobox,
+    ComboboxEmpty,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxItemIndicator,
+    ComboboxList,
+    ComboboxPopup,
+    ComboboxPositioner,
+} from "@/components/ui/combobox";
+import { XIcon } from "lucide-react";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import type { AnyFieldApi, AnyFormApi } from "@tanstack/react-form";
+import { ServerException } from "@/lib/errors";
 
-export type TableTypes = "Product" | "Category" | "Image" | "User" | "Session";
+export type TableTypes = "Product" | "Category" | "Image" | "User" | "Session" | "Product Images";
 
-export const baseSchema = z.object({
-    id: z.uuidv4().nullable().optional(),
-});
-export const productSchema = baseSchema.extend({
-    name: z.string(),
-    description: z.string().nullable(),
-    price: z.coerce.number<number>().min(0.01),
-    catid: z.uuidv4(),
-    images: z.array(z.uuidv4()),
-});
+function ForeignKeyCombobox<T extends { id?: string }>({
+    items,
+    getLabel,
+    placeholder,
+    disabled,
+    field,
+    className,
+    form,
+}: {
+    items: T[];
+    getLabel: (item: T) => string;
+    placeholder?: string;
+    disabled: boolean;
+    field: AnyFieldApi;
+    className?: string;
+    form: AnyFormApi;
+}) {
+    const id = React.useId();
+    return (
+        <Combobox
+            items={items}
+            value={field.state.value ?? ""}
+            onValueChange={(e) => field.handleChange(e)}
+            readOnly={disabled}
+        >
+            <InputGroup className={cn("text-center border-primary/50", disabled && "opacity-80 border-primary/10")}>
+                <ComboboxInput
+                    placeholder={placeholder}
+                    id={id}
+                    className={cn(className, "pr-0! px-1")}
+                    render={<InputGroupInput />}
+                    readOnly={disabled}
+                />
+                <InputGroupAddon align="inline-end" className={cn(disabled && "opacity-80")}>
+                    <button
+                        onClick={() => form.resetField(field.name)}
+                        className="enabled:hover:text-primary"
+                        disabled={disabled}
+                    >
+                        <XIcon className={cn("size-4", !field.state.value && "invisible")} />
+                    </button>
+                </InputGroupAddon>
+            </InputGroup>
+            <ComboboxPositioner sideOffset={6}>
+                <ComboboxPopup>
+                    <ComboboxEmpty>{field.name} not found.</ComboboxEmpty>
+                    <ComboboxList>
+                        {(item: T) => (
+                            <ComboboxItem key={item.id} value={item.id ?? ""} className="w-full">
+                                <ComboboxItemIndicator />
+                                <div className="col-start-2 text-nowrap text-center w-full">{getLabel(item)}</div>
+                            </ComboboxItem>
+                        )}
+                    </ComboboxList>
+                </ComboboxPopup>
+            </ComboboxPositioner>
+        </Combobox>
+    );
+}
 
-export const categorySchema = baseSchema.extend({
-    name: z.string(),
-    description: z.string().nullable(),
-});
-
-export const imageSchema = baseSchema.extend({
-    url: z.union([
-        z.url({
-            protocol: /^https?$/,
-            hostname: z.regexes.domain,
-        }),
-        z.string().regex(new RegExp(`^${UPLOAD_URL}`)),
-        z.file().max(fileStorageConfig.maxFileSize!),
-    ]),
-    alt: z.string().nullable().optional(),
-});
-
-export const userSchema = baseSchema.extend({
-    email: z.string().nullable().optional(),
-    username: z.string().nullable().optional(),
-    role: z.enum(["admin", "user"]).nullable().optional(),
-    password: z.string().nullable().optional(),
-});
-
-export const sessionSchema = baseSchema;
+const url = z.union([
+    z.url({
+        protocol: /^https?$/,
+        hostname: z.regexes.domain,
+    }),
+    z.string().regex(new RegExp(`^${UPLOAD_URL}`)),
+    z.file().max(fileStorageConfig.maxFileSize!),
+]);
 
 export async function loader({ request, context }: Route.LoaderArgs) {
     const user = context.get(UserContext);
@@ -78,6 +139,13 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     const [categories, setCategories] = useState(loaderData.categories.data ?? []);
     const [images, setImages] = useState(loaderData.images.data ?? []);
     const [users, setUsers] = useState(loaderData.users.data ?? []);
+    const imageMap = React.useMemo(() => {
+        const map = new Map<unknown, Image>();
+        images.forEach((img) => {
+            if (img.id) map.set(img.id, img);
+        });
+        return map;
+    }, [images]);
 
     const onSubmit = async <
         T extends { id?: string },
@@ -87,90 +155,130 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         ...[{ config, method, value }]: Parameters<Config<T, TableTypes, K>["onSubmit"]>
     ) => {
         const form = Any2FormData(value);
-        form.append("TableType", config.TableType);
-        const response = await fetch("/api/admin", {
+        const response = await fetch(`/api/admin/${config.TableType}`, {
             method,
             body: form,
         });
         if (!response.ok) {
-            const error = await response.text();
+            const error = ServerException.fromJson(await response.json().catch(() => null));
             toast.error(
-                `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.TableType}: ${error}`,
+                `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.TableType}: ${error.detail}`,
             );
-            throw new Error(error);
+            throw error;
         }
         const responseData = response.status !== 204 ? await response.json() : null;
         toast.success(
             `${config.TableType} ${method === "post" ? "created" : method === "put" ? "updated" : "deleted"} successfully`,
         );
-        return responseData as T;
+        return responseData;
     };
 
     const PConfig: Config<Product, TableTypes> = {
-        $schema: productSchema,
         TableType: "Product",
         desc: "Product CRUD",
+        methods: {
+            post: zProductCreate,
+            put: zProductUpdate,
+            delete: zDeleteProductsByIdData.shape.path,
+        },
         onSubmit: onSubmit<Product, TableTypes>,
-        fields: FieldConfigDefaults<Product>([
-            { key: "id", disabled: true },
-            { key: "created_at", disabled: true },
-            { key: "updated_at", disabled: true },
+        fields: FieldConfigDefaults<Product, TableTypes>([
+            { key: "id", disabled: () => true },
+            { key: "created_at", disabled: () => true },
+            { key: "updated_at", disabled: () => true },
             { key: "name" },
             { key: "description" },
             { key: "price" },
-            { key: "catid" },
+            {
+                key: "catid",
+
+                Render: ({ disabled, field, className, form }) => (
+                    <ForeignKeyCombobox
+                        items={categories}
+                        getLabel={(item) => item.name ?? item.id!}
+                        placeholder="Category ID"
+                        disabled={disabled}
+                        field={field}
+                        className={className}
+                        form={form}
+                    />
+                ),
+            },
             {
                 key: "images",
                 toSchemaType: (data) => (Array.isArray(data) ? data.map((d) => String(d.id)) : []),
                 fromSchemaType: (value) =>
                     Array.isArray(value)
                         ? value.reduce((acc, id) => {
-                              const img = images?.find((i) => i.id === id);
+                              const img = imageMap.get(id);
                               if (img) acc.push(img);
                               return acc;
                           }, [] as Image[])
                         : [],
                 nested: {
                     TableType: "Product Images",
+                    methods: {
+                        post: zDeleteImagesByIdData.shape.path,
+                        put: zDeleteImagesByIdData.shape.path,
+                        delete: zDeleteImagesByIdData.shape.path,
+                    },
                     desc: "Manage images associated with the product - Click submit on product to save",
-                    $schema: baseSchema,
                     onSubmit: ({ value }) => {
-                        const img = images?.find((i) => i.id === value.id);
+                        const img = imageMap.get(value.id);
                         if (!img) throw new Error("Image not found");
                         return img;
                     },
                     fields: FieldConfigDefaults<Image>([
                         {
-                            key: "url",
+                            key: "id",
                             name: "preview",
-                            disabled: true,
-                            render: ({ create, value }) => {
+                            disabled: () => true,
+                            Render: ({ create, field }) => {
+                                const image = imageMap.get(field.state.value);
+                                if (!image) return <> </>;
                                 return !create ? (
                                     <Img
-                                        src={`${value}?thumbnail=true`}
+                                        src={`${image.url}?resize`}
                                         alt="Image preview"
-                                        className="h-20 w-20 object-cover m-auto"
+                                        className="h-20 w-20 object-cover m-auto rounded-md"
                                     />
                                 ) : (
                                     <> </>
                                 );
                             },
                         },
-                        { key: "id" },
+                        {
+                            key: "id",
+                            Render: ({ disabled, field, className, form }) => (
+                                <ForeignKeyCombobox
+                                    items={images}
+                                    getLabel={(item) => item.alt ?? item.id!}
+                                    placeholder="Image ID"
+                                    disabled={disabled}
+                                    field={field}
+                                    className={className}
+                                    form={form}
+                                />
+                            ),
+                        },
                     ]),
                 },
             },
         ]),
     };
     const CConfig: Config<Category, TableTypes> = {
-        $schema: categorySchema,
         TableType: "Category",
         desc: "Category CRUD",
+        methods: {
+            post: zCategoryCreate,
+            put: zCategoryUpdate,
+            delete: zDeleteCategoriesByIdData.shape.path,
+        },
         onSubmit: onSubmit<Category, TableTypes>,
         fields: FieldConfigDefaults<Category>([
-            { key: "id", disabled: true },
-            { key: "created_at", disabled: true },
-            { key: "updated_at", disabled: true },
+            { key: "id", disabled: () => true },
+            { key: "created_at", disabled: () => true },
+            { key: "updated_at", disabled: () => true },
             { key: "name" },
             { key: "description" },
         ]),
@@ -178,56 +286,75 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
 
     const IConfig: Config<Image, TableTypes> = {
         TableType: "Image",
-        $schema: imageSchema,
+        methods: {
+            post: zImageCreate.extend({ url }),
+            put: zImageUpdate.extend({ url: url.nullish() }),
+            delete: zDeleteImagesByIdData.shape.path,
+        },
         desc: "Image CRUD",
         onSubmit: onSubmit<Image, TableTypes>,
         fields: FieldConfigDefaults<Image>([
-            { key: "id", disabled: true },
-            { key: "created_at", disabled: true },
-            { key: "updated_at", disabled: true },
+            { key: "id", disabled: () => true },
+            { key: "created_at", disabled: () => true },
+            { key: "updated_at", disabled: () => true },
             {
                 key: "url",
                 name: "preview",
-                disabled: true,
-                render: ({ create, value }) => {
-                    return !create ? (
-                        <Img
-                            src={`${value}?thumbnail=true`}
-                            alt="Image preview"
-                            className="h-20 w-20 object-cover m-auto"
-                        />
-                    ) : (
-                        <> </>
-                    );
+                disabled: () => true,
+                Render: ({ field }) => {
+                    const src =
+                        field.state.value instanceof File
+                            ? URL.createObjectURL(field.state.value)
+                            : `${field.state.value}?resize=0.1`;
+                    return <Img src={src} alt="Image preview" className="h-20 w-20 object-cover m-auto rounded-md" />;
                 },
             },
             {
                 key: "url",
                 file: true,
-                render: ({ create, onChange, ...props }) => {
+                Render: ({ disabled, field, className }) => {
                     return (
                         <ButtonGroup className="w-full">
-                            <Input {...props} onChange={onChange} />
-                            {create && (
-                                <Button
-                                    type="button"
-                                    onClick={(e) => {
-                                        const child = e.currentTarget?.children[0] as HTMLInputElement | null;
-                                        child?.click();
+                            <Input
+                                onChange={(e) => field.handleChange(e.target.value)}
+                                readOnly={disabled}
+                                className={className}
+                                value={
+                                    field.state.value instanceof File
+                                        ? field.state.value.name
+                                        : (field.state.value ?? "")
+                                }
+                            />
+                            <Button
+                                type="button"
+                                onClick={(e) => {
+                                    const child = e.currentTarget?.children[0] as HTMLInputElement | null;
+                                    child?.click();
+                                }}
+                                disabled={disabled}
+                            >
+                                <Input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                        if (e.target.files) {
+                                            const file = e.target.files[0];
+                                            if (file) {
+                                                // TODO: Active bug in Tanstack: https://github.com/TanStack/form/issues/1932#issuecomment-3656323010
+                                                Object.defineProperties(file, {
+                                                    name: { value: file.name, enumerable: true },
+                                                    size: { value: file.size, enumerable: true },
+                                                    type: { value: file.type, enumerable: true },
+                                                });
+                                                field.handleChange(file);
+                                            }
+                                        }
+                                        e.currentTarget.value = "";
                                     }}
-                                >
-                                    <Input
-                                        type="file"
-                                        accept="image/*"
-                                        className="hidden"
-                                        onChange={(e) => {
-                                            onChange?.(e);
-                                            e.currentTarget.value = "";
-                                        }}
-                                    />
-                                    File
-                                </Button>
-                            )}
+                                />
+                                File
+                            </Button>
                         </ButtonGroup>
                     );
                 },
@@ -236,44 +363,42 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         ]),
     };
 
-    const allSessions = users?.flatMap((u) => u.sessions ?? []) ?? [];
-
     const UConfig: Config<User, TableTypes> = {
         TableType: "User",
-        $schema: userSchema,
+        methods: {
+            post: zUserCreate,
+            put: zUserUpdate,
+            delete: zDeleteUsersByIdData.shape.path,
+        },
         desc: "User CRUD",
         onSubmit: onSubmit<User, TableTypes>,
         fields: FieldConfigDefaults<User, TableTypes>([
-            { key: "id", disabled: true },
-            { key: "created_at", disabled: true },
-            { key: "updated_at", disabled: true },
+            { key: "id", disabled: () => true },
+            { key: "created_at", disabled: () => true },
+            { key: "updated_at", disabled: () => true },
             { key: "email" },
             { key: "username" },
             { key: "role" },
-            { key: "password" },
+            {
+                key: "password",
+            },
             {
                 key: "sessions",
                 exclude: true,
-                toSchemaType: (data) => (Array.isArray(data) ? data.map((d) => String((d as Session).id)) : []),
-                fromSchemaType: (value) =>
-                    Array.isArray(value)
-                        ? value.reduce((acc, id) => {
-                              const s = allSessions.find((sess) => sess.id === id);
-                              if (s) acc.push(s);
-                              return acc;
-                          }, [] as Session[])
-                        : [],
+                disabled: ({ isEditing, isSubmitting, create }) => isSubmitting || isEditing || create,
                 nested: {
                     TableType: "Session",
+                    saveOnSubmit: true,
                     desc: "Manage user sessions - deletes sesion directly",
-                    $schema: sessionSchema,
-                    disallowed_methods: { post: true, put: true },
+                    methods: {
+                        delete: zDeleteUsersSessionsByIdData.shape.path,
+                    },
                     onSubmit: onSubmit<Session, TableTypes>,
                     fields: FieldConfigDefaults<Session, TableTypes>([
-                        { key: "id", disabled: true },
-                        { key: "created_at", disabled: true },
-                        { key: "user_id", disabled: true },
-                        { key: "max_age", disabled: true },
+                        { key: "id", disabled: () => true },
+                        { key: "created_at", disabled: () => true },
+                        { key: "user_id", disabled: () => true },
+                        { key: "max_age", disabled: () => true },
                     ]),
                 },
             },
@@ -287,7 +412,8 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     <h2 className="text-xl font-semibold mb-2 w-full text-center">Products</h2>
                     {loaderData.products.error ? (
                         <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
-                            Failed to load products: {(loaderData.products.error as { detail: string }).detail}
+                            Failed to load products:{" "}
+                            {`${loaderData.products.error.type} - ${loaderData.products.error.detail}`}
                         </p>
                     ) : (
                         <TableGenerator data={products ?? []} config={PConfig} onSubmit={setProducts} />
@@ -297,7 +423,8 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     <h2 className="text-xl font-semibold mb-2 w-full text-center">Categories</h2>
                     {loaderData.categories.error ? (
                         <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
-                            Failed to load categories: {(loaderData.categories.error as { detail: string }).detail}
+                            Failed to load categories:{" "}
+                            {`${loaderData.categories.error.type} - ${loaderData.categories.error.detail}`}
                         </p>
                     ) : (
                         <TableGenerator data={categories ?? []} config={CConfig} onSubmit={setCategories} />
@@ -307,7 +434,8 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     <h2 className="text-xl font-semibold mb-2 w-full text-center">Images</h2>
                     {loaderData.images.error ? (
                         <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
-                            Failed to load images: {(loaderData.images.error as { detail: string }).detail}
+                            Failed to load images:{" "}
+                            {`${loaderData.images.error.type} - ${loaderData.images.error.detail}`}
                         </p>
                     ) : (
                         <TableGenerator data={images ?? []} config={IConfig} onSubmit={setImages} />
@@ -317,7 +445,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     <h2 className="text-xl font-semibold mb-2 w-full text-center">Users</h2>
                     {loaderData.users.error ? (
                         <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
-                            Failed to load users: {(loaderData.users.error as { detail: string }).detail}
+                            Failed to load users: {`${loaderData.users.error.type} - ${loaderData.users.error.detail}`}
                         </p>
                     ) : (
                         <TableGenerator data={users ?? []} config={UConfig} onSubmit={setUsers} />

@@ -1,6 +1,7 @@
 import { Sdk } from "./generated/sdk.gen";
 import { sessionCookie } from "@/cookies.server";
 import { createClient } from "./generated/client";
+import { ServerException } from "./errors";
 
 const getSdk = () => {
     try {
@@ -9,7 +10,10 @@ const getSdk = () => {
         const client = createClient({
             baseUrl: process.env.API_URL,
         });
-        client.interceptors.error.use(console.error);
+        client.interceptors.error.use((err, res, req, opt) => {
+            console.error(err, res, req, opt);
+            return err;
+        });
 
         return new Sdk({ client });
     }
@@ -34,3 +38,14 @@ export const applySessionCookie = async (
 
 
 export const sdk = getSdk();
+
+export async function forward(
+    call: () => Promise<{ data?: unknown; error?: unknown; response: Response; }>,
+): Promise<Response> {
+    const { data, error, response } = await call();
+    if (error) throw ServerException.fromJson(error);
+    const headers = await applySessionCookie(response.headers);
+    return data !== undefined
+        ? Response.json(data, { status: response.status, headers })
+        : new Response(null, { status: response.status, headers });
+}

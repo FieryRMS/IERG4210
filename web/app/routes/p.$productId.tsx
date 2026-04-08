@@ -17,6 +17,7 @@ import type { Product } from "@/lib/generated/types.gen";
 import { useCart } from "@/hooks/cart-provider";
 import { Img } from "@/components/img-wrapper";
 import { sdk, applyAuth } from "@/lib/server.utils";
+import { ServerNotFoundException } from "@/lib/errors";
 
 export function meta({ loaderData }: Route.MetaArgs) {
     return [
@@ -30,7 +31,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
         path: { product_id: params.productId },
         ...await applyAuth(request),
     });
-    if (error || !data) throw new Response("Not Found", { status: 404 });
+    if (error || !data) throw new ServerNotFoundException();
     return data;
 }
 

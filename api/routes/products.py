@@ -4,7 +4,7 @@ from fastapi import APIRouter, Request, status
 from sqlmodel import col, select
 
 from db import Category, Image, Product, ProductCreate, ProductUpdate
-from models import NotFoundException
+from models import ServerNotFoundException
 from models.app import State
 from .users import with_role
 
@@ -24,7 +24,7 @@ async def get_product(request: Request, product_id: uuid.UUID) -> Product:
     session = state["session"]
     product = session.get(Product, product_id)
     if not product:
-        raise NotFoundException
+        raise ServerNotFoundException
     return product
 
 
@@ -36,7 +36,7 @@ async def get_products_by_category(
     session = state["session"]
     category = session.get(Category, category_id)
     if not category:
-        raise NotFoundException
+        raise ServerNotFoundException
     return category.products
 
 
@@ -56,16 +56,16 @@ async def new_product(request: Request, product: ProductCreate) -> Product:
     return db_product
 
 
-@router.put("/{product_id}", status_code=status.HTTP_200_OK)
+@router.put("/", status_code=status.HTTP_200_OK)
 @with_role(["admin"])
 async def update_product(
-    request: Request, product_id: uuid.UUID, product: ProductUpdate
+    request: Request, product: ProductUpdate
 ) -> Product:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
-    db_product = session.get(Product, product_id)
+    db_product = session.get(Product, product.id)
     if not db_product:
-        raise NotFoundException
+        raise ServerNotFoundException
     db_product.update_model(product)
     images = session.exec(
         select(Image).where(col(Image.id).in_(product.images))
@@ -77,13 +77,13 @@ async def update_product(
     return db_product
 
 
-@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 @with_role(["admin"])
-async def delete_product(request: Request, product_id: uuid.UUID):
+async def delete_product(request: Request, id: uuid.UUID):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
-    product = session.get(Product, product_id)
+    product = session.get(Product, id)
     if not product:
-        raise NotFoundException
+        raise ServerNotFoundException
     session.delete(product)
     session.commit()

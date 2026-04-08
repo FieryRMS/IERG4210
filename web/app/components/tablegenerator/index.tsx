@@ -3,12 +3,15 @@ import { Check, Pencil, Plus, Trash, X } from "lucide-react";
 import { z } from "zod";
 import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
-import { cn, onChangeAsync } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { ServerValidationException } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { useState, useMemo, type JSX } from "react";
 import { type HTMLFormMethod } from "react-router";
 import { Spinner } from "@/components/ui/spinner";
 import { Drawer, DrawerClose, DrawerContent, DrawerPopup, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
+import type { AnyFieldApi, AnyFormApi } from "@tanstack/react-form";
+import { toast } from "sonner";
 
 type SchemaType = string | number | null | File | undefined | (string | number | null)[];
 
@@ -46,65 +49,76 @@ function ConfirmAnim({
     );
 }
 
-type FieldConfig<T, TableTypes extends string = string> = {
-    key: string;
-    name: string;
-    disabled: boolean;
-    render: (props: React.ComponentProps<typeof Input> & { create?: boolean }) => JSX.Element;
-    toSchemaType: (data: T) => SchemaType;
-    fromSchemaType: (value: SchemaType) => T;
-    file: boolean;
-    nested?: T extends (infer U)[] ? (U extends { id?: string } ? Config<U, TableTypes> : never) : never;
-    exclude?: boolean;
-};
+type FieldConfig<T extends { id?: string }, TableTypes extends string = string> = {
+    [K in keyof T]: {
+        key: K;
+        name: string;
+        disabled: (params: {
+            isEditing: boolean;
+            create: boolean;
+            isSubmitting: boolean;
+            methods: Config<T, TableTypes>["methods"];
+        }) => boolean;
+        Render: (props: {
+            create?: boolean;
+            disabled: boolean;
+            field: AnyFieldApi;
+            className?: string;
+            form: AnyFormApi;
+        }) => JSX.Element;
+        toSchemaType: (data: T[K]) => SchemaType;
+        fromSchemaType: (value: SchemaType) => T[K];
+        file: boolean;
+        nested?: T[K] extends (infer U)[]
+            ? U extends { id?: string }
+                ? Config<U, TableTypes> & { saveOnSubmit?: boolean }
+                : never
+            : never;
+        exclude?: boolean;
+    };
+}[keyof T];
 
-export type Config<
-    T extends { id?: string },
-    TableTypes extends string = string,
-    K extends keyof T & string = keyof T & string,
-> = {
+export type Config<T extends { id?: string }, TableTypes extends string = string, K extends keyof T = keyof T> = {
     TableType: TableTypes;
     desc: string;
-    disallowed_methods?: {
-        post?: boolean;
-        put?: boolean;
-        delete?: boolean;
+    methods: {
+        post?: z.ZodObject;
+        put?: z.ZodObject;
+        delete?: z.ZodObject;
     };
     onSubmit: (params: {
         config: Config<T, TableTypes, K>;
         method: HTMLFormMethod;
         value: Partial<Record<K, SchemaType>>;
     }) => T | Promise<T>;
-    fields: FieldConfig<T[K], TableTypes>[];
-    $schema: z.ZodType<Partial<Record<K, SchemaType>>, Partial<Record<K, SchemaType>>>;
+    fields: FieldConfig<T, TableTypes>[];
 };
 
 export function FieldConfigDefaults<
     T extends { id?: string },
     TableTypes extends string = string,
-    K extends keyof T & string = keyof T & string,
->(fields: (Partial<FieldConfig<T[K], TableTypes>> & { key: K })[]): FieldConfig<T[K], TableTypes>[] {
+    K extends keyof T = keyof T,
+>(fields: (Partial<FieldConfig<T, TableTypes>> & { key: K })[]): FieldConfig<T, TableTypes>[] {
     return fields.map((field) => ({
-        name: field.key,
-        disabled: false,
-        render: ({ create, ...props }) => {
-            void create;
-            return <Input {...props} />;
+        name: field.key as string,
+
+        disabled: ({ isEditing, create, isSubmitting, methods }) =>
+            (!isEditing && !create) || isSubmitting || methods.post === undefined,
+        Render: ({ disabled, field, className }) => {
+            return (
+                <Input
+                    type="text"
+                    inputMode="numeric"
+                    value={field.state.value ?? ""}
+                    name={field.name}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    className={className}
+                    readOnly={disabled}
+                />
+            );
         },
-        toSchemaType: (data) => {
-            if (Array.isArray(data))
-                return data.map((item) => {
-                    if (item === null || item === undefined) return null;
-                    if (typeof item === "object") return JSON.stringify(item);
-                    if (typeof item === "number") return item;
-                    return String(item);
-                });
-            if (data === null || data === undefined) return null;
-            if (typeof data === "object") return JSON.stringify(data);
-            if (typeof data === "number") return data;
-            return String(data);
-        },
-        fromSchemaType: (value) => value as T[K],
+        toSchemaType: (data) => data,
+        fromSchemaType: (value) => value,
         file: false,
         exclude: false,
         ...field,
@@ -126,10 +140,10 @@ function RowGenerator<
     create?: boolean;
     onSubmit: Config<T, TableTypes, K>["onSubmit"];
 }) {
-    const defaultValues: z.infer<typeof config.$schema> = useMemo(() => {
-        const values = {} as Record<K, SchemaType>;
+    const defaultValues = useMemo(() => {
+        const values = {} as Record<K, unknown>;
         config.fields.forEach((field) => {
-            values[field.key as K] = field.key in row ? field.toSchemaType(row[field.key as K]) : null;
+            if (field.key in row) values[field.key as K] = field.toSchemaType(row[field.key as K]);
         });
         return { ...values };
     }, [config, row]);
@@ -137,55 +151,99 @@ function RowGenerator<
     const [bState, setBState] = useState<
         "idle" | "edit" | "save" | "delete" | "create" | "ssubmit" | "dsubmit" | "csubmit"
     >("idle");
+    const state2method = (state: typeof bState): HTMLFormMethod | null => {
+        if (state === "ssubmit") return "put";
+        if (state === "dsubmit") return "delete";
+        if (state === "csubmit") return "post";
+        return null;
+    };
+    const method2schema = (method: ReturnType<typeof state2method>) => {
+        if (method === "post") return config.methods.post;
+        if (method === "put") return config.methods.put;
+        if (method === "delete") return config.methods.delete;
+        return null;
+    };
     const form = useAppForm({
         defaultValues,
         validators: {
-            onChangeAsync: onChangeAsync(config.$schema),
-            onChangeAsyncDebounceMs: 300,
-            onSubmit: ({ formApi }) => {
-                const errors = formApi.parseValuesWithSchema(config.$schema);
+            onChangeAsync: ({ formApi }) => {
+                let schema: z.ZodObject | undefined;
+                if (create) schema = config.methods.post;
+                else schema = config.methods.put;
+                if (!schema) return;
+                const errors = formApi.parseValuesWithSchema(schema);
                 if (!errors) return errors;
-                setBState((prev) => {
-                    if (prev === "dsubmit") return "idle";
-                    if (prev === "ssubmit") return "edit";
-                    if (prev === "csubmit") return "idle";
-                    return prev;
-                });
-                return errors;
+
+                const dirtyFields = Object.keys(formApi.fieldInfo).filter(
+                    (key) => formApi.getFieldMeta(key as keyof typeof formApi.fieldInfo)!.isDirty,
+                );
+                return {
+                    form: Object.fromEntries(Object.entries(errors.form).filter(([key]) => dirtyFields.includes(key))),
+                    fields: Object.fromEntries(
+                        Object.entries(errors.fields).filter(([key]) => dirtyFields.includes(key)),
+                    ),
+                };
+            },
+            onChangeAsyncDebounceMs: 300,
+            onSubmitAsync: async ({ formApi }) => {
+                const method = state2method(bState);
+                const schema = method2schema(method);
+                if (!schema || !method) {
+                    toast.error("Unexpected action: Report this to the developers!");
+                    return;
+                }
+                const errors = formApi.parseValuesWithSchema(schema);
+                const rollback = () =>
+                    setBState((prev) => {
+                        if (prev === "dsubmit") return "idle";
+                        if (prev === "ssubmit") return "edit";
+                        if (prev === "csubmit") return "idle";
+                        return prev;
+                    });
+
+                if (errors) {
+                    toast.error("Validation failed! Please check the form for errors.");
+                    rollback();
+                    return errors;
+                }
+                const value = schema.parse(formApi.state.values);
+
+                const dirtyFields = new Set(
+                    (Object.keys(formApi.fieldInfo) as Array<keyof typeof formApi.fieldInfo>)
+                        .filter(
+                            (key) =>
+                                formApi.getFieldMeta(key)?.isDirty &&
+                                !config.fields.find((field) => field.key === key)?.exclude,
+                        )
+                        .map(String),
+                );
+                const updatedValue: Partial<Record<K, SchemaType>> = {};
+                for (const key of Object.keys(value) as K[]) {
+                    if (dirtyFields.has(key) || (key === "id" && method !== "post")) {
+                        updatedValue[key] = value[key] as SchemaType;
+                    }
+                }
+
+                try {
+                    await onSubmit({ config, method, value: updatedValue });
+                } catch (e) {
+                    let ret: ServerValidationException["errors"] = {
+                        form: {
+                            _errors: [{ message: "Server Error", code: "SERVER_ERROR", path: [] }],
+                        },
+                        fields: {},
+                    };
+                    if (e instanceof ServerValidationException) {
+                        ret = e.errors;
+                    }
+                    rollback();
+                    return ret;
+                }
+                setBState("idle");
             },
         },
-        onSubmit: async ({ value, formApi }) => {
-            const methodMap: Partial<Record<typeof bState, HTMLFormMethod>> = {
-                csubmit: "post",
-                ssubmit: "put",
-                dsubmit: "delete",
-            };
-            const method = methodMap[bState]!;
-            const dirtyFields = new Set(
-                (Object.keys(formApi.fieldInfo) as Array<keyof typeof formApi.fieldInfo>)
-                    .filter(
-                        (key) =>
-                            formApi.getFieldMeta(key)?.isDirty &&
-                            !config.fields.find((field) => field.key === key)?.exclude,
-                    )
-                    .map(String),
-            );
-            const updatedValue: Partial<Record<K, SchemaType>> = {};
-            for (const key of Object.keys(value) as K[]) {
-                if (dirtyFields.has(key) || (key === "id" && method !== "post")) {
-                    updatedValue[key] = value[key];
-                }
-            }
-
-            // TODO: better error handling/pydantic to tanstack error translation
-            try {
-                await onSubmit({ config, method, value: updatedValue });
-            } catch {
-                form.reset();
-            }
-
-            setBState("idle");
-            form.reset(defaultValues);
+        onSubmit: () => {
+            form.reset();
         },
     });
     return (
@@ -193,54 +251,23 @@ function RowGenerator<
             <form onSubmit={(e) => e.preventDefault()} className={TableRow({}).props.className}>
                 {config.fields.map((fieldconfig, index) => (
                     <TableCell className="text-center" key={index}>
-                        <form.AppField name={fieldconfig.key}>
+                        <form.AppField name={String(fieldconfig.key)}>
                             {(field) => (
                                 <field.Control>
                                     <form.Item>
                                         {!fieldconfig.nested ? (
-                                            fieldconfig.render({
-                                                type: "text",
-                                                inputMode: "numeric",
-                                                value:
-                                                    field.state.value instanceof File
-                                                        ? field.state.value.name
-                                                        : String(field.state.value ?? ""),
-                                                name: fieldconfig.name,
-                                                onChange: (e) => {
-                                                    if (e.target.files) {
-                                                        const file = e.target.files[0];
-                                                        if (file) {
-                                                            // Active bug in Tanstack: https://github.com/TanStack/form/issues/1932#issuecomment-3656323010
-                                                            Object.defineProperties(file, {
-                                                                name: {
-                                                                    value: file.name,
-                                                                    enumerable: true,
-                                                                },
-                                                                size: {
-                                                                    value: file.size,
-                                                                    enumerable: true,
-                                                                },
-                                                                type: {
-                                                                    value: file.type,
-                                                                    enumerable: true,
-                                                                },
-                                                            });
-                                                            field.handleChange(file as typeof field.state.value);
-                                                            return;
-                                                        }
-                                                    }
-                                                    field.handleChange(e.target.value as typeof field.state.value);
-                                                },
-                                                className:
-                                                    "text-center read-only:opacity-80! border-primary/50 read-only:border-primary/10",
-                                                readOnly:
-                                                    (fieldconfig.file && !create) ||
-                                                    fieldconfig.disabled ||
-                                                    (!["edit", "save"].includes(bState) && !create) ||
-                                                    bState.includes("submit") ||
-                                                    (create && config.disallowed_methods?.post),
-                                                create,
-                                            })
+                                            <fieldconfig.Render
+                                                create={create}
+                                                disabled={fieldconfig.disabled({
+                                                    isEditing: ["edit", "save"].includes(bState),
+                                                    create: create || false,
+                                                    isSubmitting: bState.includes("submit"),
+                                                    methods: config.methods,
+                                                })}
+                                                field={field}
+                                                form={form}
+                                                className="text-center read-only:opacity-80! border-primary/50 read-only:border-primary/10"
+                                            />
                                         ) : (
                                             <Drawer swipeDirection="down" snapPoints={["65rem", 1]}>
                                                 <DrawerTrigger
@@ -248,13 +275,13 @@ function RowGenerator<
                                                         <Button
                                                             type="button"
                                                             variant="outline"
-                                                            className="text-center disabled:opacity-70! border-primary/50 disabled:border-primary/10 disabled:bg-transparent"
-                                                            disabled={
-                                                                fieldconfig.disabled ||
-                                                                (!["edit", "save"].includes(bState) && !create) ||
-                                                                bState.includes("submit") ||
-                                                                (create && config.disallowed_methods?.post)
-                                                            }
+                                                            className="text-center disabled:opacity-80! border-primary/50 disabled:border-primary/10 disabled:bg-transparent"
+                                                            disabled={fieldconfig.disabled({
+                                                                isEditing: ["edit", "save"].includes(bState),
+                                                                create: create || false,
+                                                                isSubmitting: bState.includes("submit"),
+                                                                methods: config.methods,
+                                                            })}
                                                         />
                                                     }
                                                 >
@@ -268,12 +295,7 @@ function RowGenerator<
                                                         </DrawerTitle>
 
                                                         <TableGenerator
-                                                            config={
-                                                                fieldconfig.nested as Config<
-                                                                    { id?: string },
-                                                                    TableTypes
-                                                                >
-                                                            }
+                                                            config={fieldconfig.nested}
                                                             data={
                                                                 fieldconfig.fromSchemaType(
                                                                     field.state.value as SchemaType,
@@ -286,6 +308,16 @@ function RowGenerator<
                                                                 field.handleChange(
                                                                     updatedValue as typeof field.state.value,
                                                                 );
+                                                                // @ts-expect-error it exists dont worry 🫩
+                                                                if (fieldconfig.nested?.saveOnSubmit) {
+                                                                    onSubmit({
+                                                                        config,
+                                                                        method: "put",
+                                                                        value: {
+                                                                            id: row.id,
+                                                                        } as Partial<Record<K, SchemaType>>,
+                                                                    });
+                                                                }
                                                             }}
                                                         />
 
@@ -316,14 +348,11 @@ function RowGenerator<
                                         type="button"
                                         onClick={() => {
                                             if (!isSubmitting && bState === "create" && canSubmit) {
-                                                form.handleSubmit();
                                                 setBState("csubmit");
+                                                form.handleSubmit();
                                             }
                                         }}
-                                        disabled={
-                                            bState.includes("submit") ||
-                                            (bState === "idle" && config.disallowed_methods?.post)
-                                        }
+                                        disabled={bState.includes("submit") || config.methods.post === undefined}
                                     >
                                         {["idle", "create"].includes(bState) && (
                                             <ConfirmAnim
@@ -344,15 +373,12 @@ function RowGenerator<
                                             type="button"
                                             onClick={() => {
                                                 if (!isSubmitting && bState === "save" && canSubmit) {
-                                                    form.handleSubmit();
                                                     setBState("ssubmit");
+                                                    form.handleSubmit();
                                                 }
                                                 setBState((prev) => (prev === "idle" ? "edit" : prev));
                                             }}
-                                            disabled={
-                                                bState.includes("submit") ||
-                                                (bState === "idle" && config.disallowed_methods?.put)
-                                            }
+                                            disabled={bState.includes("submit") || config.methods.put === undefined}
                                         >
                                             {["edit", "save"].includes(bState) && (
                                                 <ConfirmAnim
@@ -396,10 +422,7 @@ function RowGenerator<
                                                     form.reset();
                                                 }
                                             }}
-                                            disabled={
-                                                bState.includes("submit") ||
-                                                (bState === "idle" && config.disallowed_methods?.delete)
-                                            }
+                                            disabled={bState.includes("submit") || config.methods.delete === undefined}
                                         >
                                             {["idle", "delete"].includes(bState) && (
                                                 <ConfirmAnim
@@ -475,8 +498,9 @@ export function TableGenerator<
 
                             if (method === "put") {
                                 const next = data.map((row) =>
-                                    row.id === item.id ? ({ ...row, ...result, id: item.id } as T) : row,
+                                    row.id === item.id ? ({ ...row, ...result } as T) : row,
                                 );
+                                console.log({ next });
                                 onSubmit?.(next);
                             } else if (method === "delete") {
                                 const next = data.filter((row) => row.id !== item.id);

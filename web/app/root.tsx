@@ -30,6 +30,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { cstfTokenGenerator } from "@/lib/security.server";
 import { CsrfContext, UserContext } from "./context.server";
 import { sdk, applyAuth, applySessionCookie } from "./lib/server.utils";
+import { ServerException } from "./lib/errors";
+import { ErrorPage } from "@/components/error-page";
 
 const authMiddleware: Route.MiddlewareFunction = async ({ request, context }, next) => {
     const { data, response: sdkResponse } = await sdk.users.getUsersMe(await applyAuth(request));
@@ -169,31 +171,29 @@ export default function App() {
     return <Outlet />;
 }
 
-// TODO: use "empty" for a better error boundary UI
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-    let message = "Oops!";
-    let details = "An unexpected error occurred.";
+    let code: number | string = 500;
+    let title = "Something went wrong";
+    let description = "An unexpected error occurred.";
     let stack: string | undefined;
 
     if (isRouteErrorResponse(error)) {
-        message = error.status === 404 ? "404" : "Error";
-        details = error.status === 404 ? "The requested page could not be found." : error.statusText || details;
-    } else if (import.meta.env.DEV && error && error instanceof Error) {
-        details = error.message;
-        stack = error.stack;
+        code = error.status;
+        title = error.status === 404 ? "Page not found" : "Error";
+        description = error.status === 404
+            ? "The page you're looking for doesn't exist or has been moved."
+            : error.statusText || description;
+    } else if (error instanceof ServerException) {
+        code = error.code;
+        title = error.type;
+        description = error.detail;
+    } else if (error instanceof Error) {
+        title = error.name || title;
+        description = error.message;
+        if (import.meta.env.DEV) stack = error.stack;
     }
 
-    return (
-        <main className="pt-16 p-4 container mx-auto">
-            <h1>{message}</h1>
-            <p>{details}</p>
-            {stack && (
-                <pre className="w-full p-4 overflow-x-auto">
-                    <code>{stack}</code>
-                </pre>
-            )}
-        </main>
-    );
+    return <ErrorPage code={code} title={title} description={description} stack={stack} />;
 }
 
 export const handle: PageHandle = {

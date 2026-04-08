@@ -20,7 +20,7 @@ export function ProductCard({ product }: { product: Product }) {
             <Link to={`/p/${product.id}`} viewTransition style={product.id ? {} : { pointerEvents: "none" }}>
                 <AspectRatio ratio={3 / 4}>
                     <Img
-                        src={`${product?.images?.[0]?.url}?thumbnail=true`}
+                        src={`${product?.images?.[0]?.url}?resize`}
                         alt={product?.images?.[0]?.alt ?? product.name}
                         className="w-full h-full object-cover pointer-events-none select-none"
                         draggable={false}

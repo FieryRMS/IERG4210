@@ -9,12 +9,12 @@ from pydantic_partial import PartialModelMixin
 
 
 class CategoryCreate(PartialModelMixin, BaseModel):
-    name: str
+    name: str = Field(min_length=3)
     description: str | None = None
 
 
 class CategoryUpdate(CategoryCreate.as_partial(), BaseModel):
-    pass
+    id: uuid.UUID
 
 
 class Category(CategoryCreate, SQLModel, table=True):
@@ -36,7 +36,7 @@ class ImageCreate(PartialModelMixin, BaseModel):
 
 
 class ImageUpdate(ImageCreate.as_partial(), BaseModel):
-    pass
+    id: uuid.UUID
 
 
 class Image(ImageCreate, SQLModel, table=True):
@@ -49,8 +49,8 @@ class Image(ImageCreate, SQLModel, table=True):
 
 class _Product(BaseModel):
     catid: uuid.UUID = Field(foreign_key="categories.id", ondelete="CASCADE")
-    name: str
-    price: float
+    name: str = Field(min_length=3)
+    price: float = Field(gt=0)
     description: str | None = None
 
 
@@ -59,7 +59,7 @@ class ProductCreate(PartialModelMixin, _Product):
 
 
 class ProductUpdate(ProductCreate.as_partial(), BaseModel):
-    pass
+    id: uuid.UUID
 
 
 class Product(_Product, SQLModel, table=True):
