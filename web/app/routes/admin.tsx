@@ -238,7 +238,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                                 if (!image) return <> </>;
                                 return !create ? (
                                     <Img
-                                        src={`${image.url}?thumbnail=true`}
+                                        src={`${image.url}?resize`}
                                         alt="Image preview"
                                         className="h-20 w-20 object-cover m-auto rounded-md"
                                     />
@@ -305,7 +305,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     const src =
                         field.state.value instanceof File
                             ? URL.createObjectURL(field.state.value)
-                            : `${field.state.value}?thumbnail=true`;
+                            : `${field.state.value}?resize=0.1`;
                     return <Img src={src} alt="Image preview" className="h-20 w-20 object-cover m-auto rounded-md" />;
                 },
             },

@@ -113,7 +113,7 @@ export function FieldConfigDefaults<
                     name={field.name}
                     onChange={(e) => field.handleChange(e.target.value)}
                     className={className}
-                    disabled={disabled}
+                    readOnly={disabled}
                 />
             );
         },
