@@ -1,13 +1,9 @@
 import enum
 import uuid
 
-import re
-
 from argon2.exceptions import VerificationError
 from argon2 import PasswordHasher
-from pydantic import EmailStr, StringConstraints, computed_field
-from pydantic.functional_validators import AfterValidator
-from typing import Annotated
+from pydantic import EmailStr, computed_field, Field as PydanticField
 from sqlmodel import Field, Relationship
 from pydantic_partial import PartialModelMixin
 
@@ -17,25 +13,6 @@ import secrets
 from datetime import datetime, timezone
 
 _ph = PasswordHasher()
-
-
-def _validate_password(v: str) -> str:
-    if not re.search(r"[A-Z]", v):
-        raise ValueError("Must contain at least one uppercase letter")
-    if not re.search(r"[a-z]", v):
-        raise ValueError("Must contain at least one lowercase letter")
-    if not re.search(r"[0-9]", v):
-        raise ValueError("Must contain at least one number")
-    if not re.search(r"[^A-Za-z0-9]", v):
-        raise ValueError("Must contain at least one special character")
-    return v
-
-
-PasswordStr = Annotated[
-    str,
-    StringConstraints(min_length=8, max_length=100),
-    AfterValidator(_validate_password),
-]
 
 
 class Role(str, enum.Enum):
@@ -48,8 +25,16 @@ class _User(BaseModel):
     username: str = Field(unique=True)
 
 
-class UserCreate(PartialModelMixin, _User):
-    password: PasswordStr
+class PasswordMixin(BaseModel):
+    password: str = PydanticField(
+        min_length=8,
+        max_length=128,
+        pattern=r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]$",
+    )
+
+
+class UserCreate(PartialModelMixin, _User, PasswordMixin):
+    pass
 
 
 class UserUpdate(UserCreate.as_partial(), BaseModel):
@@ -58,14 +43,12 @@ class UserUpdate(UserCreate.as_partial(), BaseModel):
     pass
 
 
-class UserLogin(BaseModel):
+class UserLogin(PasswordMixin):
     username: str  # email or username
-    password: str
 
 
-class UserChangePassword(BaseModel):
+class UserChangePassword(PasswordMixin):
     old_password: str
-    password: PasswordStr
 
 
 class User(_User, SQLModel, table=True):

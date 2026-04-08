@@ -105,7 +105,7 @@ def custom_generate_unique_id(route: APIRoute):
     return f"{route.tags[0]}-{route.name}"
 
 
-errs: list[type[HTTPException]] = HTTPException.__subclasses__()
+errs: list[type[HTTPException]] = [*HTTPException.__subclasses__(), HTTPException]
 
 responses: dict[int | str, dict[str, Any]] = {
     err.status_code: {"description": err.desc, "model": err} for err in errs
@@ -123,9 +123,6 @@ app = FastAPI(
 async def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> Response:
-    state: State = request.state  # pyright: ignore[reportAssignmentType]
-    logger = state["logger"]
-    logger.error(f"Validation error: {exc.errors()}")
     errs = exc.errors()
     errdict: dict[str, list[Any]] = {}
     for err in errs:
@@ -156,13 +153,23 @@ async def validation_exception_handler(
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException) -> Response:
-    state: State = request.state  # pyright: ignore[reportAssignmentType]
-    logger = state["logger"]
-    logger.error(f"HTTP error: {exc}")
     adapter = TypeAdapter(exc.__class__)
     return Response(
         content=adapter.dump_json(exc),
         status_code=exc.status_code,
+        media_type="application/json",
+    )
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception) -> Response:
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    state["logger"].error(f"Unhandled exception: {exc}", exc_info=exc)
+    adapter = TypeAdapter(HTTPException)
+    obj = HTTPException()
+    return Response(
+        content=adapter.dump_json(obj),
+        status_code=obj.status_code,
         media_type="application/json",
     )
 

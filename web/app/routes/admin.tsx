@@ -42,6 +42,7 @@ import {
 import { XIcon } from "lucide-react";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import type { AnyFieldApi, AnyFormApi } from "@tanstack/react-form";
+import { HttpException } from "@/lib/errors";
 
 export type TableTypes = "Product" | "Category" | "Image" | "User" | "Session" | "Product Images";
 
@@ -159,11 +160,11 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             body: form,
         });
         if (!response.ok) {
-            const error = await response.text();
+            const error = HttpException.fromJson(await response.json().catch(() => null));
             toast.error(
-                `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.TableType}: ${error}`,
+                `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.TableType}: ${error.message}`,
             );
-            throw new Error(error);
+            throw error;
         }
         const responseData = response.status !== 204 ? await response.json() : null;
         toast.success(
@@ -176,8 +177,8 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         TableType: "Product",
         desc: "Product CRUD",
         methods: {
-            post: zProductCreate.extend({ price: z.coerce.number().positive() }),
-            put: zProductUpdate.extend({ price: z.coerce.number().positive().optional() }),
+            post: zProductCreate,
+            put: zProductUpdate,
             delete: zDeleteProductsByIdData.shape.path,
         },
         onSubmit: onSubmit<Product, TableTypes>,
@@ -287,7 +288,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         TableType: "Image",
         methods: {
             post: zImageCreate.extend({ url }),
-            put: zImageUpdate.extend({ url: url.optional() }),
+            put: zImageUpdate.extend({ url: url.nullish() }),
             delete: zDeleteImagesByIdData.shape.path,
         },
         desc: "Image CRUD",

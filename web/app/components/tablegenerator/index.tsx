@@ -4,12 +4,14 @@ import { z } from "zod";
 import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { HttpValidationException } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { useState, useMemo, type JSX } from "react";
 import { type HTMLFormMethod } from "react-router";
 import { Spinner } from "@/components/ui/spinner";
 import { Drawer, DrawerClose, DrawerContent, DrawerPopup, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import type { AnyFieldApi, AnyFormApi } from "@tanstack/react-form";
+import { toast } from "sonner";
 
 type SchemaType = string | number | null | File | undefined | (string | number | null)[];
 
@@ -183,61 +185,65 @@ function RowGenerator<
                 };
             },
             onChangeAsyncDebounceMs: 300,
-            onSubmit: ({ formApi }): ReturnType<typeof formApi.parseValuesWithSchema> => {
-                const schema = method2schema(state2method(bState));
-                if (!schema)
-                    return {
-                        fields: {},
-                        form: {
-                            form: [
-                                {
-                                    message: "Invalid method",
-                                },
-                            ],
-                        },
-                    };
+            onSubmitAsync: async ({ formApi }) => {
+                const method = state2method(bState);
+                const schema = method2schema(method);
+                if (!schema || !method) {
+                    toast.error("Unexpected action: Report this to the developers!");
+                    return;
+                }
                 const errors = formApi.parseValuesWithSchema(schema);
-                if (!errors) return;
-                setBState((prev) => {
-                    if (prev === "dsubmit") return "idle";
-                    if (prev === "ssubmit") return "edit";
-                    if (prev === "csubmit") return "idle";
-                    return prev;
-                });
-                console.log({ errors });
-                return errors;
+                const rollback = () =>
+                    setBState((prev) => {
+                        if (prev === "dsubmit") return "idle";
+                        if (prev === "ssubmit") return "edit";
+                        if (prev === "csubmit") return "idle";
+                        return prev;
+                    });
+
+                if (errors) {
+                    toast.error("Validation failed! Please check the form for errors.");
+                    rollback();
+                    return errors;
+                }
+                const value = schema.parse(formApi.state.values);
+
+                const dirtyFields = new Set(
+                    (Object.keys(formApi.fieldInfo) as Array<keyof typeof formApi.fieldInfo>)
+                        .filter(
+                            (key) =>
+                                formApi.getFieldMeta(key)?.isDirty &&
+                                !config.fields.find((field) => field.key === key)?.exclude,
+                        )
+                        .map(String),
+                );
+                const updatedValue: Partial<Record<K, SchemaType>> = {};
+                for (const key of Object.keys(value) as K[]) {
+                    if (dirtyFields.has(key) || (key === "id" && method !== "post")) {
+                        updatedValue[key] = value[key] as SchemaType;
+                    }
+                }
+
+                try {
+                    await onSubmit({ config, method, value: updatedValue });
+                } catch (e) {
+                    let ret: HttpValidationException["errors"] = {
+                        form: {
+                            _errors: [{ message: "Server Error", code: "SERVER_ERROR", path: [] }],
+                        },
+                        fields: {},
+                    };
+                    if (e instanceof HttpValidationException) {
+                        ret = e.errors;
+                    }
+                    rollback();
+                    return ret;
+                }
+                setBState("idle");
             },
         },
-        onSubmit: async ({ value, formApi }) => {
-            const method = state2method(bState);
-            const schema = method2schema(method);
-            if (!schema || !method) return;
-            value = schema.parse(value);
-            const dirtyFields = new Set(
-                (Object.keys(formApi.fieldInfo) as Array<keyof typeof formApi.fieldInfo>)
-                    .filter(
-                        (key) =>
-                            formApi.getFieldMeta(key)?.isDirty &&
-                            !config.fields.find((field) => field.key === key)?.exclude,
-                    )
-                    .map(String),
-            );
-            const updatedValue: Partial<Record<K, SchemaType>> = {};
-            for (const key of Object.keys(value) as K[]) {
-                if (dirtyFields.has(key) || (key === "id" && method !== "post")) {
-                    updatedValue[key] = value[key] as SchemaType;
-                }
-            }
-
-            // TODO: better error handling/pydantic to tanstack error translation
-            try {
-                await onSubmit({ config, method, value: updatedValue });
-            } catch {
-                form.reset();
-            }
-
-            setBState("idle");
-            form.reset(defaultValues);
+        onSubmit: () => {
+            form.reset();
         },
     });
     return (

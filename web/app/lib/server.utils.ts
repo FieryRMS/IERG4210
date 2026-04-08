@@ -9,7 +9,7 @@ const getSdk = () => {
         const client = createClient({
             baseUrl: process.env.API_URL,
         });
-        client.interceptors.error.use(console.error);
+        // client.interceptors.error.use(console.error);
 
         return new Sdk({ client });
     }

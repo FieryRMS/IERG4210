@@ -7,7 +7,7 @@ from typing import Any, ClassVar
 
 
 class BaseModel(_BaseModel):
-    model_config = ConfigDict(from_attributes=True, validate_assignment=True)
+    model_config = ConfigDict(from_attributes=True, validate_assignment=True, regex_engine='python-re')
     DISABLE_UPDATES: ClassVar[set[str]]
 
     def update_model(self, model: BaseModel, update: Mapping[str, Any] = {}):

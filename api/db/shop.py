@@ -9,7 +9,7 @@ from pydantic_partial import PartialModelMixin
 
 
 class CategoryCreate(PartialModelMixin, BaseModel):
-    name: str
+    name: str = Field(min_length=3)
     description: str | None = None
 
 
@@ -49,8 +49,8 @@ class Image(ImageCreate, SQLModel, table=True):
 
 class _Product(BaseModel):
     catid: uuid.UUID = Field(foreign_key="categories.id", ondelete="CASCADE")
-    name: str
-    price: float
+    name: str = Field(min_length=3)
+    price: float = Field(gt=0)
     description: str | None = None
 
 
