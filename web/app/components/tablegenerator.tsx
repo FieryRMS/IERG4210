@@ -209,7 +209,7 @@ function RowGenerator<
                 const value = schema.parse(formApi.state.values);
 
                 const dirtyFields = new Set(
-                    (Object.keys(formApi.fieldInfo) as Array<keyof typeof formApi.fieldInfo>)
+                    Object.keys(formApi.fieldInfo)
                         .filter(
                             (key) =>
                                 formApi.getFieldMeta(key)?.isDirty &&
@@ -500,7 +500,6 @@ export function TableGenerator<
                                 const next = data.map((row) =>
                                     row.id === item.id ? ({ ...row, ...result } as T) : row,
                                 );
-                                console.log({ next });
                                 onSubmit?.(next);
                             } else if (method === "delete") {
                                 const next = data.filter((row) => row.id !== item.id);

@@ -21,19 +21,19 @@ class Role(str, enum.Enum):
 
 
 class _User(BaseModel):
-    email: EmailStr = Field(unique=True)
     username: str = Field(unique=True)
+    email: EmailStr = Field(unique=True)
 
 
 class PasswordMixin(BaseModel):
     password: str = PydanticField(
         min_length=8,
         max_length=128,
-        pattern=r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]$",
+        pattern=r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$",
     )
 
 
-class UserCreate(PartialModelMixin, _User, PasswordMixin):
+class UserCreate(PasswordMixin, _User, PartialModelMixin):
     pass
 
 
@@ -43,12 +43,20 @@ class UserUpdate(UserCreate.as_partial(), BaseModel):
     pass
 
 
-class UserLogin(PasswordMixin):
+class _UsernameMixin(BaseModel):  # for ordering
     username: str  # email or username
 
 
-class UserChangePassword(PasswordMixin):
+class UserLogin(PasswordMixin, _UsernameMixin):
+    pass
+
+
+class _OldPasswordMixin(BaseModel):  # for ordering
     old_password: str
+
+
+class UserChangePassword(PasswordMixin, _OldPasswordMixin):
+    pass
 
 
 class User(_User, SQLModel, table=True):

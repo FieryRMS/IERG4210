@@ -45,7 +45,9 @@ export async function forward(
     const { data, error, response } = await call();
     if (error) throw ServerException.fromJson(error);
     const headers = await applySessionCookie(response.headers);
-    return data !== undefined
-        ? Response.json(data, { status: response.status, headers })
-        : new Response(null, { status: response.status, headers });
+    return data === undefined || [
+        204, 205, 304
+    ].includes(response.status) || response.status < 200
+        ? new Response(null, { status: response.status, headers })
+        : Response.json(data, { status: response.status, headers });
 }

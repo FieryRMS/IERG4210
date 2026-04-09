@@ -89,7 +89,6 @@ export default function handleRequest(
                     // errors encountered during initial shell rendering since they'll
                     // reject and get logged in handleDocumentRequest.
                     if (shellRendered) {
-                        console.error("Error during streaming render:", error);
                         console.error(error);
                     }
                 },
@@ -100,12 +99,12 @@ export default function handleRequest(
 
 export function handleError(error: unknown, { request }: LoaderFunctionArgs | ActionFunctionArgs) {
     if (!request.signal.aborted && !isRouteErrorResponse(error)) {
-        if (error instanceof ServerException) throw Response.json(error.toJson(), { status: error.code });
+        if (error instanceof ServerException) throw Response.json(error.toJson(), { status: error.constructor.code });
         else {
             console.error("Unexpected error in loader/action:", error);
             if (import.meta.env.DEV) throw error; // Let the error boundary handle it in development for better debugging
             const err = new ServerException();
-            throw Response.json(err.toJson(), { status: err.code });
+            throw Response.json(err.toJson(), { status: err.constructor.code });
         }
     }
 }

@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { FormValidateAsyncFn, StandardSchemaV1 } from "@tanstack/form-core";
+import { standardSchemaValidators, type StandardSchemaV1Issue } from "@tanstack/form-core";
+import type { ZodObject } from "zod";
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -15,21 +16,63 @@ export class EnumX {
         };
     }
 }
+function prefixSchemaToErrors(
+    issues: readonly StandardSchemaV1Issue[],
+    formValue: unknown,
+) {
+    const schema = new Map<string, StandardSchemaV1Issue[]>();
 
-export const onChangeAsync = <TFormData,>(schema: StandardSchemaV1<TFormData, unknown>): FormValidateAsyncFn<TFormData> => {
-    return ({ formApi }) => {
-        const errors = formApi.parseValuesWithSchema(schema);
-        if (!errors) return errors;
+    for (const issue of issues) {
+        const issuePath = issue.path ?? [];
 
-        const dirtyFields = Object.keys(formApi.fieldInfo).filter(
-            (key) => formApi.getFieldMeta(key as keyof typeof formApi.fieldInfo)!.isDirty,
-        );
-        return {
-            form: Object.fromEntries(Object.entries(errors.form).filter(([key]) => dirtyFields.includes(key))),
-            fields: Object.fromEntries(
-                Object.entries(errors.fields).filter(([key]) => dirtyFields.includes(key)),
-            ),
-        };
+        let currentFormValue = formValue;
+        let path = '';
+
+        for (let i = 0; i < issuePath.length; i++) {
+            const pathSegment = issuePath[i];
+            if (pathSegment === undefined) continue;
+
+            const segment =
+                typeof pathSegment === 'object' ? pathSegment.key : pathSegment;
+
+            // Standard Schema doesn't specify if paths should use numbers or stringified numbers for array access.
+            // However, if we follow the path it provides and encounter an array, then we can assume it's intended for array access.
+            const segmentAsNumber = Number(segment);
+            if (Array.isArray(currentFormValue) && !Number.isNaN(segmentAsNumber)) {
+                path += `[${segmentAsNumber}]`;
+            } else {
+                path += (i > 0 ? '.' : '') + String(segment);
+            }
+
+            if (typeof currentFormValue === 'object' && currentFormValue !== null) {
+                currentFormValue = currentFormValue[segment as never];
+            } else {
+                currentFormValue = undefined;
+            }
+        }
+        schema.set(path, (schema.get(path) ?? []).concat(issue));
+    }
+
+    return Object.fromEntries(schema);
+}
+
+export function parseWithSchema
+    ({ value, schema, fields = [] }: { value: unknown; schema: ZodObject; fields?: string[]; }): {
+        parsed: null;
+        errors: ReturnType<typeof standardSchemaValidators["validate"]>;
+    } | { parsed: unknown; errors: null; } {
+    const result = schema.safeParse(value);
+    if (result.success) {
+        return { parsed: Object.fromEntries(Object.entries(result.data).filter(([k]) => fields.length == 0 || fields.includes(k))), errors: null };
+    };
+    const errors = prefixSchemaToErrors(result.error.issues, value);
+    const issues = Object.fromEntries(Object.entries(errors).filter(([key]) => fields.length == 0 || fields.includes(key)));
+    return {
+        parsed: null,
+        errors: {
+            form: issues,
+            fields: issues,
+        }
     };
 };
 

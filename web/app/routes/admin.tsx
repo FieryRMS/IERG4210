@@ -13,7 +13,7 @@ import { CsrfContext, UserContext } from "@/context.server";
 import { sdk, applyAuth } from "@/lib/server.utils";
 import { TableGenerator, type Config, FieldConfigDefaults } from "@/components/tablegenerator";
 import { redirect } from "react-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     zCategoryCreate,
     zCategoryUpdate,
@@ -43,6 +43,8 @@ import { XIcon } from "lucide-react";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import type { AnyFieldApi, AnyFormApi } from "@tanstack/react-form";
 import { ServerException } from "@/lib/errors";
+import { useAuth } from "@/hooks/auth-provider";
+import { useNavigate } from "react-router";
 
 export type TableTypes = "Product" | "Category" | "Image" | "User" | "Session" | "Product Images";
 
@@ -139,6 +141,9 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     const [categories, setCategories] = useState(loaderData.categories.data ?? []);
     const [images, setImages] = useState(loaderData.images.data ?? []);
     const [users, setUsers] = useState(loaderData.users.data ?? []);
+    const { user } = useAuth();
+    const navigate = useNavigate();
+
     const imageMap = React.useMemo(() => {
         const map = new Map<unknown, Image>();
         images.forEach((img) => {
@@ -146,6 +151,12 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         });
         return map;
     }, [images]);
+
+    useEffect(() => {
+        if (user?.role !== "admin") {
+            navigate("/");
+        }
+    }, [user, navigate]);
 
     const onSubmit = async <
         T extends { id?: string },

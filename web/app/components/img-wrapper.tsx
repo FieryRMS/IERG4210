@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Skeleton } from "../ui/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 export function Img({ src, onLoad, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) {
     if (src === "") src = undefined;
     const [currSrc, setSrc] = useState<string | undefined>(undefined);
