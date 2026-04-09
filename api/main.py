@@ -107,15 +107,13 @@ def custom_generate_unique_id(route: APIRoute):
 
 errs: list[type[ServerException]] = [*ServerException.__subclasses__(), ServerException]
 
-responses: dict[int | str, dict[str, Any]] = {
-    err.STATUS_CODE: {"description": err.reason(), "model": err} for err in errs
-}
-
 app = FastAPI(
     lifespan=lifespan,
     debug=DEBUG,
     generate_unique_id=custom_generate_unique_id,
-    responses=responses,
+    responses={
+        err.STATUS_CODE: {"description": err.desc(), "model": err} for err in errs
+    },
 )
 
 

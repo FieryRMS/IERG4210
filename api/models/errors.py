@@ -15,13 +15,18 @@ class ValidationError(BaseModel):
 
 
 class FormValidationError(BaseModel):
-    form: dict[str, list[ValidationError]]
-    fields: dict[str, list[ValidationError]]
+    form: dict[str, list[ValidationError]] = Field(default_factory=dict)
+    fields: dict[str, list[ValidationError]] = Field(default_factory=dict)
 
 
 @dataclass(kw_only=True)
 class ServerException(Exception):
     STATUS_CODE: ClassVar[int] = status.HTTP_500_INTERNAL_SERVER_ERROR
+    detail: str = ""
+
+    def __post_init__(self):
+        if not self.detail:
+            self.detail = self.desc()
 
     @computed_field
     @property
@@ -33,18 +38,8 @@ class ServerException(Exception):
     def type(self) -> str:
         return self.__class__.__name__
 
-    @computed_field
-    @property
-    def detail(self) -> str:
-        return self._reason
-
-    @computed_field(alias="reason")
-    @property
-    def _reason(self) -> str:
-        return self.reason()
-
     @classmethod
-    def reason(cls) -> str:
+    def desc(cls) -> str:
         return http.client.responses.get(cls.STATUS_CODE, "Unknown Error")
 
 
@@ -75,5 +70,5 @@ class ServerMethodNotAllowedException(ServerException):
 
 @dataclass(kw_only=True)
 class ServerValidationException(ServerException):
-    STATUS_CODE: ClassVar[int] = status.HTTP_422_UNPROCESSABLE_ENTITY
-    errors: FormValidationError
+    STATUS_CODE: ClassVar[int] = status.HTTP_422_UNPROCESSABLE_CONTENT
+    errors: FormValidationError = Field(default_factory=FormValidationError)
