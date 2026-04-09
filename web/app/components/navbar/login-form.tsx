@@ -24,8 +24,8 @@ export type FormTypes = "login" | "register" | "change";
 
 const schemas: Record<FormTypes, typeof zUserLogin | typeof zUserCreate | typeof zUserChangePassword> = {
     login: zUserLogin,
-    register: zUserCreate.extend({ confirm_password: z.string() }),
-    change: zUserChangePassword.extend({ confirm_password: z.string() }),
+    register: zUserCreate,
+    change: zUserChangePassword,
 };
 
 export function LoginForm() {
@@ -94,6 +94,7 @@ export function LoginForm() {
                                 toast.error(`Failed to sign out: ${error.detail}`);
                                 return;
                             }
+                            toast.success("Signed out successfully!");
                             setUser(null);
                         }}
                     >
@@ -130,7 +131,16 @@ function Form({
     onCancel?: () => void;
 }) {
     const [submitError, setSubmitError] = useState<string | null>(null);
-    const schema = schemas[type];
+    const apiSchema = schemas[type];
+    const schema =
+        type === "login"
+            ? apiSchema
+            : (apiSchema as z.ZodObject<{ password: z.ZodString } & Record<string, z.ZodTypeAny>>)
+                  .extend({ confirm_password: z.string() })
+                  .refine((data) => data.password === data.confirm_password, {
+                      message: "Passwords do not match",
+                      path: ["confirm_password"],
+                  });
     const fields = schema.shape;
     const form = useAppForm({
         defaultValues: Object.fromEntries(Object.keys(fields).map((key) => [key, ""])) as z.infer<typeof schema>,
@@ -152,7 +162,7 @@ function Form({
                 const response = await fetch(`/api/me/${type}`, {
                     method: type === "change" ? "PUT" : "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(parsed),
+                    body: JSON.stringify(apiSchema.parse(parsed)),
                 });
                 console.log(response);
                 if (!response.ok) {
@@ -164,7 +174,9 @@ function Form({
                     if (error instanceof ServerValidationException) return error.errors;
                     return { form: { _error: error.detail } };
                 }
-                console.log(onSuccess);
+                toast.success(
+                    `${type === "change" ? "Password changed" : type === "login" ? "Logged in" : "Registered"} successfully!`,
+                );
                 onSuccess?.(await response.json().catch(() => null));
             },
         },
