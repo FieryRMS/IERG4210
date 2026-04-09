@@ -5,20 +5,16 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import dotenv
+import routes
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
-from sqlmodel import create_engine, Session as SQLSession
-from models.errors import ServerException
-from models.errors import *
+from models import *
 from pydantic import TypeAdapter
-import routes
-import routes.categories
-from models.app import State
+from sqlmodel import Session as SQLSession
+from sqlmodel import create_engine
 
 dotenv.load_dotenv()  # Load environment variables from .env file
-
-from db import *
 
 DEBUG = os.getenv("EXE_MODE", "prod") == "dev"
 POSTGRES_URL = os.getenv("POSTGRES_URL")
@@ -97,9 +93,12 @@ async def lifespan(app: FastAPI):
         EF = EndpointFilter(["/openapi.json"])
         logging.getLogger("uvicorn.access").addFilter(EF)
         state["logger"].addFilter(EF)
+        app.openapi() # check if openapi can be generated at startup
+    
+    state["logger"].info("API started")
     yield
     state["engine"].dispose()
-
+    state["logger"].info("API stopped")
 
 def custom_generate_unique_id(route: APIRoute):
     return f"{route.tags[0]}-{route.name}"

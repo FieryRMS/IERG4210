@@ -1,30 +1,21 @@
 import uuid
 from datetime import datetime, timedelta, timezone
-
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, status, Response
+from email_validator import EmailNotValidError, validate_email
+from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.security import APIKeyHeader
-from sqlalchemy.exc import IntegrityError
-from sqlmodel import select
-from email_validator import validate_email, EmailNotValidError
-
-from db import (
-    User,
-    UserCreate,
-    UserLogin,
-    UserUpdate,
-    Session as UserSession,
-    UserChangePassword,
-)
+from fastapi_decorators import depends
 from models import (
-    State,
     ServerBadRequestException,
+    ServerForbiddenException,
     ServerNotFoundException,
     ServerUnauthorizedException,
-    ServerForbiddenException,
 )
-from fastapi_decorators import depends
+from models import Session as UserSession
+from models import State, User, UserChangePassword, UserCreate, UserLogin, UserUpdate
+from sqlalchemy.exc import IntegrityError
+from sqlmodel import select
 
 router = APIRouter(prefix="/users", tags=["Users"])
 

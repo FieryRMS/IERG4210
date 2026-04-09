@@ -1,11 +1,17 @@
 import uuid
 
 from fastapi import APIRouter, Request, status
+from models import (
+    Category,
+    Image,
+    Product,
+    ProductCreate,
+    ProductUpdate,
+    ServerNotFoundException,
+    State,
+)
 from sqlmodel import col, select
 
-from db import Category, Image, Product, ProductCreate, ProductUpdate
-from models import ServerNotFoundException
-from models.app import State
 from .users import with_role
 
 router = APIRouter(prefix="/products", tags=["Products"])
@@ -46,9 +52,7 @@ async def new_product(request: Request, product: ProductCreate) -> Product:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
     db_product = Product.model_validate(product)
-    images = session.exec(
-        select(Image).where(col(Image.id).in_(product.images))
-    ).all()
+    images = session.exec(select(Image).where(col(Image.id).in_(product.images))).all()
     db_product.images = list(images)
     session.add(db_product)
     session.commit()
@@ -58,18 +62,14 @@ async def new_product(request: Request, product: ProductCreate) -> Product:
 
 @router.put("/", status_code=status.HTTP_200_OK)
 @with_role(["admin"])
-async def update_product(
-    request: Request, product: ProductUpdate
-) -> Product:
+async def update_product(request: Request, product: ProductUpdate) -> Product:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
     db_product = session.get(Product, product.id)
     if not db_product:
         raise ServerNotFoundException
     db_product.update_model(product)
-    images = session.exec(
-        select(Image).where(col(Image.id).in_(product.images))
-    ).all()
+    images = session.exec(select(Image).where(col(Image.id).in_(product.images))).all()
     db_product.images = list(images)
     session.add(db_product)
     session.commit()

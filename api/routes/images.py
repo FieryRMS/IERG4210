@@ -1,11 +1,9 @@
 import uuid
 
 from fastapi import APIRouter, Request, status
+from models import Image, ImageCreate, ImageUpdate, ServerNotFoundException, State
 from sqlmodel import select
 
-from db import Image, ImageCreate, ImageUpdate
-from models.app import State
-from models.errors import ServerNotFoundException
 from .users import with_role
 
 router = APIRouter(prefix="/images", tags=["Images"])

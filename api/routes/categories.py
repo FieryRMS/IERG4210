@@ -1,11 +1,15 @@
 import uuid
 
 from fastapi import APIRouter, Request, status
+from models import (
+    Category,
+    CategoryCreate,
+    CategoryUpdate,
+    ServerNotFoundException,
+    State,
+)
 from sqlmodel import select
 
-from db import Category, CategoryCreate, CategoryUpdate
-from models.app import State
-from models.errors import ServerNotFoundException
 from .users import with_role
 
 router = APIRouter(prefix="/categories", tags=["Categories"])
@@ -46,9 +50,7 @@ async def new_category(request: Request, category: CategoryCreate) -> Category:
 
 @router.put("/", status_code=status.HTTP_200_OK)
 @with_role(["admin"])
-async def update_category(
-    request: Request, category: CategoryUpdate
-) -> Category:
+async def update_category(request: Request, category: CategoryUpdate) -> Category:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
     db_category = session.get(Category, category.id)
