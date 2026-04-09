@@ -29,7 +29,7 @@ class PasswordMixin(BaseModel):
     password: str = PydanticField(
         min_length=8,
         max_length=128,
-        pattern=r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$",
+        pattern=r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).*",
     )
 
 
