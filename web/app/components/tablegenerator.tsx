@@ -209,7 +209,7 @@ function RowGenerator<
                 const value = schema.parse(formApi.state.values);
 
                 const dirtyFields = new Set(
-                    (Object.keys(formApi.fieldInfo) as Array<keyof typeof formApi.fieldInfo>)
+                    Object.keys(formApi.fieldInfo)
                         .filter(
                             (key) =>
                                 formApi.getFieldMeta(key)?.isDirty &&

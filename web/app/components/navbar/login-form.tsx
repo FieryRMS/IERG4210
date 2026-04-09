@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { onChangeAsync } from "@/lib/utils";
+import { parseWithSchema } from "@/lib/utils";
 import { useState } from "react";
 import { useAuth } from "@/hooks/auth-provider";
 import type { User } from "@/lib/generated/types.gen";
@@ -16,37 +16,17 @@ import { LayoutDashboard, LogOut } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../ui/item";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-const passwordRules = z
-    .string()
-    .min(8)
-    .max(100)
-    .regex(/[A-Z]/, "Must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Must contain at least one number")
-    .regex(/[^A-Za-z0-9]/, "Must contain at least one special character");
+import { zUserChangePassword, zUserCreate, zUserLogin } from "@/lib/generated/zod.gen";
+import { ServerException, ServerValidationException } from "@/lib/errors";
+import { toast } from "sonner";
 
 export type FormTypes = "login" | "register" | "change";
 
-const schema = z.discriminatedUnion("type", [
-    z.object({
-        type: z.literal("login"),
-        username: z.string(),
-        password: z.string(),
-    }),
-    z.object({
-        type: z.literal("register"),
-        username: z.string().min(2).max(50),
-        email: z.email(),
-        password: passwordRules,
-        confirm_password: z.string().min(8).max(100),
-    }),
-    z.object({
-        type: z.literal("change"),
-        old_password: z.string().min(1, "Required"),
-        password: passwordRules,
-        confirm_password: z.string(),
-    }),
-]);
+const schemas: Record<FormTypes, typeof zUserLogin | typeof zUserCreate | typeof zUserChangePassword> = {
+    login: zUserLogin,
+    register: zUserCreate.extend({ confirm_password: z.string() }),
+    change: zUserChangePassword.extend({ confirm_password: z.string() }),
+};
 
 export function LoginForm() {
     const { user, setUser } = useAuth();
@@ -99,7 +79,7 @@ export function LoginForm() {
                                 Change Password
                             </AccordionTrigger>
                             <AccordionContent className="flex flex-col gap-4 px-5">
-                                <Form type="change" />
+                                <Form type="change" onSuccess={setUser} />
                             </AccordionContent>
                         </AccordionItem>
                     </Accordion>
@@ -108,7 +88,12 @@ export function LoginForm() {
                         variant="destructive"
                         className="w-full gap-2"
                         onClick={async () => {
-                            await fetch("/api/users", { method: "DELETE" });
+                            const response = await fetch("/api/me", { method: "DELETE" });
+                            if (!response.ok) {
+                                const error = ServerException.fromJson(await response.json().catch(() => null));
+                                toast.error(`Failed to sign out: ${error.detail}`);
+                                return;
+                            }
                             setUser(null);
                         }}
                     >
@@ -145,34 +130,45 @@ function Form({
     onCancel?: () => void;
 }) {
     const [submitError, setSubmitError] = useState<string | null>(null);
-    const fields = schema.options.find((opt) => opt.shape.type.value === type)!.shape;
+    const schema = schemas[type];
+    const fields = schema.shape;
     const form = useAppForm({
-        defaultValues: Object.fromEntries(
-            Object.keys(fields).map((key) => (key === "type" ? [key, type] : [key, ""])),
-        ) as z.infer<typeof schema>,
+        defaultValues: Object.fromEntries(Object.keys(fields).map((key) => [key, ""])) as z.infer<typeof schema>,
         validators: {
-            onChangeAsync: onChangeAsync(schema),
+            onChangeAsync: async ({ value, formApi }) => {
+                const dirtyFields = Object.keys(formApi.fieldInfo).filter(
+                    (key) => formApi.getFieldMeta(key as keyof typeof formApi.fieldInfo)!.isDirty,
+                );
+                return parseWithSchema({ value, schema, fields: dirtyFields }).errors;
+            },
             onChangeAsyncDebounceMs: 300,
-            onSubmit: schema,
-        },
-        onSubmit: async ({ value }) => {
-            if ((value.type === "register" || value.type === "change") && value.password !== value.confirm_password) {
-                setSubmitError("Passwords do not match");
-                return;
-            }
-            setSubmitError(null);
-            const response = await fetch("/api/users", {
-                method: value.type === "change" ? "PUT" : "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(value),
-            });
-            if (response.ok) {
+            onSubmitAsync: async ({ value }) => {
+                setSubmitError(null);
+                const { parsed, errors } = parseWithSchema({ value, schema });
+                if (errors) {
+                    setSubmitError("Invalid input!");
+                    return errors;
+                }
+                const response = await fetch(`/api/me/${type}`, {
+                    method: type === "change" ? "PUT" : "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(parsed),
+                });
+                console.log(response);
+                if (!response.ok) {
+                    const error = ServerException.fromJson(await response.json().catch(() => null));
+                    toast.error(
+                        `Failed to ${type === "change" ? "change password" : type === "login" ? "login" : "register"}`,
+                    );
+                    setSubmitError(error.detail);
+                    if (error instanceof ServerValidationException) return error.errors;
+                    return { form: { _error: error.detail } };
+                }
+                console.log(onSuccess);
                 onSuccess?.(await response.json().catch(() => null));
-            } else {
-                const error = await response.json().catch(() => null);
-                setSubmitError(error?.detail?.[0]?.msg ?? error?.detail ?? `Failed to ${type.toLowerCase()}`);
-            }
+            },
         },
+        onSubmit: async () => {},
     });
 
     const submitLabel = type === "login" ? "Sign In" : type === "register" ? "Create Account" : "Update Password";

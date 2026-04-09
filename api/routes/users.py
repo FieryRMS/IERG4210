@@ -106,7 +106,7 @@ async def login(request: Request, response: Response, credentials: UserLogin) ->
 @with_session()
 async def logout(request: Request, response: Response, session: UserSession | None):
     if session is None:
-        raise ServerNotFoundException
+        return
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
     db_session.delete(session)
@@ -132,14 +132,14 @@ async def register(request: Request, response: Response, user: UserCreate) -> Us
     return db_user
 
 
-@router.put("/change-password", status_code=status.HTTP_200_OK)
+@router.put("/change-password", status_code=status.HTTP_204_NO_CONTENT)
 @with_session()
 async def change_password(
     request: Request,
     response: Response,
     password_data: UserChangePassword,
     session: UserSession | None,
-) -> User:
+):
     if session is None:
         raise ServerNotFoundException
     state: State = request.state  # pyright: ignore[reportAssignmentType]
@@ -155,7 +155,6 @@ async def change_password(
     db_session.refresh(user)
 
     _set_session_headers(response, None)
-    return user
 
 
 @router.get("/", status_code=status.HTTP_200_OK)

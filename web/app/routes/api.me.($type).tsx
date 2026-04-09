@@ -1,9 +1,8 @@
-import type { Route } from "./+types/api.users";
+import type { Route } from "./+types/api.me.($type)";
 import { sdk, applyAuth, forward } from "@/lib/server.utils";
 import { ServerBadRequestException, ServerMethodNotAllowedException } from "@/lib/errors";
-import type { FormTypes } from "@/components/navbar/login-form";
 
-export async function action({ request }: Route.ActionArgs) {
+export async function action({ request, params }: Route.ActionArgs) {
     if (!["POST", "DELETE", "PUT"].includes(request.method)) throw new ServerMethodNotAllowedException();
 
     const auth = await applyAuth(request);
@@ -12,8 +11,9 @@ export async function action({ request }: Route.ActionArgs) {
         return forward(() => sdk.users.deleteUsersMe(auth));
     }
 
-    const body = (await request.json()) as { type: FormTypes } & Record<string, string>;
-    const { type, username, password, email, old_password } = body;
+    const body = await request.json();
+    const type = params.type;
+    const { username, password, email, old_password } = body;
 
     if (type === "login" && username && password && request.method === "POST")
         return forward(() => sdk.users.postUsersMe({ ...auth, body: { username, password } }));
