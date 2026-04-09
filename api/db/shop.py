@@ -71,8 +71,46 @@ class Product(_Product, SQLModel, table=True):
         link_model=ImageProductLink,
         sa_relationship_kwargs={"lazy": "selectin"},
     )
+    order_links: list["OrderProductLink"] = Relationship(
+        back_populates="product", cascade_delete=True
+    )
 
     @computed_field(alias="images")
     @property
     def _images(self) -> list[Image]:
         return self.images
+
+
+class _ProductOrder(BaseModel):
+    product_id: uuid.UUID
+    count: int = Field(gt=0, le=10_000)
+
+
+class CreateOrder(BaseModel):
+    products: list[_ProductOrder] = Field(min_length=1)
+
+
+class DeleteOrder(BaseModel):
+    id: uuid.UUID
+
+
+class OrderProductLink(SQLModel, table=True):
+    order_id: uuid.UUID = Field(foreign_key="orders.id", primary_key=True)
+    product_id: uuid.UUID = Field(foreign_key="products.id", primary_key=True)
+
+    order: "Order" = Relationship(back_populates="product_links")
+    product: Product = Relationship(back_populates="order_links")
+
+    count: int = Field(gt=0, default=1)
+    price: float = Field(gt=0)  # price at the time of order, for record keeping
+
+
+class Order(SQLModel, table=True):
+    __tablename__ = "orders"  # pyright: ignore[reportAssignmentType]
+
+    user_id: uuid.UUID = Field(foreign_key="users.id", ondelete="CASCADE")
+    max_age: int = 60 * 60 * 24 * 7  # 7 days in seconds
+
+    product_links: list[OrderProductLink] = Relationship(
+        back_populates="order", cascade_delete=True
+    )
