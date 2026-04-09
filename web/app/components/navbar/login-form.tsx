@@ -164,11 +164,10 @@ function Form({
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(apiSchema.parse(parsed)),
                 });
-                console.log(response);
                 if (!response.ok) {
                     const error = ServerException.fromJson(await response.json().catch(() => null));
                     toast.error(
-                        `Failed to ${type === "change" ? "change password" : type === "login" ? "login" : "register"}`,
+                        `Failed to ${type === "change" ? "change password" : type === "login" ? "login" : "register"}: ${error.detail}`,
                     );
                     setSubmitError(error.detail);
                     if (error instanceof ServerValidationException) return error.errors;

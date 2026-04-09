@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, status, Response
 from fastapi.security import APIKeyHeader
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from email_validator import validate_email, EmailNotValidError
 
@@ -16,7 +17,13 @@ from db import (
     Session as UserSession,
     UserChangePassword,
 )
-from models import State, ServerNotFoundException, ServerUnauthorizedException
+from models import (
+    State,
+    ServerBadRequestException,
+    ServerNotFoundException,
+    ServerUnauthorizedException,
+    ServerForbiddenException,
+)
 from fastapi_decorators import depends
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -62,8 +69,10 @@ def with_session():
 def with_role(roles: list[str]):
     @with_session()
     def dependency(session: UserSession | None):
-        if session is None or session.user.role.value not in roles:
-            raise ServerUnauthorizedException()
+        if session is None:
+            raise ServerUnauthorizedException
+        if session.user.role.value not in roles:
+            raise ServerForbiddenException
 
     return depends(dependency)
 
@@ -91,7 +100,7 @@ async def login(request: Request, response: Response, credentials: UserLogin) ->
         ).first()
 
     if not db_user or not db_user.verify_password(credentials.password):
-        raise ServerUnauthorizedException()
+        raise ServerUnauthorizedException(detail="Invalid username/email or password")
 
     user_session = UserSession(user_id=db_user.id)
     session.add(user_session)
@@ -124,7 +133,16 @@ async def register(request: Request, response: Response, user: UserCreate) -> Us
     user_session = UserSession(user_id=db_user.id)
     session.add(db_user)
     session.add(user_session)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError as e:
+        session.rollback()
+        orig = str(e.orig).lower()
+        if "uq_users_username" in orig:
+            raise ServerBadRequestException(detail="Username is already taken")
+        if "uq_users_email" in orig:
+            raise ServerBadRequestException(detail="Email is already registered")
+        raise ServerBadRequestException
     session.refresh(db_user)
     session.refresh(user_session)
 
@@ -141,12 +159,14 @@ async def change_password(
     session: UserSession | None,
 ):
     if session is None:
-        raise ServerNotFoundException
+        raise ServerUnauthorizedException(
+            detail="You must be logged in to change your password"
+        )
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
     user = session.user
     if not user.verify_password(password_data.old_password):
-        raise ServerUnauthorizedException
+        raise ServerForbiddenException(detail="Old password is incorrect")
     user.set_password(password_data.password)
     db_session.add(user)
     for s in user.sessions:

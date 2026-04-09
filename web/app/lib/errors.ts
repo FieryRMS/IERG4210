@@ -9,16 +9,20 @@ import { StatusCodes, getReasonPhrase } from "http-status-codes";
 export class ServerException extends Error {
     static readonly code: number = StatusCodes.INTERNAL_SERVER_ERROR;
     readonly detail: string;
-    static subclasses: typeof ServerException[] = [];
+    static subclasses: Map<number | undefined, typeof ServerException> = new Map();
 
     declare ['constructor']: typeof ServerException;
+    static { this.register(this); }
 
     constructor(data?: { detail?: string; }) {
         super(data?.detail);
-        ServerException.subclasses.push(this.constructor);
 
         this.detail = data?.detail || this.constructor.desc();
         this.message = this.detail;
+    }
+
+    static register(cls: typeof ServerException) {
+        ServerException.subclasses.set(cls.code, cls);
     }
 
     static desc(): string {
@@ -37,8 +41,8 @@ export class ServerException extends Error {
         if (!json || typeof json !== "object") {
             return new ServerException();
         }
-        const { type } = json as { type?: string; };
-        const cls = ServerException.subclasses.find((c) => c.type() === type);
+        const { code } = json as { code?: number; };
+        const cls = ServerException.subclasses.get(code);
         if (!cls) {
             return new ServerException();
         }
@@ -48,26 +52,33 @@ export class ServerException extends Error {
 
 export class ServerBadRequestException extends ServerException {
     static override readonly code = StatusCodes.BAD_REQUEST;
+    static { this.register(this); }
 }
 
 export class ServerUnauthorizedException extends ServerException {
     static override readonly code = StatusCodes.UNAUTHORIZED;
+    static { this.register(this); }
 }
 
 export class ServerForbiddenException extends ServerException {
     static override readonly code = StatusCodes.FORBIDDEN;
+    static { this.register(this); }
 }
 export class ServerNotFoundException extends ServerException {
     static override readonly code = StatusCodes.NOT_FOUND;
+    static { this.register(this); }
 }
 
 export class ServerMethodNotAllowedException extends ServerException {
     static override readonly code = StatusCodes.METHOD_NOT_ALLOWED;
+    static { this.register(this); }
 }
 
 
 export class ServerValidationException extends ServerException {
     static override readonly code = StatusCodes.UNPROCESSABLE_ENTITY;
+    static { this.register(this); }
+
     readonly errors: FormValidationError;
 
     constructor(data?: { errors?: FormValidationError; detail?: string; }) {

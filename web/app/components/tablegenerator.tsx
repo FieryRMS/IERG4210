@@ -500,7 +500,6 @@ export function TableGenerator<
                                 const next = data.map((row) =>
                                     row.id === item.id ? ({ ...row, ...result } as T) : row,
                                 );
-                                console.log({ next });
                                 onSubmit?.(next);
                             } else if (method === "delete") {
                                 const next = data.filter((row) => row.id !== item.id);
