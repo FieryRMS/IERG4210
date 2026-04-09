@@ -2,6 +2,7 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { standardSchemaValidators, type StandardSchemaV1Issue } from "@tanstack/form-core";
 import type { ZodObject } from "zod";
+import type { $ZodIssue, ParseContext } from "zod/v4/core";
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -57,11 +58,11 @@ function prefixSchemaToErrors(
 }
 
 export function parseWithSchema
-    ({ value, schema, fields = [] }: { value: unknown; schema: ZodObject; fields?: string[]; }): {
+    ({ value, schema, fields = [], params }: { value: unknown; schema: ZodObject; fields?: string[]; params?: ParseContext<$ZodIssue>; }): {
         parsed: null;
         errors: ReturnType<typeof standardSchemaValidators["validate"]>;
     } | { parsed: unknown; errors: null; } {
-    const result = schema.safeParse(value);
+    const result = schema.safeParse(value, params);
     if (result.success) {
         return { parsed: Object.fromEntries(Object.entries(result.data).filter(([k]) => fields.length == 0 || fields.includes(k))), errors: null };
     };

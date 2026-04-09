@@ -142,6 +142,19 @@ function Form({
                       path: ["confirm_password"],
                   });
     const fields = schema.shape;
+    const errorMap: z.core.ParseContext<z.core.$ZodIssue> = {
+        error: (issue) => {
+            console.log({ issue }, "password" in (issue.path || []));
+            if (issue.code === "invalid_format" && issue.format === "regex" && issue.path?.includes("password")) {
+                console.log("hit");
+                return {
+                    message:
+                        "Must include uppercase, lowercase, number, and special character",
+                };
+            }
+            return undefined;
+        },
+    };
     const form = useAppForm({
         defaultValues: Object.fromEntries(Object.keys(fields).map((key) => [key, ""])) as z.infer<typeof schema>,
         validators: {
@@ -149,12 +162,21 @@ function Form({
                 const dirtyFields = Object.keys(formApi.fieldInfo).filter(
                     (key) => formApi.getFieldMeta(key as keyof typeof formApi.fieldInfo)!.isDirty,
                 );
-                return parseWithSchema({ value, schema, fields: dirtyFields }).errors;
+                return parseWithSchema({
+                    value,
+                    schema,
+                    fields: dirtyFields,
+                    params: errorMap,
+                }).errors;
             },
             onChangeAsyncDebounceMs: 300,
             onSubmitAsync: async ({ value }) => {
                 setSubmitError(null);
-                const { parsed, errors } = parseWithSchema({ value, schema });
+                const { parsed, errors } = parseWithSchema({
+                    value,
+                    schema,
+                    params: errorMap,
+                });
                 if (errors) {
                     setSubmitError("Invalid input!");
                     return errors;
