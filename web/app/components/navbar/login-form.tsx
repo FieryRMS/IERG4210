@@ -12,23 +12,22 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/auth-provider";
 import type { User } from "@/lib/generated/types.gen";
 import { Link } from "react-router";
-import { LayoutDashboard, LogOut } from "lucide-react";
+import { LayoutDashboard, LogOut, UserRound } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../ui/item";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { zUserChangePassword, zUserCreate, zUserLogin } from "@/lib/generated/zod.gen";
 import { ServerException, ServerValidationException } from "@/lib/errors";
 import { toast } from "sonner";
 
-export type FormTypes = "login" | "register" | "change";
+export type AuthFormType = "login" | "register" | "change";
 
-const schemas: Record<FormTypes, typeof zUserLogin | typeof zUserCreate | typeof zUserChangePassword> = {
+const schemas: Record<AuthFormType, typeof zUserLogin | typeof zUserCreate | typeof zUserChangePassword> = {
     login: zUserLogin,
     register: zUserCreate,
     change: zUserChangePassword,
 };
 
-export function LoginForm() {
+export function NavLoginForm() {
     const { user, setUser } = useAuth();
 
     if (user) {
@@ -41,7 +40,7 @@ export function LoginForm() {
 
         return (
             <div className="p-2 space-y-4">
-                <ItemGroup className="">
+                <ItemGroup>
                     <Item variant="outline" render={<a href="#" />} role="listitem">
                         <ItemMedia
                             variant="image"
@@ -73,16 +72,12 @@ export function LoginForm() {
                         </Link>
                     )}
 
-                    <Accordion className="w-full mx-auto space-y-2">
-                        <AccordionItem value="change-password" className="last:border-b border rounded-md">
-                            <AccordionTrigger className="py-3 px-5 text-base items-center">
-                                Change Password
-                            </AccordionTrigger>
-                            <AccordionContent className="flex flex-col gap-4 px-5">
-                                <Form type="change" onSuccess={setUser} />
-                            </AccordionContent>
-                        </AccordionItem>
-                    </Accordion>
+                    <Link to="/me">
+                        <Button variant="outline" className="w-full gap-2">
+                            <UserRound />
+                            My Account
+                        </Button>
+                    </Link>
 
                     <Button
                         variant="destructive"
@@ -112,21 +107,21 @@ export function LoginForm() {
                 <TabsTrigger value="login">Sign In</TabsTrigger>
                 <TabsTrigger value="register">Register</TabsTrigger>
             </TabsList>
-            {(["login", "register"] satisfies FormTypes[]).map((t) => (
+            {(["login", "register"] satisfies AuthFormType[]).map((t) => (
                 <TabsContent key={t} value={t} className="mt-4">
-                    <Form type={t} onSuccess={setUser} />
+                    <AuthForm type={t} onSuccess={setUser} />
                 </TabsContent>
             ))}
         </Tabs>
     );
 }
 
-function Form({
+export function AuthForm({
     type,
     onSuccess,
     onCancel,
 }: {
-    type: FormTypes;
+    type: AuthFormType;
     onSuccess?: (user: User | null) => void;
     onCancel?: () => void;
 }) {
@@ -144,13 +139,8 @@ function Form({
     const fields = schema.shape;
     const errorMap: z.core.ParseContext<z.core.$ZodIssue> = {
         error: (issue) => {
-            console.log({ issue }, "password" in (issue.path || []));
             if (issue.code === "invalid_format" && issue.format === "regex" && issue.path?.includes("password")) {
-                console.log("hit");
-                return {
-                    message:
-                        "Must include uppercase, lowercase, number, and special character",
-                };
+                return { message: "Must include uppercase, lowercase, number, and special character" };
             }
             return undefined;
         },
@@ -162,21 +152,12 @@ function Form({
                 const dirtyFields = Object.keys(formApi.fieldInfo).filter(
                     (key) => formApi.getFieldMeta(key as keyof typeof formApi.fieldInfo)!.isDirty,
                 );
-                return parseWithSchema({
-                    value,
-                    schema,
-                    fields: dirtyFields,
-                    params: errorMap,
-                }).errors;
+                return parseWithSchema({ value, schema, fields: dirtyFields, params: errorMap }).errors;
             },
             onChangeAsyncDebounceMs: 300,
             onSubmitAsync: async ({ value }) => {
                 setSubmitError(null);
-                const { parsed, errors } = parseWithSchema({
-                    value,
-                    schema,
-                    params: errorMap,
-                });
+                const { parsed, errors } = parseWithSchema({ value, schema, params: errorMap });
                 if (errors) {
                     setSubmitError("Invalid input!");
                     return errors;

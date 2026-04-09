@@ -36,7 +36,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Theme, useTheme } from "@/hooks/theme-provider";
-import { LoginForm } from "./login-form";
+import { NavLoginForm } from "./login-form";
 import { Badge } from "@/components/ui/badge";
 import { ButtonGroup } from "@/components/ui/button-group";
 import type { LocationState, PageHandle } from "@/types";
@@ -122,7 +122,7 @@ export function Navbar({ categories }: { categories: Category[] }) {
                         <UserRound />
                     </NavigationMenuTrigger>
                     <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
-                        <LoginForm />
+                        <NavLoginForm />
                     </NavigationMenuContent>
                 </NavigationMenuItem>
 
