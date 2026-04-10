@@ -23,7 +23,6 @@ export function ProductCard({ product }: { product: Product }) {
                         src={`${product?.images?.[0]?.url}?resize`}
                         alt={product?.images?.[0]?.alt ?? product.name}
                         className="w-full h-full object-cover pointer-events-none select-none"
-                        draggable={false}
                     />
                 </AspectRatio>
                 <CardHeader className="absolute w-full bottom-2 p-3">

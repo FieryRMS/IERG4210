@@ -75,6 +75,11 @@ class Order(OrderDetails, SQLModel, table=True):
             for link in self.product_links
         ]
 
+    @computed_field()
+    @property
+    def total_price(self) -> float:
+        return sum(link.price * link.count for link in self.product_links)
+
 
 __all__ = [
     "Order",

@@ -47,6 +47,17 @@ async def get_my_orders(request: Request, user: User) -> list[Order]:
     return list(session.exec(select(Order).where(Order.user_id == user.id)).all())
 
 
+@router.get("/me/{id}", status_code=status.HTTP_200_OK)
+@with_user()
+async def get_my_order(request: Request, id: uuid.UUID, user: User) -> Order:
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    session = state["session"]
+    order = session.get(Order, id)
+    if not order or order.user_id != user.id:
+        raise ServerNotFoundException
+    return order
+
+
 @router.post("/me", status_code=status.HTTP_201_CREATED)
 @with_user()
 async def create_my_order(request: Request, order: OrderCreate, user: User) -> Order:

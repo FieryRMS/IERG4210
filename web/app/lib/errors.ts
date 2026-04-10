@@ -74,6 +74,12 @@ export class ServerMethodNotAllowedException extends ServerException {
     static { this.register(this); }
 }
 
+export class ServerConflictException extends ServerException {
+    static override readonly code = StatusCodes.CONFLICT;
+    static { this.register(this); }
+}
+
+
 
 export class ServerValidationException extends ServerException {
     static override readonly code = StatusCodes.UNPROCESSABLE_ENTITY;

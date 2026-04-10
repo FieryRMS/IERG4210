@@ -1,5 +1,3 @@
-"use client";
-
 import { z } from "zod";
 import { useAppForm } from "@/components/ui/form-tanstack";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
