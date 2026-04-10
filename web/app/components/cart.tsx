@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Img } from "@/components/img-wrapper";
-import { useCart } from "@/hooks/cart-provider";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -20,16 +19,18 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Spinner } from "./ui/spinner";
+import type { CartProviderState } from "@/hooks/cart-provider";
 
 export function CartContents({
     children,
     variantItemMedia,
+    cart,
+    setQuantity,
+    clearCart,
 }: {
     children?: React.ReactNode;
     variantItemMedia?: Parameters<typeof ItemMedia>[0]["variant"];
-}) {
-    const { cart, addQuantity, removeQuantity, setQuantity, clearCart } = useCart();
-
+} & Partial<CartProviderState>) {
     if (!cart || Object.keys(cart.products).length === 0) {
         return (
             <div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
@@ -63,28 +64,31 @@ export function CartContents({
                             <ItemTitle className="line-clamp-1">{p.name}</ItemTitle>
                             <ItemDescription>HKD {p.price.toFixed(2)}</ItemDescription>
                         </ItemContent>
-                        <ItemContent className="flex-none self-center text-center gap-1">
+                        <ItemContent className="flex-none self-center text-center gap-1 items-center justify-center min-w-25">
                             <ButtonGroup>
-                                <Button variant="outline" aria-label="decrease" onClick={() => removeQuantity(p)}>
-                                    <MinusIcon />
-                                </Button>
+                                {setQuantity && (
+                                    <Button variant="outline" aria-label="decrease" onClick={() => setQuantity(p, -1)}>
+                                        <MinusIcon />
+                                    </Button>
+                                )}
                                 <Input
                                     className="w-12 text-center"
-                                    value={q}
+                                    defaultValue={q}
                                     key={q}
-                                    min={0}
-                                    max={100}
                                     onBlur={(e) => {
                                         const v = parseInt(e.target.value, 10);
-                                        setQuantity(p, isNaN(v) ? q : v);
+                                        setQuantity?.(p, isNaN(v) ? q : v);
                                     }}
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter") e.currentTarget.blur();
                                     }}
+                                    readOnly={!setQuantity}
                                 />
-                                <Button variant="outline" aria-label="increase" onClick={() => addQuantity(p)}>
-                                    <PlusIcon />
-                                </Button>
+                                {setQuantity && (
+                                    <Button variant="outline" aria-label="increase" onClick={() => setQuantity(p, 1)}>
+                                        <PlusIcon />
+                                    </Button>
+                                )}
                             </ButtonGroup>
                             <p className="text-sm font-medium text-center">HKD {(p.price * q).toFixed(2)}</p>
                         </ItemContent>
@@ -97,13 +101,18 @@ export function CartContents({
                 <div className="flex items-center gap-3">
                     <span>HKD {total.toFixed(2)}</span>
                     <AlertDialog>
-                        <AlertDialogTrigger
-                            render={
-                                <Button variant="outline" className=" text-muted-foreground hover:text-destructive" />
-                            }
-                        >
-                            <Trash2 />
-                        </AlertDialogTrigger>
+                        {clearCart && (
+                            <AlertDialogTrigger
+                                render={
+                                    <Button
+                                        variant="outline"
+                                        className=" text-muted-foreground hover:text-destructive"
+                                    />
+                                }
+                            >
+                                <Trash2 />
+                            </AlertDialogTrigger>
+                        )}
                         <AlertDialogContent>
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Clear cart?</AlertDialogTitle>

@@ -1,17 +1,16 @@
 import type { Route } from "./+types/checkout.($id)";
-import type { Order } from "@/lib/generated/types.gen";
+import type { Order, OrderWithProducts } from "@/lib/generated/types.gen";
 import type { PageHandle } from "@/types";
 import { redirect, useNavigate } from "react-router";
 import { useState } from "react";
 import { sdk, applyAuth } from "@/lib/server.utils";
 import { ServerException, ServerNotFoundException } from "@/lib/errors";
 import { UserContext } from "@/context.server";
-import { useCart } from "@/hooks/cart-provider";
+import { useCart, type CartProviderState } from "@/hooks/cart-provider";
 import { useAuth } from "@/hooks/auth-provider";
 import { zOrderCreate } from "@/lib/generated/zod.gen";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { CartContents } from "@/components/cart";
@@ -40,46 +39,46 @@ export default function CheckoutPage({ loaderData }: Route.ComponentProps) {
     return <CartView />;
 }
 
-function OrderView({ order }: { order: Order }) {
+function OrderView({ order }: { order: OrderWithProducts }) {
+    const productmap = new Map(order.products.map((p) => [p.id, p]));
+    const cart: CartProviderState["cart"] = {
+        ray_id: order.order.ray_id!,
+        products: Object.fromEntries(
+            order.order.products.map((p) => {
+                return [p.id, { p: productmap.get(p.id)!, q: p.count }];
+            }),
+        ),
+    };
     return (
-        <main className="container mx-auto max-w-2xl px-4 py-10">
+        <div className="container mx-auto max-w-2xl px-4 py-10">
             <Card>
                 <CardHeader>
-                    <div className="flex items-center justify-between gap-2">
-                        <CardTitle>Order Summary</CardTitle>
-                        <div className="flex gap-2">
-                            {order.paid ? <Badge>Paid</Badge> : <Badge variant="outline">Unpaid</Badge>}
-                        </div>
+                    <div className="flex gap-2">
+                        <CardTitle className="flex items-center justify-center">Order ID: {order.order.id}</CardTitle>
+                        {order.order.paid ? (
+                            <Badge variant="secondary" className="bg-blue-500 text-white dark:bg-blue-600">
+                                Paid
+                            </Badge>
+                        ) : (
+                            <Badge variant="destructive">Unpaid</Badge>
+                        )}
                     </div>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                    {order.products.map((item) => (
-                        <div key={item.id} className="flex items-center gap-3 text-sm">
-                            <p className="flex-1 font-mono text-muted-foreground truncate">{item.id}</p>
-                            <p className="text-muted-foreground shrink-0">× {item.count}</p>
-                            <p className="w-28 text-right font-medium shrink-0">
-                                HKD {(item.price * item.count).toFixed(2)}
-                            </p>
-                        </div>
-                    ))}
-                    <Separator />
-                    <div className="flex justify-between font-semibold">
-                        <span>Total</span>
-                        <span>HKD {order.price.toFixed(2)}</span>
-                    </div>
+                <CardContent>
+                    <CartContents variantItemMedia="default" cart={cart} />
                 </CardContent>
                 <CardFooter>
-                    <Button className="w-full" disabled>
+                    <Button className="w-full" disabled={!cart || Object.keys(cart.products).length === 0}>
                         Pay Now
                     </Button>
                 </CardFooter>
             </Card>
-        </main>
+        </div>
     );
 }
 
 function CartView() {
-    const { cart, clearCart } = useCart();
+    const { cart, setQuantity, clearCart } = useCart();
     const { user } = useAuth();
     const navigate = useNavigate();
     const [submitting, setSubmitting] = useState(false);
@@ -108,8 +107,10 @@ function CartView() {
             }
             const order: Order = await response.json();
             clearCart();
-            toast.success("Order placed!");
-            navigate(`/checkout/${order.id}`);
+            toast.success("Order placed! Redirecting...");
+            window.setTimeout(() => {
+                navigate(`/checkout/${order.id}`);
+            }, 1000);
         } catch {
             toast.error("Failed to place order");
         } finally {
@@ -118,13 +119,18 @@ function CartView() {
     }
 
     return (
-        <main className="container mx-auto max-w-2xl px-4 py-10">
+        <div className="container mx-auto max-w-2xl px-4 py-10">
             <Card>
                 <CardHeader>
                     <CardTitle>Your Cart</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <CartContents variantItemMedia="default" />
+                    <CartContents
+                        variantItemMedia="default"
+                        cart={cart}
+                        setQuantity={setQuantity}
+                        clearCart={clearCart}
+                    />
                 </CardContent>
                 <CardFooter>
                     <Button
@@ -136,6 +142,6 @@ function CartView() {
                     </Button>
                 </CardFooter>
             </Card>
-        </main>
+        </div>
     );
 }

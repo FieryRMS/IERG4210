@@ -44,7 +44,7 @@ export function Navbar({ categories }: { categories: Category[] }) {
     if (!location.state?.breadcrumbs?.length || location.state.breadcrumbs[0]?.pathname !== "/")
         breadcrumbs.unshift(root!);
 
-    const { cart } = useCart();
+    const { cart, clearCart, setQuantity } = useCart();
 
     return (
         <NavigationMenu className="max-w-full grid w-full grid-cols-3 items-center gap-x-2 px-4 py-2 sticky top-0">
@@ -131,7 +131,12 @@ export function Navbar({ categories }: { categories: Category[] }) {
                     </NavigationMenuTrigger>
                     <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
                         <div className="p-2">
-                            <CartContents variantItemMedia="image">
+                            <CartContents
+                                variantItemMedia="image"
+                                cart={cart}
+                                setQuantity={setQuantity}
+                                clearCart={clearCart}
+                            >
                                 <Link to="/checkout" viewTransition>
                                     <Button className="w-full mt-1">Checkout</Button>
                                 </Link>

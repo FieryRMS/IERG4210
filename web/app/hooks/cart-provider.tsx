@@ -7,18 +7,14 @@ const CartItemSchema = z.object({
     ray_id: z.string(),
 });
 type Product = z.infer<typeof zProduct>;
-type CartProviderState = {
+export type CartProviderState = {
     cart: z.infer<typeof CartItemSchema> | null;
-    addQuantity: (product: Product, quantity?: number) => void;
-    removeQuantity: (product: Product, quantity?: number) => void;
-    setQuantity: (product: Product, quantity: number) => void;
+    setQuantity: (product: Product, quantity?: number) => void;
     clearCart: () => void;
 };
 
 const CartProviderContext = createContext<CartProviderState>({
     cart: null,
-    addQuantity: () => null,
-    removeQuantity: () => null,
     setQuantity: () => null,
     clearCart: () => null,
 });
@@ -64,43 +60,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     const value: CartProviderState = {
         cart,
-        addQuantity: (product: Product, quantity: number = 1) => {
+        setQuantity: (product: Product, quantity?: number) => {
             setCart((prevCart) => {
                 if (!prevCart) return null; // not loaded yet
-                if (product.id === undefined) return prevCart; // shouldn't happen
+                if (product.id === undefined) return prevCart;
                 const newCart = structuredClone(prevCart);
-                const existingItem = newCart.products[product.id];
-                if (existingItem) {
-                    newCart.products[product.id] = { p: existingItem.p, q: existingItem.q + quantity };
-                } else {
-                    newCart.products[product.id] = { p: product, q: quantity };
+                if (quantity === undefined) {
+                    quantity = (newCart.products[product.id]?.q ?? 0) + 1;
                 }
-                saveCartToLocalStorage(newCart);
-                return newCart;
-            });
-        },
-        removeQuantity: (product: Product, quantity: number = 1) => {
-            setCart((prevCart) => {
-                if (!prevCart) return null; // not loaded yet
-                if (product.id === undefined) return prevCart; // shouldn't happen
-                const newCart = structuredClone(prevCart);
-                const existingItem = newCart.products[product.id];
-                if (existingItem) {
-                    if (existingItem.q - quantity <= 0) {
-                        delete newCart.products[product.id];
-                    } else {
-                        newCart.products[product.id] = { p: existingItem.p, q: existingItem.q - quantity };
-                    }
+                if (quantity < 0) {
+                    quantity = (newCart.products[product.id]?.q ?? 0) + quantity;
                 }
-                saveCartToLocalStorage(newCart);
-                return newCart;
-            });
-        },
-        setQuantity: (product: Product, quantity: number) => {
-            setCart((prevCart) => {
-                if (!prevCart) return null; // not loaded yet
-                if (product.id === undefined) return prevCart; // shouldn't happen
-                const newCart = structuredClone(prevCart);
                 if (quantity <= 0) {
                     delete newCart.products[product.id];
                 } else {

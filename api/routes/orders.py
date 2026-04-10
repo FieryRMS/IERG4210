@@ -7,6 +7,7 @@ from models import (
     OrderCreateProducts,
     OrderProductLink,
     OrderUpdate,
+    OrderWithProducts,
     Product,
     Role,
     ServerConflictException,
@@ -49,18 +50,22 @@ async def get_my_orders(request: Request, user: User) -> list[Order]:
 
 @router.get("/me/{id}", status_code=status.HTTP_200_OK)
 @with_user()
-async def get_my_order(request: Request, id: uuid.UUID, user: User) -> Order:
+async def get_my_order(
+    request: Request, id: uuid.UUID, user: User
+) -> OrderWithProducts:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
     order = session.get(Order, id)
     if not order or order.user_id != user.id:
         raise ServerNotFoundException
-    return order
+    return OrderWithProducts(order=order)
 
 
 @router.post("/me", status_code=status.HTTP_201_CREATED)
 @with_user()
-async def create_my_order(request: Request, order: OrderCreate, user: User) -> Order:
+async def create_my_order(
+    request: Request, order: OrderCreate, user: User
+) -> OrderWithProducts:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
     total_price = _validate_order_products(session, order.products)
@@ -68,7 +73,9 @@ async def create_my_order(request: Request, order: OrderCreate, user: User) -> O
         order, update={"price": total_price, "user_id": user.id}
     )
     db_order.product_links = [
-        OrderProductLink(product_id=op.id, price=op.price, count=op.count)
+        OrderProductLink(
+            order_id=db_order.id, product_id=op.id, price=op.price, count=op.count
+        )
         for op in order.products
     ]
     session.add(db_order)
@@ -78,7 +85,7 @@ async def create_my_order(request: Request, order: OrderCreate, user: User) -> O
         session.rollback()
         raise ServerConflictException(detail="Duplicate order for this request")
     session.refresh(db_order)
-    return db_order
+    return OrderWithProducts(order=db_order)
 
 
 @router.delete("/me/{id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -89,6 +96,8 @@ async def delete_my_order(request: Request, id: uuid.UUID, user: User):
     db_order = session.get(Order, id)
     if not db_order or db_order.user_id != user.id:
         raise ServerNotFoundException
+    if db_order.paid:
+        raise ServerConflictException(detail="Cannot delete a paid order")
     session.delete(db_order)
     session.commit()
 
@@ -109,7 +118,9 @@ async def create_order(request: Request, order: OrderCreate) -> Order:
     total_price = _validate_order_products(session, order.products)
     db_order = Order.model_validate(order, update={"price": total_price})
     db_order.product_links = [
-        OrderProductLink(product_id=op.id, price=op.price, count=op.count)
+        OrderProductLink(
+            order_id=db_order.id, product_id=op.id, price=op.price, count=op.count
+        )
         for op in order.products
     ]
     session.add(db_order)
@@ -134,7 +145,9 @@ async def update_order(request: Request, order: OrderUpdate) -> Order:
         total_price = _validate_order_products(session, order.products)
         db_order.update_model(order, update={"price": total_price})
         db_order.product_links = [
-            OrderProductLink(product_id=op.id, price=op.price, count=op.count)
+            OrderProductLink(
+                order_id=db_order.id, product_id=op.id, price=op.price, count=op.count
+            )
             for op in order.products
         ]
     else:

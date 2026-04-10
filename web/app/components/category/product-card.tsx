@@ -4,7 +4,7 @@ import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "@/components/link-wrapper";
-import type { Product } from"@/lib/generated/types.gen";
+import type { Product } from "@/lib/generated/types.gen";
 import { useCart } from "@/hooks/cart-provider";
 import { Img } from "@/components/img-wrapper";
 import { Skeleton } from "../ui/skeleton";
@@ -14,7 +14,7 @@ export function ProductCard({ product }: { product: Product }) {
     const cents = Math.round((product.price - dollars) * 100)
         .toString()
         .padStart(2, "0");
-    const { addQuantity: addToCart } = useCart();
+    const { setQuantity: addToCart } = useCart();
     return (
         <Card className="w-full max-w-sm p-0 relative overflow-hidden flex max-h-fit">
             <Link to={`/p/${product.id}`} viewTransition style={product.id ? {} : { pointerEvents: "none" }}>

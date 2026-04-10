@@ -1,15 +1,12 @@
 import enum
 import uuid
-from typing import TYPE_CHECKING
 
 from pydantic import computed_field
 from pydantic_partial import PartialModelMixin
 from sqlmodel import Field, Relationship, UniqueConstraint
 
 from .base import BaseModel, SQLModel
-
-if TYPE_CHECKING:
-    from .products import Product
+from .products import Product
 
 
 class Currency(str, enum.Enum):
@@ -44,15 +41,20 @@ class OrderUpdate(OrderCreate.as_partial(), BaseModel):
 
 
 class OrderProductLink(OrderProductDetails, SQLModel, table=True):
-    order_id: uuid.UUID | None = Field(
-        default=None, foreign_key="orders.id", primary_key=True
-    )
-    product_id: uuid.UUID | None = Field(
-        default=None, foreign_key="products.id", primary_key=True
-    )
+    order_id: uuid.UUID = Field(foreign_key="orders.id", primary_key=True)
+    product_id: uuid.UUID = Field(foreign_key="products.id", primary_key=True)
 
     order: "Order" = Relationship(back_populates="product_links")
     product: "Product" = Relationship(back_populates="order_links")
+
+
+class OrderWithProducts(BaseModel):
+    order: Order
+
+    @computed_field()
+    @property
+    def products(self) -> list["Product"]:
+        return [link.product for link in self.order.product_links]
 
 
 class Order(OrderDetails, SQLModel, table=True):
@@ -71,7 +73,7 @@ class Order(OrderDetails, SQLModel, table=True):
     @property
     def products(self) -> list[ProductOrder]:
         return [
-            ProductOrder.model_validate(link.product.model_dump() | link.model_dump())
+            ProductOrder(id=link.product_id, count=link.count, price=link.price)
             for link in self.product_links
         ]
 
@@ -88,4 +90,5 @@ __all__ = [
     "OrderProductLink",
     "ProductOrder",
     "OrderCreateProducts",
+    "OrderWithProducts",
 ]
