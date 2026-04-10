@@ -184,8 +184,8 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
             ? "The page you're looking for doesn't exist or has been moved."
             : error.statusText || description;
     } else if (error instanceof ServerException) {
-        code = error.code;
-        title = error.type;
+        code = error.constructor.code;
+        title = error.name;
         description = error.detail;
     } else if (error instanceof Error) {
         title = error.name || title;

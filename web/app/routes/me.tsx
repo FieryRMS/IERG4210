@@ -3,7 +3,6 @@
 import type { Route } from "./+types/me";
 import type { PageHandle } from "@/types";
 import { redirect } from "react-router";
-import { sdk, applyAuth } from "@/lib/server.utils";
 import { useAuth } from "@/hooks/auth-provider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +15,7 @@ import { ShoppingCart, User as UserIcon, Settings, CalendarDays, Mail, Shield } 
 import { AuthForm } from "@/components/navbar/login-form";
 import React from "react";
 import type { User } from "@/lib/generated/types.gen";
+import { UserContext } from "@/context.server";
 
 export const handle: PageHandle<Route.ComponentProps["loaderData"]> = {
     breadcrumb: () => ({ pathname: "/me", name: "My Account" }),
@@ -25,9 +25,8 @@ export function meta() {
     return [{ title: "My Account | The Generic Company" }];
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
-    const auth = await applyAuth(request);
-    const { data: user } = await sdk.users.getUsersMe(auth);
+export async function loader({ context }: Route.LoaderArgs) {
+    const user = context.get(UserContext);
     if (!user) throw redirect("/");
     return { user };
 }
