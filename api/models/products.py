@@ -7,10 +7,11 @@ from sqlmodel import Field, Relationship
 
 from .base import BaseModel, SQLModel
 from .images import Image
-from .links import ImageProductLink, OrderProductLink
+from .links import ImageProductLink
 
 if TYPE_CHECKING:
     from .categories import Category
+    from .orders import OrderProductLink
 
 
 

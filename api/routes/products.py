@@ -7,12 +7,13 @@ from models import (
     Product,
     ProductCreate,
     ProductUpdate,
+    Role,
     ServerNotFoundException,
     State,
 )
 from sqlmodel import col, select
 
-from .users import with_role
+from .users import with_user
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
@@ -47,12 +48,14 @@ async def get_products_by_category(
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-@with_role(["admin"])
+@with_user(roles=[Role.admin])
 async def new_product(request: Request, product: ProductCreate) -> Product:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
     db_product = Product.model_validate(product)
     images = session.exec(select(Image).where(col(Image.id).in_(product.images))).all()
+    if len(images) != len(product.images):
+        raise ServerNotFoundException(detail="One or more images not found")
     db_product.images = list(images)
     session.add(db_product)
     session.commit()
@@ -61,7 +64,7 @@ async def new_product(request: Request, product: ProductCreate) -> Product:
 
 
 @router.put("/", status_code=status.HTTP_200_OK)
-@with_role(["admin"])
+@with_user(roles=[Role.admin])
 async def update_product(request: Request, product: ProductUpdate) -> Product:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
@@ -70,6 +73,8 @@ async def update_product(request: Request, product: ProductUpdate) -> Product:
         raise ServerNotFoundException
     db_product.update_model(product)
     images = session.exec(select(Image).where(col(Image.id).in_(product.images))).all()
+    if len(images) != len(product.images):
+        raise ServerNotFoundException(detail="One or more images not found")
     db_product.images = list(images)
     session.add(db_product)
     session.commit()
@@ -78,7 +83,7 @@ async def update_product(request: Request, product: ProductUpdate) -> Product:
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
-@with_role(["admin"])
+@with_user(roles=[Role.admin])
 async def delete_product(request: Request, id: uuid.UUID):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]

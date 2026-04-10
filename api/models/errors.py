@@ -69,6 +69,11 @@ class ServerMethodNotAllowedException(ServerException):
 
 
 @dataclass(kw_only=True)
+class ServerConflictException(ServerException):
+    STATUS_CODE: ClassVar[int] = status.HTTP_409_CONFLICT
+
+
+@dataclass(kw_only=True)
 class ServerValidationException(ServerException):
     STATUS_CODE: ClassVar[int] = status.HTTP_422_UNPROCESSABLE_CONTENT
     errors: FormValidationError = Field(default_factory=FormValidationError)
@@ -81,5 +86,6 @@ __all__ = [
     "ServerForbiddenException",
     "ServerNotFoundException",
     "ServerMethodNotAllowedException",
+    "ServerConflictException",
     "ServerValidationException",
 ]

@@ -5,12 +5,13 @@ from models import (
     Category,
     CategoryCreate,
     CategoryUpdate,
+    Role,
     ServerNotFoundException,
     State,
 )
 from sqlmodel import select
 
-from .users import with_role
+from .users import with_user
 
 router = APIRouter(prefix="/categories", tags=["Categories"])
 
@@ -37,7 +38,7 @@ async def get_category(request: Request, category_id: uuid.UUID) -> Category:
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-@with_role(["admin"])
+@with_user(roles=[Role.admin])
 async def new_category(request: Request, category: CategoryCreate) -> Category:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
@@ -49,7 +50,7 @@ async def new_category(request: Request, category: CategoryCreate) -> Category:
 
 
 @router.put("/", status_code=status.HTTP_200_OK)
-@with_role(["admin"])
+@with_user(roles=[Role.admin])
 async def update_category(request: Request, category: CategoryUpdate) -> Category:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
@@ -64,7 +65,7 @@ async def update_category(request: Request, category: CategoryUpdate) -> Categor
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
-@with_role(["admin"])
+@with_user(roles=[Role.admin])
 async def delete_category(request: Request, id: uuid.UUID):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]

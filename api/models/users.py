@@ -115,4 +115,5 @@ __all__ = [
     "UserUpdate",
     "UserLogin",
     "UserChangePassword",
+    "Role",
 ]
