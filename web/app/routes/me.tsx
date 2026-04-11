@@ -2,7 +2,7 @@
 
 import type { Route } from "./+types/me";
 import type { PageHandle } from "@/types";
-import { redirect } from "react-router";
+import { Link, redirect } from "react-router";
 import { useAuth } from "@/hooks/auth-provider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,8 @@ import { AuthForm } from "@/components/navbar/login-form";
 import React from "react";
 import type { User } from "@/lib/generated/types.gen";
 import { UserContext } from "@/context.server";
+import { applyAuth, sdk } from "@/lib/server.utils";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 
 export const handle: PageHandle<Route.ComponentProps["loaderData"]> = {
     breadcrumb: () => ({ pathname: "/me", name: "My Account" }),
@@ -25,10 +27,12 @@ export function meta() {
     return [{ title: "My Account | The Generic Company" }];
 }
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
     const user = context.get(UserContext);
+    const auth = await applyAuth(request);
+    const { data } = await sdk.orders.getOrdersMe(auth);
     if (!user) throw redirect("/");
-    return { user };
+    return { user, orders: data };
 }
 
 export default function MePage({ loaderData }: Route.ComponentProps) {
@@ -127,17 +131,50 @@ export default function MePage({ loaderData }: Route.ComponentProps) {
                 <TabsContent value="orders">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Cart</CardTitle>
-                            <CardDescription>Your shopping cart. Checkout coming soon.</CardDescription>
+                            <CardTitle>Orders</CardTitle>
+                            <CardDescription>Manage your orders.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="flex flex-col items-center gap-4 py-10 text-muted-foreground">
-                                <ShoppingCart className="size-12 opacity-30" />
-                                <p className="text-sm">Cart functionality coming soon.</p>
-                                <Button variant="outline" disabled>
-                                    View Cart
-                                </Button>
-                            </div>
+                            {loaderData.orders ? (
+                                <ItemGroup className="gap-4">
+                                    {loaderData.orders.map((order) => (
+                                        <Item variant="outline" key={order.id}>
+                                            <ItemMedia variant="default" className="self-center! translate-y-0!">
+                                                {order.paid ? (
+                                                    <Badge
+                                                        variant="secondary"
+                                                        className="bg-blue-500 text-white dark:bg-blue-600"
+                                                    >
+                                                        Paid
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="destructive">Unpaid</Badge>
+                                                )}
+                                            </ItemMedia>
+                                            <ItemContent>
+                                                <ItemTitle>
+                                                    {new Date(order.created_at!).toLocaleString()} -{" "}
+                                                    {order.products.length} item(s) - {order.price.toFixed(2)}{" "}
+                                                    {order.currency!.toUpperCase()}
+                                                </ItemTitle>
+                                                <ItemDescription>{order.id}</ItemDescription>
+                                            </ItemContent>
+                                            <ItemActions>
+                                                <Link to={`/checkout/${order.id}`}>
+                                                    <Button variant="outline">
+                                                        <ShoppingCart />
+                                                    </Button>
+                                                </Link>
+                                            </ItemActions>
+                                        </Item>
+                                    ))}
+                                </ItemGroup>
+                            ) : (
+                                <div className="flex flex-col items-center gap-4 py-10 text-muted-foreground">
+                                    <ShoppingCart className="size-12 opacity-30" />
+                                    <p className="text-sm">You have no orders yet.</p>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>

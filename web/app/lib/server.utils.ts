@@ -10,10 +10,10 @@ const getSdk = () => {
         const client = createClient({
             baseUrl: process.env.API_URL,
         });
-        client.interceptors.error.use((err, res, req, opt) => {
-            console.error(err, res, req, opt);
-            return err;
-        });
+        // client.interceptors.error.use((err, res, req, opt) => {
+        //     console.error(err, res, req, opt);
+        //     return err;
+        // });
 
         return new Sdk({ client });
     }
@@ -43,7 +43,7 @@ export async function forward(
     call: () => Promise<{ data?: unknown; error?: unknown; response: Response; }>,
 ): Promise<Response> {
     const { data, error, response } = await call();
-    if (error) throw ServerException.fromJson(error);
+    if (error) throw ServerException.fromJson(error).toResponse();
     const headers = await applySessionCookie(response.headers);
     return data === undefined || [
         204, 205, 304

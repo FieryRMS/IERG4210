@@ -1,11 +1,7 @@
-import { ErrorPage } from "@/components/error-page";
+import { ServerNotFoundException } from "@/lib/errors";
 
-export default function NotFound() {
-    return (
-        <ErrorPage
-            code={404}
-            title="Page not found"
-            description="The page you're looking for doesn't exist or has been moved."
-        />
-    );
+export function loader() {
+    throw new ServerNotFoundException().toResponse();
 }
+
+export default function NotFoundPage() {}

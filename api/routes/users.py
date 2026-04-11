@@ -60,14 +60,14 @@ def with_session():
 
 def with_user(*, roles: list[Role] = []):
     @with_session()
-    def dependency(session: UserSession | None) -> User:
+    def dependency(session: UserSession | None) -> UserSession:
         if session is None:
             raise ServerUnauthorizedException
         if len(roles) > 0 and session.user.role.value not in roles:
             raise ServerForbiddenException
-        return session.user
+        return session
 
-    return depends(user=dependency)
+    return depends(session=dependency)
 
 
 @router.get("/me", status_code=status.HTTP_200_OK)
@@ -93,7 +93,7 @@ async def login(request: Request, response: Response, credentials: UserLogin) ->
         ).first()
 
     if not db_user or not db_user.verify_password(credentials.password):
-        raise ServerUnauthorizedException(detail="Invalid username/email or password")
+        raise ServerUnauthorizedException(message="Invalid username/email or password")
 
     user_session = UserSession(user_id=db_user.id)
     session.add(user_session)
@@ -132,9 +132,9 @@ async def register(request: Request, response: Response, user: UserCreate) -> Us
         session.rollback()
         orig = str(e.orig).lower()
         if "uq_users_username" in orig:
-            raise ServerBadRequestException(detail="Username is already taken")
+            raise ServerBadRequestException(message="Username is already taken")
         if "uq_users_email" in orig:
-            raise ServerBadRequestException(detail="Email is already registered")
+            raise ServerBadRequestException(message="Email is already registered")
         raise ServerBadRequestException
     session.refresh(db_user)
     session.refresh(user_session)
@@ -153,13 +153,13 @@ async def change_password(
 ):
     if session is None:
         raise ServerUnauthorizedException(
-            detail="You must be logged in to change your password"
+            message="You must be logged in to change your password"
         )
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
     user = session.user
     if not user.verify_password(password_data.old_password):
-        raise ServerForbiddenException(detail="Old password is incorrect")
+        raise ServerForbiddenException(message="Old password is incorrect")
     user.set_password(password_data.password)
     db_session.add(user)
     for s in user.sessions:

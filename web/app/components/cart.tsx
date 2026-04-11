@@ -115,9 +115,9 @@ export function CartContents({
                         )}
                         <AlertDialogContent>
                             <AlertDialogHeader>
-                                <AlertDialogTitle>Clear cart?</AlertDialogTitle>
+                                <AlertDialogTitle>Delete?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    This will remove all items from your cart.
+                                    This process cannot be undone. Are you sure?
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -126,7 +126,7 @@ export function CartContents({
                                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                     onClick={clearCart}
                                 >
-                                    Clear
+                                    Delete
                                 </AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>

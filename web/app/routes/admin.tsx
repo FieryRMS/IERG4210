@@ -173,7 +173,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         if (!response.ok) {
             const error = ServerException.fromJson(await response.json().catch(() => null));
             toast.error(
-                `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.TableType}: ${error.detail}`,
+                `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.TableType}: ${error.message}`,
             );
             throw error;
         }
@@ -424,7 +424,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     {loaderData.products.error ? (
                         <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
                             Failed to load products:{" "}
-                            {`${loaderData.products.error.type} - ${loaderData.products.error.detail}`}
+                            {`${loaderData.products.error.name} - ${loaderData.products.error.message}`}
                         </p>
                     ) : (
                         <TableGenerator data={products ?? []} config={PConfig} onSubmit={setProducts} />
@@ -435,7 +435,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     {loaderData.categories.error ? (
                         <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
                             Failed to load categories:{" "}
-                            {`${loaderData.categories.error.type} - ${loaderData.categories.error.detail}`}
+                            {`${loaderData.categories.error.name} - ${loaderData.categories.error.message}`}
                         </p>
                     ) : (
                         <TableGenerator data={categories ?? []} config={CConfig} onSubmit={setCategories} />
@@ -446,7 +446,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     {loaderData.images.error ? (
                         <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
                             Failed to load images:{" "}
-                            {`${loaderData.images.error.type} - ${loaderData.images.error.detail}`}
+                            {`${loaderData.images.error.name} - ${loaderData.images.error.message}`}
                         </p>
                     ) : (
                         <TableGenerator data={images ?? []} config={IConfig} onSubmit={setImages} />
@@ -456,7 +456,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     <h2 className="text-xl font-semibold mb-2 w-full text-center">Users</h2>
                     {loaderData.users.error ? (
                         <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
-                            Failed to load users: {`${loaderData.users.error.type} - ${loaderData.users.error.detail}`}
+                            Failed to load users: {`${loaderData.users.error.name} - ${loaderData.users.error.message}`}
                         </p>
                     ) : (
                         <TableGenerator data={users ?? []} config={UConfig} onSubmit={setUsers} />

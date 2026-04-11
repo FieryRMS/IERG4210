@@ -1,6 +1,6 @@
 import { PassThrough } from "node:stream";
 
-import type { RouterContextProvider, EntryContext, LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
+import type { RouterContextProvider, EntryContext, HandleErrorFunction } from "react-router";
 import { createReadableStreamFromReadable } from "@react-router/node";
 import { isRouteErrorResponse, ServerRouter } from "react-router";
 import { isbot } from "isbot";
@@ -97,14 +97,10 @@ export default function handleRequest(
     });
 }
 
-export function handleError(error: unknown, { request }: LoaderFunctionArgs | ActionFunctionArgs) {
+export const handleError: HandleErrorFunction = (error, { request }) => {
     if (!request.signal.aborted && !isRouteErrorResponse(error)) {
-        if (error instanceof ServerException) throw Response.json(error.toJson(), { status: error.constructor.code });
-        else {
+        if (!(error instanceof ServerException)) {
             console.error("Unexpected error in loader/action:", error);
-            if (import.meta.env.DEV) throw error; // Let the error boundary handle it in development for better debugging
-            const err = new ServerException();
-            throw Response.json(err.toJson(), { status: err.constructor.code });
         }
     }
-}
+};

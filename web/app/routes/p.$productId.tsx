@@ -42,7 +42,7 @@ export default function ({ params, loaderData }: Route.ComponentProps) {
         .padStart(2, "0");
     const pid = params.productId;
 
-    const { addQuantity: addToCart } = useCart();
+    const { setQuantity: addToCart } = useCart();
 
     const p: Product | null = loaderData?.id === pid ? loaderData : null;
 

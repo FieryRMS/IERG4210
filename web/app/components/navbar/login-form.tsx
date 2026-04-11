@@ -84,7 +84,7 @@ export function NavLoginForm() {
                             const response = await fetch("/api/me", { method: "DELETE" });
                             if (!response.ok) {
                                 const error = ServerException.fromJson(await response.json().catch(() => null));
-                                toast.error(`Failed to sign out: ${error.detail}`);
+                                toast.error(`Failed to sign out: ${error.message}`);
                                 return;
                             }
                             toast.success("Signed out successfully!");
@@ -168,11 +168,11 @@ export function AuthForm({
                 if (!response.ok) {
                     const error = ServerException.fromJson(await response.json().catch(() => null));
                     toast.error(
-                        `Failed to ${type === "change" ? "change password" : type === "login" ? "login" : "register"}: ${error.detail}`,
+                        `Failed to ${type === "change" ? "change password" : type === "login" ? "login" : "register"}: ${error.message}`,
                     );
-                    setSubmitError(error.detail);
+                    setSubmitError(error.message);
                     if (error instanceof ServerValidationException) return error.errors;
-                    return { form: { _error: error.detail } };
+                    return { form: { _error: error.message } };
                 }
                 toast.success(
                     `${type === "change" ? "Password changed" : type === "login" ? "Logged in" : "Registered"} successfully!`,

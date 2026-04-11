@@ -30,7 +30,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { cstfTokenGenerator } from "@/lib/security.server";
 import { CsrfContext, UserContext } from "./context.server";
 import { sdk, applyAuth, applySessionCookie } from "./lib/server.utils";
-import { ServerException } from "./lib/errors";
+import { ServerException, ServerForbiddenException } from "./lib/errors";
 import { ErrorPage } from "@/components/error-page";
 
 const authMiddleware: Route.MiddlewareFunction = async ({ request, context }, next) => {
@@ -47,7 +47,7 @@ const csrfMiddleware: Route.MiddlewareFunction = async ({ request, context }, ne
     if (["POST", "PUT", "DELETE"].includes(request.method)) {
         const csrfToken = request.headers.get("X-CSRF-Token");
         if (!csrfToken || !csrfSalt || !cstfTokenGenerator.verifySignedToken(csrfToken, csrfSalt)) {
-            return new Response("Invalid CSRF token", { status: 403 });
+            throw new ServerForbiddenException();
         }
     } else {
         if (!csrfSalt) csrfSalt = cstfTokenGenerator.generateSalt();
@@ -87,7 +87,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     };
 }
 
-export function Layout() {
+export function Layout({ children }: { children: React.ReactNode }) {
     const nonce = useNonce();
     const loaderData = useLoaderData<Route.ComponentProps["loaderData"] | undefined>();
     const location: Location<LocationState> = useLocation();
@@ -150,9 +150,7 @@ export function Layout() {
                             <header className="sticky top-0 z-50 w-full bg-background pb-2">
                                 <Navbar categories={loaderData?.categories || []} />
                             </header>
-                            <main className="py-4 w-full h-full">
-                                <Outlet />
-                            </main>
+                            <main className="py-4 w-full h-full">{children}</main>
                             <footer className="w-full py-6">
                                 <Footer />
                             </footer>
@@ -176,21 +174,19 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     let title = "Something went wrong";
     let description = "An unexpected error occurred.";
     let stack: string | undefined;
+    if (error instanceof Error) {
+        error = new ServerException({}, error);
+    }
 
-    if (isRouteErrorResponse(error)) {
+    if (isRouteErrorResponse(error) && ServerException.isServerException(error.data)) {
+        code = error.data.code;
+        title = error.data.name;
+        description = error.data.message!;
+        stack = error.data.stack || undefined;
+    } else if (isRouteErrorResponse(error)) {
         code = error.status;
-        title = error.status === 404 ? "Page not found" : "Error";
-        description = error.status === 404
-            ? "The page you're looking for doesn't exist or has been moved."
-            : error.statusText || description;
-    } else if (error instanceof ServerException) {
-        code = error.constructor.code;
-        title = error.name;
-        description = error.detail;
-    } else if (error instanceof Error) {
-        title = error.name || title;
-        description = error.message;
-        if (import.meta.env.DEV) stack = error.stack;
+        title = error.statusText || title;
+        description = error.data || description;
     }
 
     return <ErrorPage code={code} title={title} description={description} stack={stack} />;

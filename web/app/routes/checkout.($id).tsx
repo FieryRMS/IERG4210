@@ -3,8 +3,8 @@ import type { Order, OrderWithProducts } from "@/lib/generated/types.gen";
 import type { PageHandle } from "@/types";
 import { redirect, useNavigate } from "react-router";
 import { useState } from "react";
-import { sdk, applyAuth } from "@/lib/server.utils";
-import { ServerException, ServerNotFoundException } from "@/lib/errors";
+import { sdk, applyAuth, forward } from "@/lib/server.utils";
+import { ServerException } from "@/lib/errors";
 import { UserContext } from "@/context.server";
 import { useCart, type CartProviderState } from "@/hooks/cart-provider";
 import { useAuth } from "@/hooks/auth-provider";
@@ -29,9 +29,8 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     if (!id) return null;
     const user = context.get(UserContext);
     if (!user) throw redirect("/");
-    const { data, error } = await sdk.orders.getOrdersMeById({ ...(await applyAuth(request)), path: { id } });
-    if (error || !data) throw new ServerNotFoundException();
-    return data;
+    const auth = await applyAuth(request);
+    return forward(() => sdk.orders.getOrdersMeById({ ...auth, path: { id } }));
 }
 
 export default function CheckoutPage({ loaderData }: Route.ComponentProps) {
@@ -65,7 +64,29 @@ function OrderView({ order }: { order: OrderWithProducts }) {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <CartContents variantItemMedia="default" cart={cart} />
+                    <CartContents
+                        variantItemMedia="default"
+                        cart={cart}
+                        clearCart={() => {
+                            fetch(`/api/order/${order.order.id}`, { method: "DELETE" })
+                                .then((res) => {
+                                    if (res.ok) {
+                                        toast.success("Order cancelled");
+                                    } else {
+                                        return res.json();
+                                    }
+                                })
+                                .then((data) => {
+                                    if (data?.detail) {
+                                        const error = ServerException.fromJson(data);
+                                        toast.error(`Failed to cancel order: ${error.message}`);
+                                    }
+                                })
+                                .catch(() => {
+                                    toast.error("Failed to cancel order");
+                                });
+                        }}
+                    />
                 </CardContent>
                 <CardFooter>
                     <Button className="w-full" disabled={!cart || Object.keys(cart.products).length === 0}>
@@ -102,7 +123,7 @@ function CartView() {
             });
             if (!response.ok) {
                 const error = ServerException.fromJson(await response.json().catch(() => null));
-                toast.error(`Failed to place order: ${error.detail}`);
+                toast.error(`Failed to place order: ${error.message}`);
                 return;
             }
             const order: Order = await response.json();
