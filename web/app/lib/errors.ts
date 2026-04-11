@@ -8,9 +8,9 @@ import { StatusCodes, getReasonPhrase } from "http-status-codes";
 
 export class ServerException {
     static readonly STATUS_CODE: number = StatusCodes.INTERNAL_SERVER_ERROR;
+    message: string;
     readonly name: string;
     readonly code: number;
-    readonly message: string;
     readonly stack: string | undefined;
     static subclasses: Map<number | undefined, typeof ServerException> = new Map();
 
@@ -97,6 +97,7 @@ export class ServerForbiddenException extends ServerException {
 }
 export class ServerNotFoundException extends ServerException {
     static override readonly STATUS_CODE = StatusCodes.NOT_FOUND;
+    message = "The requested resource has been permanently removed or does not exist.";
     static { this.register(this); }
 }
 

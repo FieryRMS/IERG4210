@@ -80,6 +80,7 @@ class ServerForbiddenException(ServerException):
 @dataclass(kw_only=True)
 class ServerNotFoundException(ServerException):
     STATUS_CODE: ClassVar[int] = status.HTTP_404_NOT_FOUND
+    message: str = "The requested resource has been permanently removed or does not exist."
 
 
 @dataclass(kw_only=True)
@@ -96,6 +97,12 @@ class ServerConflictException(ServerException):
 class ServerValidationException(ServerException):
     STATUS_CODE: ClassVar[int] = status.HTTP_422_UNPROCESSABLE_CONTENT
     errors: FormValidationError = Field(default_factory=FormValidationError)
+
+    @computed_field
+    @property
+    def stack(self) -> str | None:
+        stack = super().stack
+        return f"{self.errors.model_dump_json(indent=2)}\n{stack}" if stack else None
 
 
 __all__ = [

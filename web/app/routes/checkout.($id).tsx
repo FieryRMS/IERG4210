@@ -39,6 +39,7 @@ export default function CheckoutPage({ loaderData }: Route.ComponentProps) {
 }
 
 function OrderView({ order }: { order: OrderWithProducts }) {
+    const navigate = useNavigate();
     const productmap = new Map(order.products.map((p) => [p.id, p]));
     const cart: CartProviderState["cart"] = {
         ray_id: order.order.ray_id!,
@@ -72,7 +73,9 @@ function OrderView({ order }: { order: OrderWithProducts }) {
                                 .then((res) => {
                                     if (res.ok) {
                                         toast.success("Order cancelled");
+                                        navigate("/me");
                                     } else {
+                                        console.error("Failed to cancel order", res);
                                         return res.json();
                                     }
                                 })
@@ -129,9 +132,7 @@ function CartView() {
             const order: Order = await response.json();
             clearCart();
             toast.success("Order placed! Redirecting...");
-            window.setTimeout(() => {
-                navigate(`/checkout/${order.id}`);
-            }, 1000);
+            navigate(`/checkout/${order.id}`);
         } catch {
             toast.error("Failed to place order");
         } finally {

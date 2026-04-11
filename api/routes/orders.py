@@ -67,7 +67,7 @@ async def get_my_order(
 @with_user()
 async def create_my_order(
     request: Request, order: OrderCreate, session: UserSession
-) -> OrderWithProducts:
+) -> Order:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
     total_price = _validate_order_products(db_session, order.products)
@@ -87,7 +87,7 @@ async def create_my_order(
         db_session.rollback()
         raise ServerConflictException(message="Duplicate order for this request")
     db_session.refresh(db_order)
-    return OrderWithProducts(order=db_order)
+    return db_order
 
 
 @router.delete("/me/{id}", status_code=status.HTTP_204_NO_CONTENT)

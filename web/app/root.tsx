@@ -32,6 +32,7 @@ import { CsrfContext, UserContext } from "./context.server";
 import { sdk, applyAuth, applySessionCookie } from "./lib/server.utils";
 import { ServerException, ServerForbiddenException } from "./lib/errors";
 import { ErrorPage } from "@/components/error-page";
+import { getReasonPhrase } from "http-status-codes";
 
 const authMiddleware: Route.MiddlewareFunction = async ({ request, context }, next) => {
     const { data, response: sdkResponse } = await sdk.users.getUsersMe(await applyAuth(request));
@@ -180,7 +181,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
 
     if (isRouteErrorResponse(error) && ServerException.isServerException(error.data)) {
         code = error.data.code;
-        title = error.data.name;
+        title = getReasonPhrase(code);
         description = error.data.message!;
         stack = error.data.stack || undefined;
     } else if (isRouteErrorResponse(error)) {

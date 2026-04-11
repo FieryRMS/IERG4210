@@ -138,7 +138,7 @@ export function Navbar({ categories }: { categories: Category[] }) {
                                 clearCart={clearCart}
                             >
                                 <Link to="/checkout" viewTransition>
-                                    <Button className="w-full mt-1">Checkout</Button>
+                                    <Button className="w-full mt-1">Goto Checkout</Button>
                                 </Link>
                             </CartContents>
                         </div>

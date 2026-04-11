@@ -137,6 +137,12 @@ export default function MePage({ loaderData }: Route.ComponentProps) {
                         <CardContent>
                             {loaderData.orders ? (
                                 <ItemGroup className="gap-4">
+                                    {loaderData.orders.length === 0 && (
+                                        <div className="flex flex-col items-center gap-4 py-10 text-muted-foreground">
+                                            <ShoppingCart className="size-12 opacity-30" />
+                                            <p className="text-sm">You have no orders yet.</p>
+                                        </div>
+                                    )}
                                     {loaderData.orders.map((order) => (
                                         <Item variant="outline" key={order.id}>
                                             <ItemMedia variant="default" className="self-center! translate-y-0!">
