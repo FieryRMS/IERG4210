@@ -3,7 +3,7 @@
 import type { Route } from "./+types/me";
 import type { PageHandle } from "@/types";
 import { Link, redirect } from "react-router";
-import { useAuth } from "@/hooks/auth-provider";
+import { useAuth } from "@/hooks/auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -15,7 +15,7 @@ import { ShoppingCart, User as UserIcon, Settings, CalendarDays, Mail, Shield } 
 import { AuthForm } from "@/components/navbar/login-form";
 import React from "react";
 import type { User } from "@/lib/generated/types.gen";
-import { UserContext } from "@/context.server";
+import { UserContext } from "@/lib/security.server";
 import { applyAuth, sdk } from "@/lib/server.utils";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 

@@ -1,5 +1,5 @@
 import { Sdk } from "./generated/sdk.gen";
-import { sessionCookie } from "@/cookies.server";
+import { sessionCookie } from "@/lib/security.server";
 import { createClient } from "./generated/client";
 import { ServerException } from "./errors";
 
@@ -38,12 +38,21 @@ export const applySessionCookie = async (
 
 
 export const sdk = getSdk();
-
-export async function forward(
-    call: () => Promise<{ data?: unknown; error?: unknown; response: Response; }>,
-): Promise<Response> {
+export async function forward<T, E>(
+    call: () => Promise<{ data?: T; error?: E; response: Response }>,
+    raw: true,
+): Promise<T>;
+export async function forward<T, E>(
+    call: () => Promise<{ data?: T; error?: E; response: Response }>,
+    raw?: false,
+): Promise<Response>;
+export async function forward<T, E>(
+    call: () => Promise<{ data?: T; error?: E; response: Response }>,
+    raw: boolean = false,
+): Promise<Response | T> {
     const { data, error, response } = await call();
     if (error) throw ServerException.fromJson(error).toResponse();
+    if (raw) return data!;
     const headers = await applySessionCookie(response.headers);
     return data === undefined || [
         204, 205, 304

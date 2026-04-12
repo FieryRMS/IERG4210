@@ -9,7 +9,7 @@ import { Img } from "@/components/img-wrapper";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { toast } from "sonner";
 import { fileStorageConfig, UPLOAD_URL } from "@/config";
-import { CsrfContext, UserContext } from "@/context.server";
+import { CsrfContext, UserContext } from "@/lib/security.server";
 import { sdk, applyAuth } from "@/lib/server.utils";
 import { TableGenerator, type Config, FieldConfigDefaults } from "@/components/tablegenerator";
 import { redirect } from "react-router";
@@ -43,7 +43,7 @@ import { XIcon } from "lucide-react";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import type { AnyFieldApi, AnyFormApi } from "@tanstack/react-form";
 import { ServerException } from "@/lib/errors";
-import { useAuth } from "@/hooks/auth-provider";
+import { useAuth } from "@/hooks/auth";
 import { useNavigate } from "react-router";
 
 export type TableTypes = "Product" | "Category" | "Image" | "User" | "Session" | "Product Images";

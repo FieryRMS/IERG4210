@@ -13,22 +13,27 @@ import {
     type UIMatch,
     useLoaderData,
 } from "react-router";
-import { useNonce } from "@/context/nonce";
-import { ThemeProvider, Theme } from "@/hooks/theme-provider";
+import { NonceProvider } from "@/hooks/nonce";
+import { ThemeProvider, Theme } from "@/hooks/theme";
 
 import type { Route } from "./+types/root";
 import "./app.css";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import type { LocationState, PageHandle } from "./types";
-import { CartProvider } from "./hooks/cart-provider";
-import { AuthProvider } from "./hooks/auth-provider";
+import { CartProvider } from "./hooks/cart";
+import { AuthProvider } from "./hooks/auth";
 import { useCallback, useEffect } from "react";
-import { prefsCookie } from "@/prefs.cookies";
-import { csrfCookie } from "@/cookies.server";
+import { prefsCookie } from "@/lib/cookies";
+import {
+    csrfCookie,
+    cstfTokenGenerator,
+    CsrfContext,
+    UserContext,
+    generateNonce,
+    nonceContext,
+} from "@/lib/security.server";
 import { Toaster } from "@/components/ui/sonner";
-import { cstfTokenGenerator } from "@/lib/security.server";
-import { CsrfContext, UserContext } from "./context.server";
 import { sdk, applyAuth, applySessionCookie } from "./lib/server.utils";
 import { ServerException, ServerForbiddenException } from "./lib/errors";
 import { ErrorPage } from "@/components/error-page";
@@ -40,6 +45,12 @@ const authMiddleware: Route.MiddlewareFunction = async ({ request, context }, ne
     const response = await next();
     await applySessionCookie(sdkResponse.headers, response.headers);
     return response;
+};
+
+const nonceMiddleware: Route.MiddlewareFunction = async ({ context }, next) => {
+    const nonce = generateNonce();
+    context.set(nonceContext, nonce);
+    return await next();
 };
 
 const csrfMiddleware: Route.MiddlewareFunction = async ({ request, context }, next) => {
@@ -60,7 +71,7 @@ const csrfMiddleware: Route.MiddlewareFunction = async ({ request, context }, ne
     return response;
 };
 
-export const middleware: Route.MiddlewareFunction[] = [authMiddleware, csrfMiddleware];
+export const middleware: Route.MiddlewareFunction[] = [authMiddleware, csrfMiddleware, nonceMiddleware];
 
 export const links: Route.LinksFunction = () => [
     { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -85,12 +96,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         categories: (await sdk.categories.getCategories(await applyAuth(request))).data || [],
         csrfToken: context.get(CsrfContext),
         user: context.get(UserContext),
+        nonce: context.get(nonceContext),
     };
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-    const nonce = useNonce();
     const loaderData = useLoaderData<Route.ComponentProps["loaderData"] | undefined>();
+    const nonce = loaderData?.nonce;
     const location: Location<LocationState> = useLocation();
     const matches = useMatches();
     const breadcrumbs = (matches as UIMatch<unknown, PageHandle>[])
@@ -146,20 +158,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </head>
             <ThemeProvider defaultTheme={loaderData?.theme}>
                 <AuthProvider user={loaderData?.user ?? null}>
-                    <CartProvider>
-                        <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden grid grid-rows-[auto_1fr_auto]">
-                            <header className="sticky top-0 z-50 w-full bg-background pb-2">
-                                <Navbar categories={loaderData?.categories || []} />
-                            </header>
-                            <main className="py-4 w-full h-full">{children}</main>
-                            <footer className="w-full py-6">
-                                <Footer />
-                            </footer>
-                            <ScrollRestoration nonce={nonce} />
-                            <Scripts nonce={nonce} />
-                            <Toaster theme={loaderData?.theme} />
-                        </body>
-                    </CartProvider>
+                    <NonceProvider nonce={nonce}>
+                        <CartProvider>
+                            <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden grid grid-rows-[auto_1fr_auto]">
+                                <header className="sticky top-0 z-50 w-full bg-background pb-2">
+                                    <Navbar categories={loaderData?.categories || []} />
+                                </header>
+                                <main className="py-4 w-full h-full">{children}</main>
+                                <footer className="w-full py-6">
+                                    <Footer />
+                                </footer>
+                                <ScrollRestoration nonce={nonce} />
+                                <Scripts nonce={nonce} />
+                                <Toaster theme={loaderData?.theme} />
+                            </body>
+                        </CartProvider>
+                    </NonceProvider>
                 </AuthProvider>
             </ThemeProvider>
         </html>

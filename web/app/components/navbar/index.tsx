@@ -22,13 +22,13 @@ import {
 import { Moon, ShoppingCart, Sun, UserRound, ChevronsRightIcon, SearchIcon, HomeIcon, Contrast } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Theme, useTheme } from "@/hooks/theme-provider";
+import { Theme, useTheme } from "@/hooks/theme";
 import { NavLoginForm } from "./login-form";
 import { Badge } from "@/components/ui/badge";
 import { ButtonGroup } from "@/components/ui/button-group";
 import type { LocationState, PageHandle } from "@/types";
 import type { Category } from "@/lib/generated/types.gen";
-import { useCart } from "@/hooks/cart-provider";
+import { useCart } from "@/hooks/cart";
 import { CartContents } from "@/components/cart";
 import { cn } from "@/lib/utils";
 

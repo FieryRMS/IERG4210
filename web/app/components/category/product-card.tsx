@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "@/components/link-wrapper";
 import type { Product } from "@/lib/generated/types.gen";
-import { useCart } from "@/hooks/cart-provider";
+import { useCart } from "@/hooks/cart";
 import { Img } from "@/components/img-wrapper";
 import { Skeleton } from "../ui/skeleton";
 

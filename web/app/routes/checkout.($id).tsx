@@ -5,9 +5,9 @@ import { redirect, useNavigate } from "react-router";
 import { useState } from "react";
 import { sdk, applyAuth, forward } from "@/lib/server.utils";
 import { ServerException } from "@/lib/errors";
-import { UserContext } from "@/context.server";
-import { useCart, type CartProviderState } from "@/hooks/cart-provider";
-import { useAuth } from "@/hooks/auth-provider";
+import { UserContext } from "@/lib/security.server";
+import { useCart, type CartProviderState } from "@/hooks/cart";
+import { useAuth } from "@/hooks/auth";
 import { zOrderCreate } from "@/lib/generated/zod.gen";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { CartContents } from "@/components/cart";
 import { toast } from "sonner";
+import { PayPalButtons, PayPalScriptProvider, type ReactPayPalScriptOptions } from "@paypal/react-paypal-js";
+import { useNonce } from "@/hooks/nonce";
 
 export const handle: PageHandle<Route.ComponentProps["loaderData"]> = {
     breadcrumb: () => ({ pathname: "/checkout", name: "Checkout" }),
@@ -30,7 +32,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     const user = context.get(UserContext);
     if (!user) throw redirect("/");
     const auth = await applyAuth(request);
-    return forward(() => sdk.orders.getOrdersMeById({ ...auth, path: { id } }));
+    return forward(() => sdk.orders.getOrdersMeById({ ...auth, path: { id } }), true);
 }
 
 export default function CheckoutPage({ loaderData }: Route.ComponentProps) {
@@ -39,6 +41,7 @@ export default function CheckoutPage({ loaderData }: Route.ComponentProps) {
 }
 
 function OrderView({ order }: { order: OrderWithProducts }) {
+    const nonce = useNonce();
     const navigate = useNavigate();
     const productmap = new Map(order.products.map((p) => [p.id, p]));
     const cart: CartProviderState["cart"] = {
@@ -48,6 +51,11 @@ function OrderView({ order }: { order: OrderWithProducts }) {
                 return [p.id, { p: productmap.get(p.id)!, q: p.count }];
             }),
         ),
+    };
+    const initialOptions: ReactPayPalScriptOptions = {
+        clientId: import.meta.env.VITE_clientId,
+        currency: order.order.currency,
+        dataCspNonce: nonce,
     };
     return (
         <div className="container mx-auto max-w-2xl px-4 py-10">
@@ -91,10 +99,14 @@ function OrderView({ order }: { order: OrderWithProducts }) {
                         }}
                     />
                 </CardContent>
-                <CardFooter>
-                    <Button className="w-full" disabled={!cart || Object.keys(cart.products).length === 0}>
-                        Pay Now
-                    </Button>
+                <CardFooter className="w-full">
+                    <PayPalScriptProvider options={initialOptions}>
+                        <PayPalButtons
+                            style={{
+                                disableMaxWidth: true,
+                            }}
+                        />
+                    </PayPalScriptProvider>
                 </CardFooter>
             </Card>
         </div>

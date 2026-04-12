@@ -14,7 +14,7 @@ import { ShoppingCartIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { PageHandle } from "@/types";
 import type { Product } from "@/lib/generated/types.gen";
-import { useCart } from "@/hooks/cart-provider";
+import { useCart } from "@/hooks/cart";
 import { Img } from "@/components/img-wrapper";
 import { sdk, applyAuth } from "@/lib/server.utils";
 import { ServerNotFoundException } from "@/lib/errors";

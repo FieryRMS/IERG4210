@@ -19,7 +19,7 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Spinner } from "./ui/spinner";
-import type { CartProviderState } from "@/hooks/cart-provider";
+import type { CartProviderState } from "@/hooks/cart";
 
 export function CartContents({
     children,

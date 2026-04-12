@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { parseWithSchema } from "@/lib/utils";
 import { useState } from "react";
-import { useAuth } from "@/hooks/auth-provider";
+import { useAuth } from "@/hooks/auth";
 import type { User } from "@/lib/generated/types.gen";
 import { Link } from "react-router";
 import { LayoutDashboard, LogOut, UserRound } from "lucide-react";

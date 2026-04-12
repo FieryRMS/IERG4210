@@ -1,4 +1,10 @@
+import { createCookie } from "react-router";
+
 import { randomBytes, createHmac, timingSafeEqual } from 'node:crypto';
+import { createContext } from "react-router";
+import type { User } from "@/lib/generated/types.gen";
+
+
 
 export function generateNonce(): string {
     return randomBytes(16).toString("base64");
@@ -12,16 +18,20 @@ export interface SecurityHeaders {
     "Permissions-Policy": string;
 }
 
-export function buildSecurityHeaders(nonce: string): SecurityHeaders {
+export function buildSecurityHeaders(nonce: string | undefined): SecurityHeaders {
+    if (!nonce)
+        console.warn("buildSecurityHeaders: No nonce provided, CSP may not work as intended.");
     return {
         "Content-Security-Policy": [
             "default-src 'self'",
-            `script-src 'self' 'nonce-${nonce}'`,
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-            "font-src 'self' https://fonts.gstatic.com",
-            "img-src 'self' data: blob: https://avatar.vercel.sh",
+            `script-src 'self' *.paypal.com *.paypalobjects.com *.venmo.com${nonce ? ` 'nonce-${nonce}'` : ''}`,
+            `style-src 'self' 'unsafe-inline' fonts.googleapis.com *.paypal.com *.paypalobjects.com *.venmo.com`,
+            "font-src 'self' fonts.gstatic.com",
+            "img-src 'self' data: blob: avatar.vercel.sh *.paypal.com *.paypalobjects.com *.venmo.com",
             "worker-src 'self' blob:",
-            "connect-src 'self'",
+            "connect-src 'self' *.paypal.com *.paypalobjects.com *.venmo.com",
+            "frame-src 'self' *.paypal.com *.paypalobjects.com *.venmo.com",
+            "child-src 'self' *.paypal.com *.paypalobjects.com *.venmo.com",
             "frame-ancestors 'none'",
         ].join("; "),
         "X-Frame-Options": "DENY",
@@ -30,6 +40,8 @@ export function buildSecurityHeaders(nonce: string): SecurityHeaders {
         "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
     };
 }
+
+export const nonceContext = createContext<string | undefined>(undefined);
 
 const createTokenGenerator = ({
     size,
@@ -74,3 +86,22 @@ export const cstfTokenGenerator = createTokenGenerator({
     size: 32,
     secret: process.env.SIGNING_SECRET ?? "default_secret",
 });
+
+export const csrfCookie = createCookie("__Host-csrf", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 12, // 12 hours
+    secrets: [process.env.SIGNING_SECRET!],
+});
+export const CsrfContext = createContext<string | null>(null);
+
+export const sessionCookie = createCookie("__Host-session", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    secrets: [process.env.SIGNING_SECRET!],
+});
+export const UserContext = createContext<User | null>(null);
