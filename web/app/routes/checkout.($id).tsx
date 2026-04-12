@@ -36,8 +36,11 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 }
 
 export default function CheckoutPage({ loaderData }: Route.ComponentProps) {
-    if (loaderData) return <OrderView order={loaderData} />;
-    return <CartView />;
+    return (
+        <div className="container mx-auto max-w-2xl px-4 py-10">
+            {loaderData ? <OrderView order={loaderData} /> : <CartView />}
+        </div>
+    );
 }
 
 function OrderView({ order }: { order: OrderWithProducts }) {
@@ -58,58 +61,57 @@ function OrderView({ order }: { order: OrderWithProducts }) {
         dataCspNonce: nonce,
     };
     return (
-        <div className="container mx-auto max-w-2xl px-4 py-10">
-            <Card>
-                <CardHeader>
-                    <div className="flex gap-2">
-                        <CardTitle className="flex items-center justify-center">Order ID: {order.order.id}</CardTitle>
-                        {order.order.paid ? (
-                            <Badge variant="secondary" className="bg-blue-500 text-white dark:bg-blue-600">
-                                Paid
-                            </Badge>
-                        ) : (
-                            <Badge variant="destructive">Unpaid</Badge>
-                        )}
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <CartContents
-                        variantItemMedia="default"
-                        cart={cart}
-                        clearCart={() => {
-                            fetch(`/api/order/${order.order.id}`, { method: "DELETE" })
-                                .then((res) => {
-                                    if (res.ok) {
-                                        toast.success("Order cancelled");
-                                        navigate("/me");
-                                    } else {
-                                        console.error("Failed to cancel order", res);
-                                        return res.json();
-                                    }
-                                })
-                                .then((data) => {
-                                    if (data?.detail) {
-                                        const error = ServerException.fromJson(data);
-                                        toast.error(`Failed to cancel order: ${error.message}`);
-                                    }
-                                })
-                                .catch(() => {
-                                    toast.error("Failed to cancel order");
-                                });
+        <Card>
+            <CardHeader>
+                <div className="flex gap-2">
+                    <CardTitle className="flex items-center justify-center">Order ID: {order.order.id}</CardTitle>
+                    {order.order.paid ? (
+                        <Badge variant="secondary" className="bg-blue-500 text-white dark:bg-blue-600">
+                            Paid
+                        </Badge>
+                    ) : (
+                        <Badge variant="destructive">Unpaid</Badge>
+                    )}
+                </div>
+            </CardHeader>
+            <CardContent>
+                <CartContents
+                    variantItemMedia="default"
+                    cart={cart}
+                    clearCart={() => {
+                        fetch(`/api/order/${order.order.id}`, { method: "DELETE" })
+                            .then((res) => {
+                                if (res.ok) {
+                                    toast.success("Order cancelled");
+                                    navigate("/me");
+                                } else {
+                                    console.error("Failed to cancel order", res);
+                                    return res.json();
+                                }
+                            })
+                            .then((data) => {
+                                if (data?.detail) {
+                                    const error = ServerException.fromJson(data);
+                                    toast.error(`Failed to cancel order: ${error.message}`);
+                                }
+                            })
+                            .catch(() => {
+                                toast.error("Failed to cancel order");
+                            });
+                    }}
+                />
+            </CardContent>
+            <CardFooter>
+                <PayPalScriptProvider options={initialOptions}>
+                    <PayPalButtons
+                        style={{
+                            disableMaxWidth: true,
                         }}
-                    />
-                </CardContent>
-                <CardFooter className="w-full">
-                    <PayPalScriptProvider options={initialOptions}>
-                        <PayPalButtons
-                            style={{
-                                disableMaxWidth: true,
-                            }}
-                        />
-                    </PayPalScriptProvider>
-                </CardFooter>
-            </Card>
-        </div>
+                        className="w-full p-2 bg-white rounded disabled:cursor-not-allowed disabled:opacity-50"
+                    ></PayPalButtons>
+                </PayPalScriptProvider>
+            </CardFooter>
+        </Card>
     );
 }
 
@@ -153,29 +155,22 @@ function CartView() {
     }
 
     return (
-        <div className="container mx-auto max-w-2xl px-4 py-10">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Your Cart</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <CartContents
-                        variantItemMedia="default"
-                        cart={cart}
-                        setQuantity={setQuantity}
-                        clearCart={clearCart}
-                    />
-                </CardContent>
-                <CardFooter>
-                    <Button
-                        className="w-full"
-                        onClick={() => cart && handleCheckout(cart)}
-                        disabled={submitting || !cart || Object.keys(cart.products).length === 0}
-                    >
-                        {submitting ? <Spinner /> : "Checkout"}
-                    </Button>
-                </CardFooter>
-            </Card>
-        </div>
+        <Card>
+            <CardHeader>
+                <CardTitle>Your Cart</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <CartContents variantItemMedia="default" cart={cart} setQuantity={setQuantity} clearCart={clearCart} />
+            </CardContent>
+            <CardFooter>
+                <Button
+                    className="w-full"
+                    onClick={() => cart && handleCheckout(cart)}
+                    disabled={submitting || !cart || Object.keys(cart.products).length === 0}
+                >
+                    {submitting ? <Spinner /> : "Checkout"}
+                </Button>
+            </CardFooter>
+        </Card>
     );
 }
