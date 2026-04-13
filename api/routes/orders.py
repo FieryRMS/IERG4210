@@ -15,9 +15,10 @@ from models import (
     ServerConflictException,
     ServerException,
     ServerNotFoundException,
+    State,
+    TransactionStatus,
+    User,
 )
-from models import Session as UserSession
-from models import State, TransactionStatus
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, select
 
@@ -45,37 +46,33 @@ def _validate_order_products(
 
 @router.get("/me", status_code=status.HTTP_200_OK)
 @with_user()
-async def get_my_orders(request: Request, session: UserSession) -> list[Order]:
+async def get_my_orders(request: Request, user: User) -> list[Order]:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
-    return list(
-        db_session.exec(select(Order).where(Order.user_id == session.user.id)).all()
-    )
+    return list(db_session.exec(select(Order).where(Order.user_id == user.id)).all())
 
 
 @router.get("/me/{id}", status_code=status.HTTP_200_OK)
 @with_user()
 async def get_my_order(
-    request: Request, id: uuid.UUID, session: UserSession
+    request: Request, id: uuid.UUID, user: User
 ) -> OrderWithProducts:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
     order = db_session.get(Order, id)
-    if not order or order.user_id != session.user.id:
+    if not order or order.user_id != user.id:
         raise ServerNotFoundException
     return OrderWithProducts(order=order)
 
 
 @router.post("/me", status_code=status.HTTP_201_CREATED)
 @with_user()
-async def create_my_order(
-    request: Request, order: OrderCreate, session: UserSession
-) -> Order:
+async def create_my_order(request: Request, order: OrderCreate, user: User) -> Order:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
     total_price = _validate_order_products(db_session, order.products)
     db_order = Order.model_validate(
-        order, update={"price": total_price, "user_id": session.user.id}
+        order, update={"price": total_price, "user_id": user.id}
     )
     db_order.product_links = [
         OrderProductLink(
@@ -95,11 +92,11 @@ async def create_my_order(
 
 @router.delete("/me/{id}", status_code=status.HTTP_204_NO_CONTENT)
 @with_user()
-async def delete_my_order(request: Request, id: uuid.UUID, session: UserSession):
+async def delete_my_order(request: Request, id: uuid.UUID, user: User):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
     db_order = db_session.get(Order, id)
-    if not db_order or db_order.user_id != session.user.id:
+    if not db_order or db_order.user_id != user.id:
         raise ServerNotFoundException
     if db_order.paid:
         raise ServerConflictException(message="Cannot delete a paid order")
@@ -178,13 +175,13 @@ async def delete_order(request: Request, id: uuid.UUID):
 @router.post("/me/paypal/{id}", status_code=status.HTTP_200_OK)
 @with_user()
 async def create_paypal_order(
-    request: Request, id: uuid.UUID, session: UserSession
+    request: Request, id: uuid.UUID, user: User
 ) -> PaypalTransaction:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
     api = state["OrdersApi"]
     db_order = db_session.get(Order, id)
-    if not db_order or db_order.user_id != session.user.id:
+    if not db_order or db_order.user_id != user.id:
         raise ServerNotFoundException
     transaction = PaypalTransaction(
         order_id=db_order.id,
@@ -249,7 +246,7 @@ async def create_paypal_order(
 @router.put("/me/paypal/{id}", status_code=status.HTTP_200_OK)
 @with_user()
 async def capture_paypal_order(
-    request: Request, id: str, session: UserSession
+    request: Request, id: str, user: User
 ) -> PaypalTransaction:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
@@ -260,7 +257,7 @@ async def capture_paypal_order(
     if not transaction:
         raise ServerNotFoundException
     db_order = transaction.order
-    if not db_order or db_order.user_id != session.user.id:
+    if not db_order or db_order.user_id != user.id:
         raise ServerNotFoundException
     if transaction.status != TransactionStatus.PENDING:
         raise ServerConflictException(message="Invalid transaction status")
@@ -293,4 +290,5 @@ async def capture_paypal_order(
     db_session.commit()
     db_session.refresh(transaction)
 
+    return transaction
     return transaction

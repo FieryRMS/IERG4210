@@ -34,7 +34,7 @@ def _set_session_headers(response: Response, user_session: UserSession | None):
     )
 
 
-def with_session():
+def with_session(*, inject: bool = True):
     def dependency(
         request: Request,
         token: Annotated[str | None, Depends(_session_scheme)] = None,
@@ -55,19 +55,31 @@ def with_session():
             return None
         return user_session
 
+    if not inject:
+        return depends(dependency)
+
     return depends(session=dependency)
 
 
-def with_user(*, roles: list[Role] = []):
+def with_user(*, roles: list[Role] = [], inject: bool | None = None):
+    """
+    by default(inject=None) injects if roles are not defined.
+    """
+
     @with_session()
-    def dependency(session: UserSession | None) -> UserSession:
+    def dependency(session: UserSession | None) -> User:
         if session is None:
             raise ServerUnauthorizedException
         if len(roles) > 0 and session.user.role.value not in roles:
             raise ServerForbiddenException
-        return session
+        return session.user
 
-    return depends(session=dependency)
+    if inject == None:
+        inject = len(roles) == 0
+
+    if not inject:
+        return depends(dependency)
+    return depends(user=dependency)
 
 
 @router.get("/me", status_code=status.HTTP_200_OK)
