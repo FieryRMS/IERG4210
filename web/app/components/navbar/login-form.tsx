@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { parseWithSchema } from "@/lib/utils";
+import { clientForward, parseWithSchema } from "@/lib/utils";
 import { useState } from "react";
 import { useAuth } from "@/hooks/auth";
 import type { User } from "@/lib/generated/types.gen";
@@ -14,7 +14,7 @@ import { LayoutDashboard, LogOut, UserRound } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../ui/item";
 import { zUserChangePassword, zUserCreate, zUserLogin } from "@/lib/generated/zod.gen";
-import { ServerException, ServerValidationException } from "@/lib/errors";
+import { ServerValidationException } from "@/lib/errors";
 import { toast } from "sonner";
 
 export type AuthFormType = "login" | "register" | "change";
@@ -81,12 +81,10 @@ export function NavLoginForm() {
                         variant="destructive"
                         className="w-full gap-2"
                         onClick={async () => {
-                            const response = await fetch("/api/me", { method: "DELETE" });
-                            if (!response.ok) {
-                                const error = ServerException.fromJson(await response.json().catch(() => null));
-                                toast.error(`Failed to sign out: ${error.message}`);
-                                return;
-                            }
+                            await clientForward(() => fetch("/api/me", { method: "DELETE" })).catch((e) => {
+                                toast.error(`Failed to sign out: ${e.message}`);
+                            });
+
                             toast.success("Signed out successfully!");
                             setUser(null);
                         }}
@@ -160,24 +158,27 @@ export function AuthForm({
                     setSubmitError("Invalid input!");
                     return errors;
                 }
-                const response = await fetch(`/api/me/${type}`, {
-                    method: type === "change" ? "PUT" : "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(apiSchema.parse(parsed)),
-                });
-                if (!response.ok) {
-                    const error = ServerException.fromJson(await response.json().catch(() => null));
-                    toast.error(
-                        `Failed to ${type === "change" ? "change password" : type === "login" ? "login" : "register"}: ${error.message}`,
-                    );
-                    setSubmitError(error.message);
-                    if (error instanceof ServerValidationException) return error.errors;
-                    return { form: { _error: error.message } };
-                }
-                toast.success(
-                    `${type === "change" ? "Password changed" : type === "login" ? "Logged in" : "Registered"} successfully!`,
-                );
-                onSuccess?.(await response.json().catch(() => null));
+                return clientForward<User>(() =>
+                    fetch(`/api/me/${type}`, {
+                        method: type === "change" ? "PUT" : "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(apiSchema.parse(parsed)),
+                    }),
+                )
+                    .then((data) => {
+                        toast.success(
+                            `${type === "change" ? "Password changed" : type === "login" ? "Logged in" : "Registered"} successfully!`,
+                        );
+                        onSuccess?.(data);
+                    })
+                    .catch((error) => {
+                        toast.error(
+                            `Failed to ${type === "change" ? "change password" : type === "login" ? "login" : "register"}: ${error.message}`,
+                        );
+                        setSubmitError(error.message);
+                        if (error instanceof ServerValidationException) return error.errors;
+                        return { form: { _error: error.message } };
+                    });
             },
         },
         onSubmit: async () => {},

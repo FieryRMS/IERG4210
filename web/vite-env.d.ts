@@ -3,7 +3,7 @@ interface ViteTypeOptions {
 }
 
 interface ImportMetaEnv {
-    readonly VITE_clientId: string;
+    readonly VITE_O_AUTH_CLIENT_ID: string;
 }
 
 interface ImportMeta {

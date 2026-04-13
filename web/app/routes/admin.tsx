@@ -3,7 +3,7 @@ import type { PageHandle } from "@/types";
 import type { Product, Category, Image, User, Session } from "@/lib/generated/types.gen";
 import { z } from "zod";
 import { Input } from "@/components/ui/input";
-import { Any2FormData, cn } from "@/lib/utils";
+import { Any2FormData, clientForward, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Img } from "@/components/img-wrapper";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -42,7 +42,6 @@ import {
 import { XIcon } from "lucide-react";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import type { AnyFieldApi, AnyFormApi } from "@tanstack/react-form";
-import { ServerException } from "@/lib/errors";
 import { useAuth } from "@/hooks/auth";
 import { useNavigate } from "react-router";
 
@@ -166,22 +165,24 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         ...[{ config, method, value }]: Parameters<Config<T, TableTypes, K>["onSubmit"]>
     ) => {
         const form = Any2FormData(value);
-        const response = await fetch(`/api/admin/${config.TableType}`, {
-            method,
-            body: form,
-        });
-        if (!response.ok) {
-            const error = ServerException.fromJson(await response.json().catch(() => null));
-            toast.error(
-                `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.TableType}: ${error.message}`,
-            );
-            throw error;
-        }
-        const responseData = response.status !== 204 ? await response.json() : null;
-        toast.success(
-            `${config.TableType} ${method === "post" ? "created" : method === "put" ? "updated" : "deleted"} successfully`,
-        );
-        return responseData;
+        return clientForward(() =>
+            fetch(`/api/admin/${config.TableType}`, {
+                method,
+                body: form,
+            }),
+        )
+            .then((data) => {
+                toast.success(
+                    `${config.TableType} ${method === "post" ? "created" : method === "put" ? "updated" : "deleted"} successfully`,
+                );
+                return data;
+            })
+            .catch((e) => {
+                toast.error(
+                    `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.TableType}: ${e.message}`,
+                );
+                throw e;
+            }) as Promise<never>;
     };
 
     const PConfig: Config<Product, TableTypes> = {

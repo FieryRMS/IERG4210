@@ -2,9 +2,12 @@ import logging
 import os
 from collections.abc import Callable
 from contextlib import asynccontextmanager
+from time import time
 from typing import Any
 
 import dotenv
+import paypal_orders
+import requests
 import routes
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -18,6 +21,12 @@ dotenv.load_dotenv()  # Load environment variables from .env file
 
 DEBUG = os.getenv("EXE_MODE", "prod") == "dev"
 POSTGRES_URL = os.getenv("POSTGRES_URL")
+
+config = paypal_orders.Configuration(
+    host=os.getenv("PAYPAL_API_BASE_URL", "https://api-m.sandbox.paypal.com"),
+    username=os.getenv("O_AUTH_CLIENT_ID"),
+    password=os.getenv("O_AUTH_CLIENT_SECRET"),
+)
 
 
 class ColoredFormatter(logging.Formatter):
@@ -93,12 +102,24 @@ async def lifespan(app: FastAPI):
         EF = EndpointFilter(["/openapi.json"])
         logging.getLogger("uvicorn.access").addFilter(EF)
         state["logger"].addFilter(EF)
-        app.openapi() # check if openapi can be generated at startup
-    
+        app.openapi()  # check if openapi can be generated at startup
+
+    api_client = paypal_orders.ApiClient(config)
+    state["paypal_config"] = config
+    state["OrdersApi"] = paypal_orders.OrdersApi(api_client)
+    state["authorization"] = Authorization(
+        access_token="",
+        token_type="",
+        app_id="",
+        expires_in=0,
+        nonce="",
+    )
+
     state["logger"].info("API started")
     yield
     state["engine"].dispose()
     state["logger"].info("API stopped")
+
 
 def custom_generate_unique_id(route: APIRoute):
     return f"{route.tags[0]}-{route.name}"
@@ -192,9 +213,42 @@ async def inject_state(
     request.state["debug"] = appstate["debug"]
     request.state["engine"] = appstate["engine"]
     request.state["session"] = SQLSession(appstate["engine"])
+    request.state["paypal_config"] = appstate["paypal_config"]
+    request.state["OrdersApi"] = appstate["OrdersApi"]
+    request.state["authorization"] = appstate["authorization"]
     res = await call_next(request)
     request.state["session"].close()
     return res
+
+
+@app.middleware("http")
+async def refresh_paypal_token(
+    request: Request[State], call_next: Callable[..., Any]
+) -> Response:
+    state: State = request.app.state
+    auth: Authorization = state["authorization"]
+    if auth.expires_in + auth.created_at < time():
+        state["logger"].info("Refreshing PayPal access token")
+        config = state["paypal_config"]
+        response = requests.post(
+            f"{config.host}/v1/oauth2/token",
+            auth=(config.username or "", config.password or ""),
+            data={"grant_type": "client_credentials"},
+        )
+        if response.status_code == 200:
+            state["authorization"] = Authorization(**response.json())
+            state[
+                "OrdersApi"
+            ].api_client.set_default_header(  # pyright: ignore[reportUnknownMemberType]
+                "Authorization",
+                f"Bearer {state['authorization'].access_token}",
+            )
+            state["logger"].info("PayPal access token refreshed")
+        else:
+            state["logger"].error(
+                f"Failed to refresh PayPal access token: {response.status_code} {response.text}"
+            )
+    return await call_next(request)
 
 
 app.include_router(routes.root.router)

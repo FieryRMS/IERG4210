@@ -1,10 +1,9 @@
 import type { Route } from "./+types/checkout.($id)";
-import type { Order, OrderWithProducts } from "@/lib/generated/types.gen";
+import type { Order, OrderWithProducts, PaypalTransaction } from "@/lib/generated/types.gen";
 import type { PageHandle } from "@/types";
 import { redirect, useNavigate } from "react-router";
 import { useState } from "react";
 import { sdk, applyAuth, forward } from "@/lib/server.utils";
-import { ServerException } from "@/lib/errors";
 import { UserContext } from "@/lib/security.server";
 import { useCart, type CartProviderState } from "@/hooks/cart";
 import { useAuth } from "@/hooks/auth";
@@ -15,8 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { CartContents } from "@/components/cart";
 import { toast } from "sonner";
-import { PayPalButtons, PayPalScriptProvider, type ReactPayPalScriptOptions } from "@paypal/react-paypal-js";
-import { useNonce } from "@/hooks/nonce";
+import { PayPalButtons } from "@paypal/react-paypal-js";
+import { clientForward } from "@/lib/utils";
 
 export const handle: PageHandle<Route.ComponentProps["loaderData"]> = {
     breadcrumb: () => ({ pathname: "/checkout", name: "Checkout" }),
@@ -37,14 +36,13 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 
 export default function CheckoutPage({ loaderData }: Route.ComponentProps) {
     return (
-        <div className="container mx-auto max-w-2xl px-4 py-10">
+        <div className="container mx-auto max-w-6xl px-4 py-10">
             {loaderData ? <OrderView order={loaderData} /> : <CartView />}
         </div>
     );
 }
 
 function OrderView({ order }: { order: OrderWithProducts }) {
-    const nonce = useNonce();
     const navigate = useNavigate();
     const productmap = new Map(order.products.map((p) => [p.id, p]));
     const cart: CartProviderState["cart"] = {
@@ -54,11 +52,6 @@ function OrderView({ order }: { order: OrderWithProducts }) {
                 return [p.id, { p: productmap.get(p.id)!, q: p.count }];
             }),
         ),
-    };
-    const initialOptions: ReactPayPalScriptOptions = {
-        clientId: import.meta.env.VITE_clientId,
-        currency: order.order.currency,
-        dataCspNonce: nonce,
     };
     return (
         <Card>
@@ -79,37 +72,53 @@ function OrderView({ order }: { order: OrderWithProducts }) {
                     variantItemMedia="default"
                     cart={cart}
                     clearCart={() => {
-                        fetch(`/api/order/${order.order.id}`, { method: "DELETE" })
-                            .then((res) => {
-                                if (res.ok) {
-                                    toast.success("Order cancelled");
-                                    navigate("/me");
-                                } else {
-                                    console.error("Failed to cancel order", res);
-                                    return res.json();
-                                }
+                        clientForward(() => fetch(`/api/order/${order.order.id}`, { method: "DELETE" }))
+                            .then(() => {
+                                toast.success("Order cancelled");
+                                navigate("/me");
                             })
-                            .then((data) => {
-                                if (data?.detail) {
-                                    const error = ServerException.fromJson(data);
-                                    toast.error(`Failed to cancel order: ${error.message}`);
-                                }
-                            })
-                            .catch(() => {
-                                toast.error("Failed to cancel order");
+                            .catch((e) => {
+                                toast.error(`Failed to cancel order: ${e.message}`);
                             });
                     }}
                 />
             </CardContent>
             <CardFooter>
-                <PayPalScriptProvider options={initialOptions}>
-                    <PayPalButtons
-                        style={{
-                            disableMaxWidth: true,
-                        }}
-                        className="w-full p-2 bg-white rounded disabled:cursor-not-allowed disabled:opacity-50"
-                    ></PayPalButtons>
-                </PayPalScriptProvider>
+                <PayPalButtons
+                    style={{
+                        disableMaxWidth: true,
+                    }}
+                    className="w-full p-2 bg-white rounded disabled:cursor-not-allowed disabled:opacity-50 z-0!"
+                    createOrder={async () => {
+                        return clientForward<PaypalTransaction>(() =>
+                            fetch(`/api/paypal/${order.order.id}`, { method: "POST" }),
+                        )
+                            .then((data) => data.transaction_id)
+                            .catch((e) => {
+                                toast.error(`Failed to create PayPal order: ${e.message}`);
+                                throw e;
+                            });
+                    }}
+                    onApprove={async (data, actions) => {
+                        clientForward<PaypalTransaction>(() =>
+                            fetch(`/api/paypal/${data.orderID}`, {
+                                method: "PUT",
+                            }),
+                        )
+                            .then((data) => {
+                                if (data.status === "COMPLETED") {
+                                    toast.success("Payment successful!");
+                                    navigate(0);
+                                } else if (data.status === "PENDING") {
+                                    toast("Payment could not be completed. Try again");
+                                    actions.restart();
+                                }
+                            })
+                            .catch((e) => {
+                                toast.error(`Failed to capture PayPal order: ${e.message}`);
+                            });
+                    }}
+                />
             </CardFooter>
         </Card>
     );
@@ -127,31 +136,35 @@ function CartView() {
             return;
         }
         setSubmitting(true);
-        try {
-            const body = zOrderCreate.parse({
-                user_id: user.id,
-                ray_id: c.ray_id,
-                products: Object.values(c.products).map(({ p, q }) => ({ id: p.id, price: p.price, count: q })),
-            });
-            const response = await fetch("/api/order", {
+        clientForward<Order>(() =>
+            fetch("/api/order", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body),
+                body: JSON.stringify(
+                    zOrderCreate.parse({
+                        user_id: user.id,
+                        ray_id: c.ray_id,
+                        products: Object.values(c.products).map(({ p, q }) => ({
+                            id: p.id,
+                            price: p.price,
+                            count: q,
+                            name: p.name,
+                        })),
+                    }),
+                ),
+            }),
+        )
+            .then((order) => {
+                clearCart();
+                toast.success("Order placed! Redirecting...");
+                navigate(`/checkout/${order.id}`);
+            })
+            .catch((e) => {
+                toast.error("Failed to place order: " + e.message);
+            })
+            .finally(() => {
+                setSubmitting(false);
             });
-            if (!response.ok) {
-                const error = ServerException.fromJson(await response.json().catch(() => null));
-                toast.error(`Failed to place order: ${error.message}`);
-                return;
-            }
-            const order: Order = await response.json();
-            clearCart();
-            toast.success("Order placed! Redirecting...");
-            navigate(`/checkout/${order.id}`);
-        } catch {
-            toast.error("Failed to place order");
-        } finally {
-            setSubmitting(false);
-        }
     }
 
     return (

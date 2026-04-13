@@ -1,5 +1,7 @@
+import os
 import uuid
 
+import paypal_orders
 from fastapi import APIRouter, Request, status
 from models import (
     Order,
@@ -8,13 +10,15 @@ from models import (
     OrderProductLink,
     OrderUpdate,
     OrderWithProducts,
+    PaypalTransaction,
     Product,
     Role,
     ServerConflictException,
+    ServerException,
     ServerNotFoundException,
 )
 from models import Session as UserSession
-from models import State
+from models import State, TransctionDetails
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, select
 
@@ -170,3 +174,137 @@ async def delete_order(request: Request, id: uuid.UUID):
         raise ServerNotFoundException
     db_session.delete(db_order)
     db_session.commit()
+
+
+@router.post("/me/paypal/{id}", status_code=status.HTTP_200_OK)
+@with_user()
+async def create_paypal_order(
+    request: Request, id: uuid.UUID, session: UserSession
+) -> PaypalTransaction:
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    db_session = state["session"]
+    api = state["OrdersApi"]
+    db_order = db_session.get(Order, id)
+    if not db_order or db_order.user_id != session.user.id:
+        raise ServerNotFoundException
+    transaction = PaypalTransaction(
+        order_id=db_order.id,
+        transaction_id="",
+        amount=db_order.price,
+        status=TransctionDetails.status.PENDING,
+    )
+
+    try:
+        result = api.orders_create(
+            paypal_orders.OrderRequest(
+                intent=paypal_orders.CheckoutPaymentIntent.CAPTURE,
+                purchase_units=[
+                    paypal_orders.PurchaseUnitRequest(
+                        custom_id=str(db_order.id),
+                        invoice_id=str(transaction.id),
+                        description=f"Order #{db_order.id} from The Generic Company",
+                        amount=paypal_orders.AmountWithBreakdown(
+                            currency_code=db_order.currency,
+                            value=f"{db_order.price:.2f}",
+                            breakdown=paypal_orders.AmountBreakdown(
+                                item_total=paypal_orders.Money(
+                                    currency_code=db_order.currency,
+                                    value=f"{db_order.price:.2f}",
+                                )
+                            ),
+                        ),
+                        items=[
+                            paypal_orders.ItemRequest(
+                                name=link.product.name,
+                                quantity=str(link.count),
+                                unit_amount=paypal_orders.Money(
+                                    currency_code=db_order.currency,
+                                    value=f"{link.price:.2f}",
+                                ),
+                                description=(
+                                    f"{link.product.description[:100]}{'...' if len(link.product.description) > 100 else ''}"
+                                    if link.product.description
+                                    else None
+                                ),
+                                image_url=(
+                                    (
+                                        f"{os.getenv('WEB_URL')}{link.product.images[0].url}"
+                                        if not link.product.images[0].url.startswith(
+                                            "http"
+                                        )
+                                        else link.product.images[0].url
+                                    )
+                                    if link.product.images
+                                    else None
+                                ),
+                                url=f"{os.getenv('WEB_URL')}/p/{link.product_id}",
+                                category="PHYSICAL_GOODS",
+                            )
+                            for link in db_order.product_links
+                        ],
+                    )
+                ],
+            ),
+            prefer="return=minimal",
+        )
+        if not result.id:
+            raise ServerException()
+    except Exception as e:
+        state["logger"].error(f"Failed to create PayPal order: {e}")
+        raise ServerException(message="Failed to create PayPal order")
+
+    transaction.transaction_id = result.id
+    db_session.add(transaction)
+    db_session.commit()
+    db_session.refresh(transaction)
+    return transaction
+
+
+@router.put("/me/paypal/{id}", status_code=status.HTTP_200_OK)
+@with_user()
+async def capture_paypal_order(
+    request: Request, id: uuid.UUID, session: UserSession
+) -> PaypalTransaction:
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    db_session = state["session"]
+    api = state["OrdersApi"]
+    transaction = db_session.exec(
+        select(PaypalTransaction).where(PaypalTransaction.id == id)
+    ).first()
+    if not transaction:
+        raise ServerNotFoundException
+    db_order = transaction.order
+    if not db_order or db_order.user_id != session.user.id:
+        raise ServerNotFoundException
+    if transaction.status != TransctionDetails.status.PENDING:
+        raise ServerConflictException(message="Invalid transaction status")
+    if db_order.paid:
+        raise ServerConflictException(message="Order has already been paid")
+    try:
+        result = api.orders_capture(transaction.transaction_id)
+        if result.status == paypal_orders.OrderStatus.COMPLETED:
+            transaction.status = TransctionDetails.status.COMPLETED
+            db_order.paid = True
+        else:
+            transaction.status = TransctionDetails.status.FAILED
+    except paypal_orders.ApiException as e:
+        state["logger"].error(f"Failed to capture PayPal order: {e}")
+        try:
+            error = paypal_orders.Error.model_validate_json(
+                e.body  # pyright: ignore[reportArgumentType, reportUnknownMemberType]
+            )
+            state["logger"].error(f"PayPal API error: {error}")
+            if error.details and error.details[0].issue == "INSTRUMENT_DECLINED":
+                transaction.status = TransctionDetails.status.PENDING
+            else:
+                transaction.status = TransctionDetails.status.FAILED
+        except Exception as e2:
+            state["logger"].error(f"Failed to parse PayPal API error: {e2}")
+            transaction.status = TransctionDetails.status.FAILED
+
+    db_session.add(transaction)
+    db_session.add(db_order)
+    db_session.commit()
+    db_session.refresh(transaction)
+
+    return transaction

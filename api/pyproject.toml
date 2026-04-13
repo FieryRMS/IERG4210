@@ -12,12 +12,21 @@ dependencies = [
     "pydantic-partial>=0.10.2",
     "sqlalchemy>=2.0.47",
     "sqlmodel>=0.0.37",
+    "alembic-postgresql-enum>=1.10.0",
+    "requests>=2.33.1",
+    "paypal-orders",
 ]
 
 [tool.fastapi]
 entrypoint = "main:app"
 
+[tool.uv.sources]
+paypal-orders = { path = "./generated/paypal_orders" }
+
 [dependency-groups]
 dev = [
     "alembic[tz]>=1.18.4",
+]
+prebuild = [
+    "openapi-generator-cli>=7.21.0",
 ]

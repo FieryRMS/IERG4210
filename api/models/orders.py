@@ -10,7 +10,29 @@ from .products import Product
 
 
 class Currency(str, enum.Enum):
+    Australian_dollar = "AUD"
+    Brazilian_real = "BRL"
+    Canadian_dollar = "CAD"
+    Chinese_Renmenbi = "CNY"
+    Czech_koruna = "CZK"
+    Danish_krone = "DKK"
+    Euro = "EUR"
+    Hong_Kong_dollar = "HKD"
     HKD = "HKD"
+    # Israeli_new_shekel = "ILS" doesnt exist
+    Malaysian_ringgit = "MYR"
+    Mexican_peso = "MXN"
+    New_Zealand_dollar = "NZD"
+    Norwegian_krone = "NOK"
+    Philippine_peso = "PHP"
+    Polish_złoty = "PLN"
+    Pound_sterling = "GBP"
+    Russian_ruble = "RUB"
+    Singapore_dollar = "SGD"
+    Swedish_krona = "SEK"
+    Swiss_franc = "CHF"
+    Thai_baht = "THB"
+    United_States_dollar = "USD"
 
 
 class OrderDetails(BaseModel):
@@ -65,6 +87,10 @@ class Order(OrderDetails, SQLModel, table=True):
     max_age: int = 60 * 60 * 24 * 7  # 7 days in seconds
     paid: bool = False
 
+    paypal_transactions: list["PaypalTransaction"] = Relationship(
+        back_populates="order"
+    )
+
     product_links: list[OrderProductLink] = Relationship(
         back_populates="order", cascade_delete=True
     )
@@ -83,6 +109,26 @@ class Order(OrderDetails, SQLModel, table=True):
         return sum(link.price * link.count for link in self.product_links)
 
 
+class TransactionStatus(str, enum.Enum):
+    COMPLETED = "COMPLETED"
+    PENDING = "PENDING"
+    FAILED = "FAILED"
+    REFUNDED = "REFUNDED"
+    CANCELED = "CANCELED"
+
+
+class TransctionDetails(BaseModel):
+    order_id: uuid.UUID | None = Field(foreign_key="orders.id", ondelete="CASCADE")
+    transaction_id: str
+    amount: float
+    status: TransactionStatus
+
+
+class PaypalTransaction(TransctionDetails, SQLModel, table=True):
+    __tablename__ = "paypal_transactions"  # pyright: ignore[reportAssignmentType]
+    order: Order | None = Relationship(back_populates="paypal_transactions")
+
+
 __all__ = [
     "Order",
     "OrderCreate",
@@ -91,4 +137,8 @@ __all__ = [
     "ProductOrder",
     "OrderCreateProducts",
     "OrderWithProducts",
+    "TransctionDetails",
+    "TransactionStatus",
+    "Currency",
+    "PaypalTransaction",
 ]

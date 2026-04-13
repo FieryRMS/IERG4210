@@ -38,6 +38,7 @@ import { sdk, applyAuth, applySessionCookie } from "./lib/server.utils";
 import { ServerException, ServerForbiddenException } from "./lib/errors";
 import { ErrorPage } from "@/components/error-page";
 import { getReasonPhrase } from "http-status-codes";
+import { PayPalScriptProvider, type ReactPayPalScriptOptions } from "@paypal/react-paypal-js";
 
 const authMiddleware: Route.MiddlewareFunction = async ({ request, context }, next) => {
     const { data, response: sdkResponse } = await sdk.users.getUsersMe(await applyAuth(request));
@@ -109,6 +110,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
         .filter((match) => match.handle && match.handle.breadcrumb)
         .map((match) => match.handle.breadcrumb!(match));
 
+    const initialOptions: ReactPayPalScriptOptions = {
+        clientId: import.meta.env.VITE_O_AUTH_CLIENT_ID,
+        dataCspNonce: nonce,
+        currency: "HKD"
+    };
     const shouldBlock = useCallback<BlockerFunction>(
         ({ currentLocation, nextLocation, historyAction }) => {
             // if pushing new entry
@@ -156,26 +162,28 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     `}
                 </script>
             </head>
-            <ThemeProvider defaultTheme={loaderData?.theme}>
-                <AuthProvider user={loaderData?.user ?? null}>
-                    <NonceProvider nonce={nonce}>
-                        <CartProvider>
-                            <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden grid grid-rows-[auto_1fr_auto]">
-                                <header className="sticky top-0 z-50 w-full bg-background pb-2">
-                                    <Navbar categories={loaderData?.categories || []} />
-                                </header>
-                                <main className="py-4 w-full h-full">{children}</main>
-                                <footer className="w-full py-6">
-                                    <Footer />
-                                </footer>
-                                <ScrollRestoration nonce={nonce} />
-                                <Scripts nonce={nonce} />
-                                <Toaster theme={loaderData?.theme} />
-                            </body>
-                        </CartProvider>
-                    </NonceProvider>
-                </AuthProvider>
-            </ThemeProvider>
+            <PayPalScriptProvider options={initialOptions}>
+                <ThemeProvider defaultTheme={loaderData?.theme}>
+                    <AuthProvider user={loaderData?.user ?? null}>
+                        <NonceProvider nonce={nonce}>
+                            <CartProvider>
+                                <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden grid grid-rows-[auto_1fr_auto]">
+                                    <header className="sticky top-0 z-50 w-full bg-background pb-2">
+                                        <Navbar categories={loaderData?.categories || []} />
+                                    </header>
+                                    <main className="py-4 w-full h-full">{children}</main>
+                                    <footer className="w-full py-6">
+                                        <Footer />
+                                    </footer>
+                                    <ScrollRestoration nonce={nonce} />
+                                    <Scripts nonce={nonce} />
+                                    <Toaster theme={loaderData?.theme} />
+                                </body>
+                            </CartProvider>
+                        </NonceProvider>
+                    </AuthProvider>
+                </ThemeProvider>
+            </PayPalScriptProvider>
         </html>
     );
 }

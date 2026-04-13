@@ -7,6 +7,7 @@ sys.path.insert(
 
 from logging.config import fileConfig
 
+import alembic_postgresql_enum  # pyright: ignore[reportUnusedImport]
 import dotenv
 from alembic import context
 from sqlalchemy import MetaData, engine_from_config, pool
