@@ -1,6 +1,15 @@
 import type { Route } from "./+types/admin";
 import type { PageHandle } from "@/types";
-import type { Product, Category, Image, User, Session } from "@/lib/generated/types.gen";
+import type {
+    Product,
+    Category,
+    Image,
+    User,
+    Session,
+    Order,
+    PaypalTransaction,
+    ProductOrder,
+} from "@/lib/generated/types.gen";
 import { z } from "zod";
 import { Input } from "@/components/ui/input";
 import { Any2FormData, clientForward, cn } from "@/lib/utils";
@@ -45,7 +54,15 @@ import type { AnyFieldApi, AnyFormApi } from "@tanstack/react-form";
 import { useAuth } from "@/hooks/auth";
 import { useNavigate } from "react-router";
 
-export type TableTypes = "Product" | "Category" | "Image" | "User" | "Session" | "Product Images";
+export type TableTypes =
+    | "Product"
+    | "Category"
+    | "Image"
+    | "User"
+    | "Session"
+    | "Product Images"
+    | "Order"
+    | "PaypalTransaction";
 
 function ForeignKeyCombobox<T extends { id?: string }>({
     items,
@@ -120,17 +137,21 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const user = context.get(UserContext);
     if (!user || user.role !== "admin") throw redirect("/");
     const auth = await applyAuth(request);
-    const { data: products, error: perror } = await sdk.products.getProducts(auth);
-    const { data: categories, error: cerror } = await sdk.categories.getCategories(auth);
-    const { data: images, error: ierror } = await sdk.images.getImages(auth);
-    const { data: users, error: uerror } = await sdk.users.getUsers(auth);
+    const { request: _prq, response: _prs, ...products } = await sdk.products.getProducts(auth);
+    const { request: _crq, response: _crs, ...categories } = await sdk.categories.getCategories(auth);
+    const { request: _irq, response: _irs, ...images } = await sdk.images.getImages(auth);
+    const { request: _urq, response: _urs, ...users } = await sdk.users.getUsers(auth);
+    const { request: _orq, response: _ors, ...orders } = await sdk.orders.getOrders(auth);
+    const { request: _ptrq, response: _ptrs, ...transactions } = await sdk.orders.getOrdersPaypalTransactions(auth);
     const csrf = context.get(CsrfContext);
 
     return {
-        products: { data: products, error: perror },
-        categories: { data: categories, error: cerror },
-        images: { data: images, error: ierror },
-        users: { data: users, error: uerror },
+        products,
+        categories,
+        images,
+        users,
+        orders,
+        transactions,
         csrf,
     };
 }
@@ -140,6 +161,8 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     const [categories, setCategories] = useState(loaderData.categories.data ?? []);
     const [images, setImages] = useState(loaderData.images.data ?? []);
     const [users, setUsers] = useState(loaderData.users.data ?? []);
+    const [orders, setOrders] = useState(loaderData.orders.data ?? []);
+    const [transactions, setTransactions] = useState(loaderData.transactions.data ?? []);
     const { user } = useAuth();
     const navigate = useNavigate();
 
@@ -150,6 +173,14 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         });
         return map;
     }, [images]);
+
+    const productMap = React.useMemo(() => {
+        const map = new Map<unknown, Product>();
+        products.forEach((product) => {
+            if (product.id) map.set(product.id, product);
+        });
+        return map;
+    }, [products]);
 
     useEffect(() => {
         if (user?.role !== "admin") {
@@ -416,6 +447,69 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             },
         ]),
     };
+
+    const OConfig: Config<Order, TableTypes> = {
+        TableType: "Order",
+        desc: "Order CRUD",
+        onSubmit: onSubmit<Order, TableTypes>,
+        fields: FieldConfigDefaults<Order, TableTypes>([
+            { key: "id", disabled: () => true },
+            { key: "created_at", disabled: () => true },
+            { key: "updated_at", disabled: () => true },
+            { key: "user_id" },
+            { key: "paid" },
+            { key: "currency" },
+            { key: "total_price" },
+            {
+                key: "products",
+                disabled: () => false,
+                nested: {
+                    TableType: "Product",
+                    desc: "Products for Order",
+                    onSubmit: ({ value }) => {
+                        return value as ProductOrder;
+                    },
+                    fields: FieldConfigDefaults<ProductOrder, TableTypes>([
+                        { key: "id", disabled: () => true },
+                        {
+                            key: "id",
+                            name: "name",
+                            Render: ({ disabled, field, className }) => {
+                                const name = productMap.get(field.state.value)?.name ?? field.state.value;
+                                return (
+                                    <Input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={name}
+                                        className={className}
+                                        readOnly={disabled}
+                                    />
+                                );
+                            },
+                        },
+                        { key: "price", disabled: () => true },
+                        { key: "count", disabled: () => true },
+                    ]),
+                },
+            },
+        ]),
+    };
+
+    const TConfig: Config<PaypalTransaction, TableTypes> = {
+        TableType: "PaypalTransaction",
+        desc: "Paypal Transaction CRUD",
+        onSubmit: onSubmit<PaypalTransaction, TableTypes>,
+        fields: FieldConfigDefaults<PaypalTransaction, TableTypes>([
+            { key: "id", disabled: () => true },
+            { key: "created_at", disabled: () => true },
+            { key: "updated_at", disabled: () => true },
+            { key: "transaction_id" },
+            { key: "order_id" },
+            { key: "status" },
+            { key: "amount" },
+        ]),
+    };
+
     return (
         <div className="p-4">
             <h1 className="text-2xl font-bold mb-4 w-full text-center">Admin Dashboard</h1>
@@ -461,6 +555,28 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                         </p>
                     ) : (
                         <TableGenerator data={users ?? []} config={UConfig} onSubmit={setUsers} />
+                    )}
+                </div>
+                <div className="p-4 rounded shadow">
+                    <h2 className="text-xl font-semibold mb-2 w-full text-center">Orders</h2>
+                    {loaderData.orders.error ? (
+                        <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
+                            Failed to load orders:{" "}
+                            {`${loaderData.orders.error.name} - ${loaderData.orders.error.message}`}
+                        </p>
+                    ) : (
+                        <TableGenerator data={orders ?? []} config={OConfig} onSubmit={setOrders} />
+                    )}
+                </div>
+                <div className="p-4 rounded shadow">
+                    <h2 className="text-xl font-semibold mb-2 w-full text-center">Paypal Transactions</h2>
+                    {loaderData.transactions.error ? (
+                        <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
+                            Failed to load transactions:{" "}
+                            {`${loaderData.transactions.error.name} - ${loaderData.transactions.error.message}`}
+                        </p>
+                    ) : (
+                        <TableGenerator data={transactions ?? []} config={TConfig} onSubmit={setTransactions} />
                     )}
                 </div>
             </div>

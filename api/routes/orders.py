@@ -172,6 +172,14 @@ async def delete_order(request: Request, id: uuid.UUID):
     db_session.commit()
 
 
+@router.get("/paypal/transactions", status_code=status.HTTP_200_OK)
+@with_user(roles=[Role.admin])
+async def get_paypal_transactions(request: Request) -> list[PaypalTransaction]:
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    db_session = state["session"]
+    return list(db_session.exec(select(PaypalTransaction)).all())
+
+
 @router.post("/me/paypal/{id}", status_code=status.HTTP_200_OK)
 @with_user()
 async def create_paypal_order(
@@ -290,5 +298,4 @@ async def capture_paypal_order(
     db_session.commit()
     db_session.refresh(transaction)
 
-    return transaction
     return transaction

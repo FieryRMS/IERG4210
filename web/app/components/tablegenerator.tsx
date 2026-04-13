@@ -57,7 +57,7 @@ type FieldConfig<T extends { id?: string }, TableTypes extends string = string> 
             isEditing: boolean;
             create: boolean;
             isSubmitting: boolean;
-            methods: Config<T, TableTypes>["methods"];
+            methods?: Config<T, TableTypes>["methods"];
         }) => boolean;
         Render: (props: {
             create?: boolean;
@@ -81,7 +81,7 @@ type FieldConfig<T extends { id?: string }, TableTypes extends string = string> 
 export type Config<T extends { id?: string }, TableTypes extends string = string, K extends keyof T = keyof T> = {
     TableType: TableTypes;
     desc: string;
-    methods: {
+    methods?: {
         post?: z.ZodObject;
         put?: z.ZodObject;
         delete?: z.ZodObject;
@@ -103,7 +103,7 @@ export function FieldConfigDefaults<
         name: field.key as string,
 
         disabled: ({ isEditing, create, isSubmitting, methods }) =>
-            (!isEditing && !create) || isSubmitting || methods.post === undefined,
+            (!isEditing && !create) || isSubmitting || methods?.post === undefined,
         Render: ({ disabled, field, className }) => {
             return (
                 <Input
@@ -158,9 +158,9 @@ function RowGenerator<
         return null;
     };
     const method2schema = (method: ReturnType<typeof state2method>) => {
-        if (method === "post") return config.methods.post;
-        if (method === "put") return config.methods.put;
-        if (method === "delete") return config.methods.delete;
+        if (method === "post") return config.methods?.post;
+        if (method === "put") return config.methods?.put;
+        if (method === "delete") return config.methods?.delete;
         return null;
     };
     const form = useAppForm({
@@ -168,8 +168,8 @@ function RowGenerator<
         validators: {
             onChangeAsync: ({ formApi }) => {
                 let schema: z.ZodObject | undefined;
-                if (create) schema = config.methods.post;
-                else schema = config.methods.put;
+                if (create) schema = config.methods?.post;
+                else schema = config.methods?.put;
                 if (!schema) return;
                 const errors = formApi.parseValuesWithSchema(schema);
                 if (!errors) return errors;
@@ -352,7 +352,7 @@ function RowGenerator<
                                                 form.handleSubmit();
                                             }
                                         }}
-                                        disabled={bState.includes("submit") || config.methods.post === undefined}
+                                        disabled={bState.includes("submit") || config.methods?.post === undefined}
                                     >
                                         {["idle", "create"].includes(bState) && (
                                             <ConfirmAnim
@@ -378,7 +378,7 @@ function RowGenerator<
                                                 }
                                                 setBState((prev) => (prev === "idle" ? "edit" : prev));
                                             }}
-                                            disabled={bState.includes("submit") || config.methods.put === undefined}
+                                            disabled={bState.includes("submit") || config.methods?.put === undefined}
                                         >
                                             {["edit", "save"].includes(bState) && (
                                                 <ConfirmAnim
@@ -422,7 +422,7 @@ function RowGenerator<
                                                     form.reset();
                                                 }
                                             }}
-                                            disabled={bState.includes("submit") || config.methods.delete === undefined}
+                                            disabled={bState.includes("submit") || config.methods?.delete === undefined}
                                         >
                                             {["idle", "delete"].includes(bState) && (
                                                 <ConfirmAnim
@@ -510,19 +510,21 @@ export function TableGenerator<
                         }}
                     />
                 ))}
-                <RowGenerator
-                    row={{} as T}
-                    config={config}
-                    create
-                    onSubmit={async ({ config, method, value }) => {
-                        const result = await config.onSubmit({ config, method, value });
-                        if (method === "post") {
-                            const next = [...data, result];
-                            onSubmit?.(next);
-                        }
-                        return result;
-                    }}
-                />
+                {config.methods?.post && (
+                    <RowGenerator
+                        row={{} as T}
+                        config={config}
+                        create
+                        onSubmit={async ({ config, method, value }) => {
+                            const result = await config.onSubmit({ config, method, value });
+                            if (method === "post") {
+                                const next = [...data, result];
+                                onSubmit?.(next);
+                            }
+                            return result;
+                        }}
+                    />
+                )}
             </TableBody>
         </Table>
     );
