@@ -367,97 +367,113 @@ function RowGenerator<
                                     </Button>
                                 ) : (
                                     <>
-                                        <Button
-                                            className="p-2 mx-1 relative overflow-hidden group"
-                                            variant="outline"
-                                            type="button"
-                                            onClick={() => {
-                                                if (!isSubmitting && bState === "save" && canSubmit) {
-                                                    setBState("ssubmit");
-                                                    form.handleSubmit();
-                                                }
-                                                setBState((prev) => (prev === "idle" ? "edit" : prev));
-                                            }}
-                                            disabled={bState.includes("submit") || config.methods?.put === undefined}
-                                        >
-                                            {["edit", "save"].includes(bState) && (
-                                                <ConfirmAnim
-                                                    className="bg-blue-500"
-                                                    onConfirm={() =>
-                                                        setBState((prev) => (prev === "edit" ? "save" : prev))
+                                        {config.methods?.put && (
+                                            <Button
+                                                className="p-2 mx-1 relative overflow-hidden group"
+                                                variant="outline"
+                                                type="button"
+                                                onClick={() => {
+                                                    if (!isSubmitting && bState === "save" && canSubmit) {
+                                                        setBState("ssubmit");
+                                                        form.handleSubmit();
                                                     }
-                                                    onStart={() =>
-                                                        setBState((prev) => (prev === "save" ? "edit" : prev))
-                                                    }
-                                                />
-                                            )}
-                                            <Pencil
-                                                className={
-                                                    "transition-all " +
-                                                    (!["edit", "save", "ssubmit"].includes(bState)
-                                                        ? "scale-100 rotate-0"
-                                                        : "scale-0 -rotate-90")
+                                                    setBState((prev) => (prev === "idle" ? "edit" : prev));
+                                                }}
+                                                disabled={
+                                                    bState.includes("submit") || config.methods?.put === undefined
                                                 }
-                                            />
-                                            <Check
-                                                className={
-                                                    "transition-all absolute " +
-                                                    (["edit", "save"].includes(bState)
-                                                        ? "scale-100 rotate-0"
-                                                        : "scale-0 rotate-90")
-                                                }
-                                            />
-                                            {bState === "ssubmit" && <Spinner className="absolute inset-0 m-auto" />}
-                                        </Button>
-                                        <Button
-                                            className="p-2 mx-1 relative overflow-hidden group"
-                                            variant="outline"
-                                            type="button"
-                                            onClick={() => {
-                                                if (!isSubmitting && bState === "delete" && canSubmit) {
-                                                    setBState("dsubmit");
-                                                    form.handleSubmit();
-                                                } else if (!isSubmitting && !bState.includes("submit")) {
-                                                    setBState("idle");
-                                                    form.reset();
-                                                }
-                                            }}
-                                            disabled={bState.includes("submit") || config.methods?.delete === undefined}
-                                        >
-                                            {["idle", "delete"].includes(bState) && (
-                                                <ConfirmAnim
-                                                    className="bg-red-500"
-                                                    onConfirm={() => {
-                                                        setBState((prev) => (prev === "idle" ? "delete" : prev));
-                                                    }}
-                                                    onStart={() =>
-                                                        setBState((prev) => (prev === "delete" ? "idle" : prev))
-                                                    }
-                                                />
-                                            )}
-                                            {bState === "dsubmit" ? (
-                                                <Spinner />
-                                            ) : (
-                                                <>
-                                                    <Trash
-                                                        className={
-                                                            "transition-all " +
-                                                            (["idle", "delete", "dsubmit"].includes(bState)
-                                                                ? "scale-100 rotate-0"
-                                                                : "scale-0 -rotate-90")
+                                            >
+                                                {["edit", "save"].includes(bState) && (
+                                                    <ConfirmAnim
+                                                        className="bg-blue-500"
+                                                        onConfirm={() =>
+                                                            setBState((prev) => (prev === "edit" ? "save" : prev))
+                                                        }
+                                                        onStart={() =>
+                                                            setBState((prev) => (prev === "save" ? "edit" : prev))
                                                         }
                                                     />
-                                                    <X
-                                                        className={
-                                                            "transition-all absolute " +
-                                                            (!["idle", "delete", "dsubmit"].includes(bState)
-                                                                ? "scale-100 rotate-0"
-                                                                : "scale-0 rotate-90")
+                                                )}
+                                                <Pencil
+                                                    className={
+                                                        "transition-all " +
+                                                        (!["edit", "save", "ssubmit"].includes(bState)
+                                                            ? "scale-100 rotate-0"
+                                                            : "scale-0 -rotate-90")
+                                                    }
+                                                />
+                                                <Check
+                                                    className={
+                                                        "transition-all absolute " +
+                                                        (["edit", "save"].includes(bState)
+                                                            ? "scale-100 rotate-0"
+                                                            : "scale-0 rotate-90")
+                                                    }
+                                                />
+                                                {bState === "ssubmit" && (
+                                                    <Spinner className="absolute inset-0 m-auto" />
+                                                )}
+                                            </Button>
+                                        )}
+                                        {(config.methods?.delete || config.methods?.put) && (
+                                            <Button
+                                                className="p-2 mx-1 relative overflow-hidden group"
+                                                variant="outline"
+                                                type="button"
+                                                onClick={() => {
+                                                    if (!isSubmitting && bState === "delete" && canSubmit) {
+                                                        setBState("dsubmit");
+                                                        form.handleSubmit();
+                                                    } else if (!isSubmitting && !bState.includes("submit")) {
+                                                        setBState("idle");
+                                                        form.reset();
+                                                    }
+                                                }}
+                                                disabled={
+                                                    bState.includes("submit") ||
+                                                    (config.methods?.delete === undefined &&
+                                                        ["idle", "delete", "dsubmit"].includes(bState))
+                                                }
+                                            >
+                                                {["idle", "delete"].includes(bState) && (
+                                                    <ConfirmAnim
+                                                        className="bg-red-500"
+                                                        onConfirm={() => {
+                                                            setBState((prev) => (prev === "idle" ? "delete" : prev));
+                                                        }}
+                                                        onStart={() =>
+                                                            setBState((prev) => (prev === "delete" ? "idle" : prev))
                                                         }
                                                     />
-                                                </>
-                                            )}
-                                        </Button>
+                                                )}
+                                                {bState === "dsubmit" ? (
+                                                    <Spinner />
+                                                ) : (
+                                                    <>
+                                                        <Trash
+                                                            className={
+                                                                "transition-all " +
+                                                                (["idle", "delete", "dsubmit"].includes(bState) &&
+                                                                config.methods?.delete
+                                                                    ? "scale-100 rotate-0"
+                                                                    : "scale-0 -rotate-90")
+                                                            }
+                                                        />
+                                                        <X
+                                                            className={
+                                                                "transition-all absolute " +
+                                                                (!(
+                                                                    ["idle", "delete", "dsubmit"].includes(bState) &&
+                                                                    config.methods?.delete
+                                                                )
+                                                                    ? "scale-100 rotate-0"
+                                                                    : "scale-0 rotate-90")
+                                                            }
+                                                        />
+                                                    </>
+                                                )}
+                                            </Button>
+                                        )}
                                     </>
                                 )}
                             </>
