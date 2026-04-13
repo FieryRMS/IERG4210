@@ -1,5 +1,5 @@
 import type { Route } from "./+types/checkout.($id)";
-import type { Order, OrderWithProducts, PaypalTransaction } from "@/lib/generated/types.gen";
+import type { Order, OrderWithProducts, Transaction } from "@/lib/generated/types.gen";
 import type { PageHandle } from "@/types";
 import { redirect, useNavigate } from "react-router";
 import { useState } from "react";
@@ -95,7 +95,7 @@ function OrderView({ order }: { order: OrderWithProducts }) {
                         }}
                         className="w-full p-2 bg-white rounded disabled:cursor-not-allowed disabled:opacity-50 z-0!"
                         createOrder={async () => {
-                            return clientForward<PaypalTransaction>(() =>
+                            return clientForward<Transaction>(() =>
                                 fetch(`/api/paypal/${order.order.id}`, { method: "POST" }),
                             )
                                 .then((data) => data.transaction_id)
@@ -105,7 +105,7 @@ function OrderView({ order }: { order: OrderWithProducts }) {
                                 });
                         }}
                         onApprove={async (data, actions) => {
-                            clientForward<PaypalTransaction>(() =>
+                            clientForward<Transaction>(() =>
                                 fetch(`/api/paypal/${data.orderID}`, {
                                     method: "PUT",
                                 }),
@@ -117,6 +117,8 @@ function OrderView({ order }: { order: OrderWithProducts }) {
                                     } else if (data.status === "PENDING") {
                                         toast("Payment could not be completed. Try again");
                                         actions.restart();
+                                    } else {
+                                        toast.error(`Payment failed with status: ${data.status}`);
                                     }
                                 })
                                 .catch((e) => {

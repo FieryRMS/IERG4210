@@ -7,6 +7,7 @@ from sqlmodel import Field, Relationship, UniqueConstraint
 
 from .base import BaseModel, SQLModel
 from .products import Product
+from .users import User
 
 
 class Currency(str, enum.Enum):
@@ -87,9 +88,7 @@ class Order(OrderDetails, SQLModel, table=True):
     max_age: int = 60 * 60 * 24 * 7  # 7 days in seconds
     paid: bool = False
 
-    paypal_transactions: list["PaypalTransaction"] = Relationship(
-        back_populates="order"
-    )
+    transactions: list["Transaction"] = Relationship(back_populates="order")
 
     product_links: list[OrderProductLink] = Relationship(
         back_populates="order", cascade_delete=True
@@ -112,21 +111,29 @@ class Order(OrderDetails, SQLModel, table=True):
 class TransactionStatus(str, enum.Enum):
     COMPLETED = "COMPLETED"
     PENDING = "PENDING"
+    AUTHORIZED = "AUTHORIZED"
     FAILED = "FAILED"
     REFUNDED = "REFUNDED"
     CANCELED = "CANCELED"
 
 
-class TransctionDetails(BaseModel):
-    order_id: uuid.UUID | None = Field(foreign_key="orders.id", ondelete="CASCADE")
+class PaymentProvider(str, enum.Enum):
+    PAYPAL = "PAYPAL"
+
+
+class Transaction(SQLModel, table=True):
+    __tablename__ = "transactions"  # pyright: ignore[reportAssignmentType]
+    __table_args__ = (UniqueConstraint("transaction_id", "provider"),)
+
+    order_id: uuid.UUID | None = Field(foreign_key="orders.id")
+    user_id: uuid.UUID | None = Field(foreign_key="users.id")
+    provider: PaymentProvider
     transaction_id: str
-    amount: float
+    price: float
     status: TransactionStatus
 
-
-class PaypalTransaction(TransctionDetails, SQLModel, table=True):
-    __tablename__ = "paypal_transactions"  # pyright: ignore[reportAssignmentType]
-    order: Order | None = Relationship(back_populates="paypal_transactions")
+    order: Order | None = Relationship(back_populates="transactions")
+    user: User | None = Relationship(back_populates="transactions")
 
 
 __all__ = [
@@ -137,8 +144,8 @@ __all__ = [
     "ProductOrder",
     "OrderCreateProducts",
     "OrderWithProducts",
-    "TransctionDetails",
     "TransactionStatus",
     "Currency",
-    "PaypalTransaction",
+    "PaymentProvider",
+    "Transaction",
 ]

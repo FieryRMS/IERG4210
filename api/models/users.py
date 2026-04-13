@@ -2,6 +2,7 @@ import enum
 import secrets
 import uuid
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError
@@ -12,6 +13,9 @@ from pydantic_partial import PartialModelMixin
 from sqlmodel import Field, Relationship
 
 from .base import BaseModel, SQLModel
+
+if TYPE_CHECKING:
+    from .orders import Transaction
 
 _ph = PasswordHasher()
 
@@ -65,11 +69,8 @@ class User(_User, SQLModel, table=True):
 
     role: Role = Role.user
     password_hash: str = Field(exclude=True, default="")
-    sessions: list["Session"] = Relationship(
-        back_populates="user",
-        cascade_delete=True,
-        sa_relationship_kwargs={"lazy": "selectin"},
-    )
+    sessions: list["Session"] = Relationship(back_populates="user", cascade_delete=True)
+    transactions: list["Transaction"] = Relationship(back_populates="user")
 
     @computed_field(alias="sessions")
     @property

@@ -90,7 +90,7 @@ export type Config<T extends { id?: string }, TableTypes extends string = string
         config: Config<T, TableTypes, K>;
         method: HTMLFormMethod;
         value: Partial<Record<K, SchemaType>>;
-    }) => T | Promise<T>;
+    }) => T | Promise<T | void>;
     fields: FieldConfig<T, TableTypes>[];
 };
 
@@ -112,7 +112,7 @@ export function FieldConfigDefaults<
                     value={field.state.value ?? ""}
                     name={field.name}
                     onChange={(e) => field.handleChange(e.target.value)}
-                    className={className}
+                    className={cn("field-sizing-content", className)}
                     readOnly={disabled}
                 />
             );
@@ -491,7 +491,7 @@ export function TableGenerator<
     K extends keyof T & string = keyof T & string,
 >({ data, config, onSubmit }: { data: T[]; config: Config<T, TableTypes, K>; onSubmit: (updatedRows: T[]) => void }) {
     return (
-        <Table className="px-10">
+        <Table>
             <TableCaption className="text-center">{config.desc}</TableCaption>
             <TableHeader>
                 <TableRow>
@@ -512,12 +512,12 @@ export function TableGenerator<
                         onSubmit={async ({ config, method, value }) => {
                             const result = await config.onSubmit({ config, method, value });
 
-                            if (method === "put") {
+                            if (result) {
                                 const next = data.map((row) =>
                                     row.id === item.id ? ({ ...row, ...result } as T) : row,
                                 );
                                 onSubmit?.(next);
-                            } else if (method === "delete") {
+                            } else {
                                 const next = data.filter((row) => row.id !== item.id);
                                 onSubmit?.(next);
                             }
@@ -534,7 +534,7 @@ export function TableGenerator<
                         onSubmit={async ({ config, method, value }) => {
                             const result = await config.onSubmit({ config, method, value });
                             if (method === "post") {
-                                const next = [...data, result];
+                                const next = [...data, result!];
                                 onSubmit?.(next);
                             }
                             return result;

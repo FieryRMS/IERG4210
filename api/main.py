@@ -24,7 +24,7 @@ POSTGRES_URL = os.getenv("POSTGRES_URL")
 
 config = paypal.Configuration(
     host=os.getenv("PAYPAL_API_BASE_URL", "https://api-m.sandbox.paypal.com"),
-    username=os.getenv("O_AUTH_CLIENT_ID"),
+    username=os.getenv("VITE_O_AUTH_CLIENT_ID"),
     password=os.getenv("O_AUTH_CLIENT_SECRET"),
 )
 
@@ -257,3 +257,5 @@ app.include_router(routes.products.router)
 app.include_router(routes.images.router)
 app.include_router(routes.users.router)
 app.include_router(routes.orders.router)
+app.include_router(routes.transactions.router)
+app.include_router(routes.paypal.router)

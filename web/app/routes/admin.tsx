@@ -7,7 +7,7 @@ import type {
     User,
     Session,
     Order,
-    PaypalTransaction,
+    Transaction,
     ProductOrder,
 } from "@/lib/generated/types.gen";
 import { z } from "zod";
@@ -35,6 +35,7 @@ import {
     zImageUpdate,
     zProductCreate,
     zProductUpdate,
+    zPutTransactionsCancelByIdData,
     zUserCreate,
     zUserUpdate,
 } from "@/lib/generated/zod.gen";
@@ -53,6 +54,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import type { AnyFieldApi, AnyFormApi } from "@tanstack/react-form";
 import { useAuth } from "@/hooks/auth";
 import { useNavigate } from "react-router";
+import { ServerMethodNotAllowedException } from "@/lib/errors";
 
 export type TableTypes =
     | "Product"
@@ -62,7 +64,7 @@ export type TableTypes =
     | "Session"
     | "Product Images"
     | "Order"
-    | "PaypalTransaction";
+    | "Transaction";
 
 function ForeignKeyCombobox<T extends { id?: string }>({
     items,
@@ -142,7 +144,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const { request: _irq, response: _irs, ...images } = await sdk.images.getImages(auth);
     const { request: _urq, response: _urs, ...users } = await sdk.users.getUsers(auth);
     const { request: _orq, response: _ors, ...orders } = await sdk.orders.getOrders(auth);
-    const { request: _ptrq, response: _ptrs, ...transactions } = await sdk.orders.getOrdersPaypalTransactions(auth);
+    const { request: _ptrq, response: _ptrs, ...transactions } = await sdk.transactions.getTransactions(auth);
     const csrf = context.get(CsrfContext);
 
     return {
@@ -495,18 +497,36 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         ]),
     };
 
-    const TConfig: Config<PaypalTransaction, TableTypes> = {
-        TableType: "PaypalTransaction",
-        desc: "Paypal Transaction CRUD",
-        onSubmit: onSubmit<PaypalTransaction, TableTypes>,
-        fields: FieldConfigDefaults<PaypalTransaction, TableTypes>([
+    const TConfig: Config<Transaction, TableTypes> = {
+        TableType: "Transaction",
+        desc: "Transaction CRUD",
+        methods: {
+            delete: zPutTransactionsCancelByIdData.shape.path,
+        },
+        onSubmit: async ({ method, value }) => {
+            if (method !== "delete") {
+                toast.error(`Only canceling transactions is allowed`);
+                throw new ServerMethodNotAllowedException();
+            }
+            return clientForward(() => fetch(`/api/transaction/${value.id}`, { method: "PUT" }))
+                .then((data) => {
+                    toast.success(`Transaction cancelled successfully`);
+                    return data as Transaction;
+                })
+                .catch((e) => {
+                    toast.error(`Failed to cancel transaction: ${e.message}`);
+                    throw e;
+                });
+        },
+        fields: FieldConfigDefaults<Transaction, TableTypes>([
             { key: "id", disabled: () => true },
             { key: "created_at", disabled: () => true },
             { key: "updated_at", disabled: () => true },
             { key: "transaction_id" },
             { key: "order_id" },
             { key: "status" },
-            { key: "amount" },
+            { key: "price" },
+            { key: "provider" },
         ]),
     };
 

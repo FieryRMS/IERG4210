@@ -113,7 +113,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
     const initialOptions: ReactPayPalScriptOptions = {
         clientId: import.meta.env.VITE_O_AUTH_CLIENT_ID,
         dataCspNonce: nonce,
-        currency: "HKD"
+        currency: "HKD",
+        intent: "authorize"
     };
     const shouldBlock = useCallback<BlockerFunction>(
         ({ currentLocation, nextLocation, historyAction }) => {
