@@ -2,7 +2,7 @@ from logging import Logger
 from time import time
 from typing import TypedDict
 
-import paypal_orders
+import paypal
 from models.base import BaseModel
 from pydantic import Field
 from sqlalchemy import Engine
@@ -25,9 +25,9 @@ class State(TypedDict):
     engine: Engine
     session: Session
     debug: bool
-    OrdersApi: paypal_orders.OrdersApi
+    OrdersApi: paypal.OrdersApi
     authorization: Authorization
-    paypal_config: paypal_orders.Configuration
+    paypal_config: paypal.Configuration
 
 
 __all__ = ["State", "Authorization"]

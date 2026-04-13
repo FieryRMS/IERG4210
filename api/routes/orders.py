@@ -1,6 +1,6 @@
 import uuid
 
-import paypal_orders
+import paypal
 from fastapi import APIRouter, Request, status
 from models import (
     Order,
@@ -195,28 +195,28 @@ async def create_paypal_order(
 
     try:
         result = api.orders_create(
-            paypal_orders.OrderRequest(
-                intent=paypal_orders.CheckoutPaymentIntent.CAPTURE,
+            paypal.OrderRequest(
+                intent=paypal.CheckoutPaymentIntent.CAPTURE,
                 purchase_units=[
-                    paypal_orders.PurchaseUnitRequest(
+                    paypal.PurchaseUnitRequest(
                         custom_id=str(db_order.id),
                         invoice_id=str(transaction.id),
                         description=f"Order #{db_order.id} from The Generic Company",
-                        amount=paypal_orders.AmountWithBreakdown(
+                        amount=paypal.AmountWithBreakdown(
                             currency_code=db_order.currency,
                             value=f"{db_order.price:.2f}",
-                            breakdown=paypal_orders.AmountBreakdown(
-                                item_total=paypal_orders.Money(
+                            breakdown=paypal.AmountBreakdown(
+                                item_total=paypal.Money(
                                     currency_code=db_order.currency,
                                     value=f"{db_order.price:.2f}",
                                 )
                             ),
                         ),
                         items=[
-                            paypal_orders.ItemRequest(
+                            paypal.ItemRequest(
                                 name=link.product.name,
                                 quantity=str(link.count),
-                                unit_amount=paypal_orders.Money(
+                                unit_amount=paypal.Money(
                                     currency_code=db_order.currency,
                                     value=f"{link.price:.2f}",
                                 ),
@@ -268,15 +268,15 @@ async def capture_paypal_order(
         raise ServerConflictException(message="Order has already been paid")
     try:
         result = api.orders_capture(transaction.transaction_id)
-        if result.status == paypal_orders.OrderStatus.COMPLETED:
+        if result.status == paypal.OrderStatus.COMPLETED:
             transaction.status = TransactionStatus.COMPLETED
             db_order.paid = True
         else:
             transaction.status = TransactionStatus.FAILED
-    except paypal_orders.ApiException as e:
+    except paypal.ApiException as e:
         state["logger"].error(f"Failed to capture PayPal order: {e}")
         try:
-            error = paypal_orders.Error.model_validate_json(
+            error = paypal.Error.model_validate_json(
                 e.body  # pyright: ignore[reportArgumentType, reportUnknownMemberType]
             )
             state["logger"].error(f"PayPal API error: {error}")

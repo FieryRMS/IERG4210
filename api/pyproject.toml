@@ -14,19 +14,31 @@ dependencies = [
     "sqlmodel>=0.0.37",
     "alembic-postgresql-enum>=1.10.0",
     "requests>=2.33.1",
-    "paypal-orders",
+    "paypal",
 ]
 
 [tool.fastapi]
 entrypoint = "main:app"
 
 [tool.uv.sources]
-paypal-orders = { path = "./generated/paypal_orders" }
+paypal = { path = "./generated/paypal" }
 
 [dependency-groups]
 dev = [
     "alembic[tz]>=1.18.4",
-]
-prebuild = [
     "openapi-generator-cli>=7.21.0",
+    "poethepoet>=0.44.0",
 ]
+
+[tool.poe.executor]
+type = "simple"
+
+[tool.poe.tasks]
+paypal = """openapi-generator-cli generate -i \
+            https://raw.githubusercontent.com/paypal/paypal-rest-api-specifications/refs/heads/main/openapi/checkout_orders_v2.json \
+            -g python \
+            --additional-properties=packageName=paypal \
+            -o generated/paypal
+        """
+
+build = { sequence = ["paypal"] }

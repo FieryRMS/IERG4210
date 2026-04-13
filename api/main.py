@@ -6,7 +6,7 @@ from time import time
 from typing import Any
 
 import dotenv
-import paypal_orders
+import paypal
 import requests
 import routes
 from fastapi import FastAPI, Request, Response
@@ -22,7 +22,7 @@ dotenv.load_dotenv()  # Load environment variables from .env file
 DEBUG = os.getenv("EXE_MODE", "prod") == "dev"
 POSTGRES_URL = os.getenv("POSTGRES_URL")
 
-config = paypal_orders.Configuration(
+config = paypal.Configuration(
     host=os.getenv("PAYPAL_API_BASE_URL", "https://api-m.sandbox.paypal.com"),
     username=os.getenv("O_AUTH_CLIENT_ID"),
     password=os.getenv("O_AUTH_CLIENT_SECRET"),
@@ -104,9 +104,9 @@ async def lifespan(app: FastAPI):
         state["logger"].addFilter(EF)
         app.openapi()  # check if openapi can be generated at startup
 
-    api_client = paypal_orders.ApiClient(config)
+    api_client = paypal.ApiClient(config)
     state["paypal_config"] = config
-    state["OrdersApi"] = paypal_orders.OrdersApi(api_client)
+    state["OrdersApi"] = paypal.OrdersApi(api_client)
     state["authorization"] = Authorization(
         access_token="",
         token_type="",

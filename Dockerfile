@@ -1,21 +1,28 @@
-FROM ghcr.io/astral-sh/uv:latest AS api-uv
-
-
-FROM node:20-alpine AS api-uvbase
-COPY --from=api-uv /uv /uvx /bin/
-
-
-FROM api-uvbase AS api-uvsync
-WORKDIR /app
-ENV UV_NO_DEV=1
-COPY api/pyproject.toml api/.python-version api/uv.lock ./
-RUN uv sync --frozen
+FROM node:20-alpine AS api-uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 ENV PATH="/app/.venv/bin:$PATH"
 
+FROM api-uv AS api-dev
+WORKDIR /app
+COPY api/pyproject.toml api/.python-version api/uv.lock ./
+RUN apk add --no-cache openjdk11
+RUN uv sync --frozen --only-dev
+RUN poe build
 
-FROM api-uvsync AS api
+
+FROM api-uv AS api-prod
+WORKDIR /app
+COPY api/pyproject.toml api/.python-version api/uv.lock ./
+COPY --from=api-dev /app/generated /app/generated
+RUN uv sync --no-dev --frozen
+
+
+FROM api-uv AS api
 WORKDIR /app
 COPY api/ .
+COPY --from=api-prod /app/.venv /app/.venv
+COPY --from=api-prod /root/.local/share/uv/python /root/.local/share/uv/python
+RUN ls -la /app/.venv/Lib/site-packages
 RUN python -c "import main, json; print(json.dumps(main.app.openapi()))" > openapi.json
 CMD ["fastapi", "run"]
 
