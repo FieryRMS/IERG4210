@@ -1,4 +1,3 @@
-import os
 import uuid
 
 import paypal_orders
@@ -18,7 +17,7 @@ from models import (
     ServerNotFoundException,
 )
 from models import Session as UserSession
-from models import State, TransctionDetails
+from models import State, TransactionStatus
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, select
 
@@ -191,7 +190,7 @@ async def create_paypal_order(
         order_id=db_order.id,
         transaction_id="",
         amount=db_order.price,
-        status=TransctionDetails.status.PENDING,
+        status=TransactionStatus.PENDING,
     )
 
     try:
@@ -226,19 +225,6 @@ async def create_paypal_order(
                                     if link.product.description
                                     else None
                                 ),
-                                image_url=(
-                                    (
-                                        f"{os.getenv('WEB_URL')}{link.product.images[0].url}"
-                                        if not link.product.images[0].url.startswith(
-                                            "http"
-                                        )
-                                        else link.product.images[0].url
-                                    )
-                                    if link.product.images
-                                    else None
-                                ),
-                                url=f"{os.getenv('WEB_URL')}/p/{link.product_id}",
-                                category="PHYSICAL_GOODS",
                             )
                             for link in db_order.product_links
                         ],
@@ -263,30 +249,30 @@ async def create_paypal_order(
 @router.put("/me/paypal/{id}", status_code=status.HTTP_200_OK)
 @with_user()
 async def capture_paypal_order(
-    request: Request, id: uuid.UUID, session: UserSession
+    request: Request, id: str, session: UserSession
 ) -> PaypalTransaction:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
     api = state["OrdersApi"]
     transaction = db_session.exec(
-        select(PaypalTransaction).where(PaypalTransaction.id == id)
+        select(PaypalTransaction).where(PaypalTransaction.transaction_id == id)
     ).first()
     if not transaction:
         raise ServerNotFoundException
     db_order = transaction.order
     if not db_order or db_order.user_id != session.user.id:
         raise ServerNotFoundException
-    if transaction.status != TransctionDetails.status.PENDING:
+    if transaction.status != TransactionStatus.PENDING:
         raise ServerConflictException(message="Invalid transaction status")
     if db_order.paid:
         raise ServerConflictException(message="Order has already been paid")
     try:
         result = api.orders_capture(transaction.transaction_id)
         if result.status == paypal_orders.OrderStatus.COMPLETED:
-            transaction.status = TransctionDetails.status.COMPLETED
+            transaction.status = TransactionStatus.COMPLETED
             db_order.paid = True
         else:
-            transaction.status = TransctionDetails.status.FAILED
+            transaction.status = TransactionStatus.FAILED
     except paypal_orders.ApiException as e:
         state["logger"].error(f"Failed to capture PayPal order: {e}")
         try:
@@ -295,12 +281,12 @@ async def capture_paypal_order(
             )
             state["logger"].error(f"PayPal API error: {error}")
             if error.details and error.details[0].issue == "INSTRUMENT_DECLINED":
-                transaction.status = TransctionDetails.status.PENDING
+                transaction.status = TransactionStatus.PENDING
             else:
-                transaction.status = TransctionDetails.status.FAILED
+                transaction.status = TransactionStatus.FAILED
         except Exception as e2:
             state["logger"].error(f"Failed to parse PayPal API error: {e2}")
-            transaction.status = TransctionDetails.status.FAILED
+            transaction.status = TransactionStatus.FAILED
 
     db_session.add(transaction)
     db_session.add(db_order)

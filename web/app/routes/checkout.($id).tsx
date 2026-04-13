@@ -71,54 +71,60 @@ function OrderView({ order }: { order: OrderWithProducts }) {
                 <CartContents
                     variantItemMedia="default"
                     cart={cart}
-                    clearCart={() => {
-                        clientForward(() => fetch(`/api/order/${order.order.id}`, { method: "DELETE" }))
-                            .then(() => {
-                                toast.success("Order cancelled");
-                                navigate("/me");
-                            })
-                            .catch((e) => {
-                                toast.error(`Failed to cancel order: ${e.message}`);
-                            });
-                    }}
+                    clearCart={
+                        !order.order.paid
+                            ? () => {
+                                  clientForward(() => fetch(`/api/order/${order.order.id}`, { method: "DELETE" }))
+                                      .then(() => {
+                                          toast.success("Order cancelled");
+                                          navigate("/me");
+                                      })
+                                      .catch((e) => {
+                                          toast.error(`Failed to cancel order: ${e.message}`);
+                                      });
+                              }
+                            : undefined
+                    }
                 />
             </CardContent>
             <CardFooter>
-                <PayPalButtons
-                    style={{
-                        disableMaxWidth: true,
-                    }}
-                    className="w-full p-2 bg-white rounded disabled:cursor-not-allowed disabled:opacity-50 z-0!"
-                    createOrder={async () => {
-                        return clientForward<PaypalTransaction>(() =>
-                            fetch(`/api/paypal/${order.order.id}`, { method: "POST" }),
-                        )
-                            .then((data) => data.transaction_id)
-                            .catch((e) => {
-                                toast.error(`Failed to create PayPal order: ${e.message}`);
-                                throw e;
-                            });
-                    }}
-                    onApprove={async (data, actions) => {
-                        clientForward<PaypalTransaction>(() =>
-                            fetch(`/api/paypal/${data.orderID}`, {
-                                method: "PUT",
-                            }),
-                        )
-                            .then((data) => {
-                                if (data.status === "COMPLETED") {
-                                    toast.success("Payment successful!");
-                                    navigate(0);
-                                } else if (data.status === "PENDING") {
-                                    toast("Payment could not be completed. Try again");
-                                    actions.restart();
-                                }
-                            })
-                            .catch((e) => {
-                                toast.error(`Failed to capture PayPal order: ${e.message}`);
-                            });
-                    }}
-                />
+                {!order.order.paid && (
+                    <PayPalButtons
+                        style={{
+                            disableMaxWidth: true,
+                        }}
+                        className="w-full p-2 bg-white rounded disabled:cursor-not-allowed disabled:opacity-50 z-0!"
+                        createOrder={async () => {
+                            return clientForward<PaypalTransaction>(() =>
+                                fetch(`/api/paypal/${order.order.id}`, { method: "POST" }),
+                            )
+                                .then((data) => data.transaction_id)
+                                .catch((e) => {
+                                    toast.error(`Failed to create PayPal order: ${e.message}`);
+                                    throw e;
+                                });
+                        }}
+                        onApprove={async (data, actions) => {
+                            clientForward<PaypalTransaction>(() =>
+                                fetch(`/api/paypal/${data.orderID}`, {
+                                    method: "PUT",
+                                }),
+                            )
+                                .then((data) => {
+                                    if (data.status === "COMPLETED") {
+                                        toast.success("Payment successful!");
+                                        navigate(0);
+                                    } else if (data.status === "PENDING") {
+                                        toast("Payment could not be completed. Try again");
+                                        actions.restart();
+                                    }
+                                })
+                                .catch((e) => {
+                                    toast.error(`Failed to capture PayPal order: ${e.message}`);
+                                });
+                        }}
+                    />
+                )}
             </CardFooter>
         </Card>
     );
