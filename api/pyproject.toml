@@ -35,11 +35,13 @@ dev = [
 type = "simple"
 
 [tool.poe.tasks]
+paypal_merge = "npx openapi-merge-cli"
 paypal = """openapi-generator-cli generate -i \
-            https://raw.githubusercontent.com/paypal/paypal-rest-api-specifications/refs/heads/main/openapi/checkout_orders_v2.json \
+            openapi.json \
             -g python \
             --additional-properties=packageName=paypal \
             -o generated/paypal
         """
 
-build = { sequence = ["paypal"] }
+build = { sequence = ["paypal_merge","paypal"] }
+
