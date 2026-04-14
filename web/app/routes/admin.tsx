@@ -35,7 +35,6 @@ import {
     zImageUpdate,
     zProductCreate,
     zProductUpdate,
-    zPutTransactionsCancelByIdData,
     zUserCreate,
     zUserUpdate,
 } from "@/lib/generated/zod.gen";
@@ -54,7 +53,6 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import type { AnyFieldApi, AnyFormApi } from "@tanstack/react-form";
 import { useAuth } from "@/hooks/auth";
 import { useNavigate } from "react-router";
-import { ServerMethodNotAllowedException } from "@/lib/errors";
 
 export type TableTypes =
     | "Product"
@@ -500,24 +498,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     const TConfig: Config<Transaction, TableTypes> = {
         TableType: "Transaction",
         desc: "Transaction CRUD",
-        methods: {
-            delete: zPutTransactionsCancelByIdData.shape.path,
-        },
-        onSubmit: async ({ method, value }) => {
-            if (method !== "delete") {
-                toast.error(`Only canceling transactions is allowed`);
-                throw new ServerMethodNotAllowedException();
-            }
-            return clientForward(() => fetch(`/api/transaction/${value.id}`, { method: "PUT" }))
-                .then((data) => {
-                    toast.success(`Transaction cancelled successfully`);
-                    return data as Transaction;
-                })
-                .catch((e) => {
-                    toast.error(`Failed to cancel transaction: ${e.message}`);
-                    throw e;
-                });
-        },
+        onSubmit: async () => {},
         fields: FieldConfigDefaults<Transaction, TableTypes>([
             { key: "id", disabled: () => true },
             { key: "created_at", disabled: () => true },

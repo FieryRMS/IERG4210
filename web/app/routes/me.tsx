@@ -13,16 +13,10 @@ import { Separator } from "@/components/ui/separator";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ShoppingCart, User as UserIcon, Settings, CalendarDays, Mail, Shield } from "lucide-react";
 import { AuthForm } from "@/components/navbar/login-form";
-import React, { useState } from "react";
+import React from "react";
 import { UserContext } from "@/lib/security.server";
 import { applyAuth, sdk } from "@/lib/server.utils";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
-import { FieldConfigDefaults, TableGenerator, type Config } from "@/components/tablegenerator";
-import type { Transaction } from "@/lib/generated/types.gen";
-import { ServerMethodNotAllowedException } from "@/lib/errors";
-import { clientForward } from "@/lib/utils";
-import { toast } from "sonner";
-import { zPutTransactionsCancelByIdData } from "@/lib/generated/zod.gen";
 
 export const handle: PageHandle<Route.ComponentProps["loaderData"]> = {
     breadcrumb: () => ({ pathname: "/me", name: "My Account" }),
@@ -38,14 +32,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
     const auth = await applyAuth(request);
     const { request: _orq, response: _ors, ...orders } = await sdk.orders.getOrdersMe(auth);
-    const { request: _trq, response: _trs, ...transactions } = await sdk.transactions.getTransactionsMe(auth);
-    return { orders, transactions };
+    return { orders };
 }
 
 export default function MePage({ loaderData }: Route.ComponentProps) {
     const { setUser, ...temp } = useAuth();
     const user = temp.user!;
-    const [transactions, setTransactions] = useState(loaderData.transactions.data ?? []);
 
     const initials = user.username
         .split(/\s+/)
@@ -53,37 +45,6 @@ export default function MePage({ loaderData }: Route.ComponentProps) {
         .join("")
         .toUpperCase()
         .slice(0, 2);
-
-    const TConfig: Config<Transaction> = {
-        TableType: "Transaction",
-        desc: "Transaction CRUD",
-        methods: {
-            delete: zPutTransactionsCancelByIdData.shape.path,
-        },
-        onSubmit: async ({ method, value }) => {
-            if (method !== "delete") {
-                toast.error(`Only canceling transactions is allowed`);
-                throw new ServerMethodNotAllowedException();
-            }
-            return clientForward(() => fetch(`/api/transaction/${value.id}`, { method: "PUT" }))
-                .then((data) => {
-                    toast.success(`Transaction cancelled successfully`);
-                    return data as Transaction;
-                })
-                .catch((e) => {
-                    toast.error(`Failed to cancel transaction: ${e.message}`);
-                    throw e;
-                });
-        },
-        fields: FieldConfigDefaults<Transaction>([
-            { key: "id", disabled: () => true },
-            { key: "created_at", disabled: () => true },
-            { key: "order_id" },
-            { key: "status" },
-            { key: "price" },
-            { key: "provider" },
-        ]),
-    };
 
     const joinedDate = user.created_at
         ? new Date(user.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
@@ -219,29 +180,6 @@ export default function MePage({ loaderData }: Route.ComponentProps) {
                                     <p className="text-sm">You have no orders yet.</p>
                                 </div>
                             )}
-                        </CardContent>
-                    </Card>
-                    <Card className="mt-4">
-                        <CardHeader>
-                            <CardTitle>Transaction History</CardTitle>
-                            <CardDescription>Manage transactions.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="rounded shadow">
-                                <h2 className="text-xl font-semibold mb-2 w-full text-center">Paypal Transactions</h2>
-                                {loaderData.transactions.error ? (
-                                    <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
-                                        Failed to load transactions:{" "}
-                                        {`${loaderData.transactions.error.name} - ${loaderData.transactions.error.message}`}
-                                    </p>
-                                ) : (
-                                    <TableGenerator
-                                        data={transactions ?? []}
-                                        config={TConfig}
-                                        onSubmit={setTransactions}
-                                    />
-                                )}
-                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
