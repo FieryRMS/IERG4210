@@ -21,10 +21,7 @@ class Authorization(BaseModel):
     @computed_field
     @property
     def is_expired(self) -> bool:
-        return self.expires_in + self.created_at < time()
-
-    def model_post_init(self, __context: object) -> None:
-        self.expires_in = self.expires_in - 60
+        return self.expires_in + self.created_at - 60 < time()
 
 
 class State(TypedDict):

@@ -129,7 +129,8 @@ class Transaction(SQLModel, table=True):
     user_id: uuid.UUID | None = Field(foreign_key="users.id")
     provider: PaymentProvider
     transaction_id: str
-    price: float
+    authorization_id: str | None = Field(default=None, exclude=True)
+    price: float = 0
     status: TransactionStatus
 
     order: Order | None = Relationship(back_populates="transactions")

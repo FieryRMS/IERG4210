@@ -94,7 +94,6 @@ async def create_paypal_order(
         user_id=user.id,
         provider=PaymentProvider.PAYPAL,
         transaction_id="",
-        price=db_order.price,
         status=TransactionStatus.PENDING,
     )
 
@@ -154,7 +153,8 @@ async def create_paypal_order(
 @with_user()
 async def capture_paypal_order(request: Request, id: str, user: User) -> Transaction:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
-    api = paypal.OrdersApi(api_client)
+    ordersapi = paypal.OrdersApi(api_client)
+    authorizationsapi = paypal.AuthorizationsApi(api_client)
     db_session = state["session"]
     transaction = db_session.exec(
         select(Transaction).where(
@@ -164,7 +164,6 @@ async def capture_paypal_order(request: Request, id: str, user: User) -> Transac
         )
     ).first()
 
-    # Validate transaction and order
     if not transaction:
         raise ServerNotFoundException
     db_order = transaction.order
@@ -179,65 +178,68 @@ async def capture_paypal_order(request: Request, id: str, user: User) -> Transac
         raise ServerConflictException(
             message=f"Invalid transaction status: {transaction.status}"
         )
-    for otransaction in db_order.transactions:
-        if otransaction.status == TransactionStatus.COMPLETED:
+
+    # Scan sibling transactions: recover if already completed, cancel any others
+    # to prevent double-charging before we proceed.
+    for order_transaction in db_order.transactions:
+        if order_transaction.status == TransactionStatus.COMPLETED:
+            # A previous attempt succeeded but paid wasn't flushed — recover and return.
             db_order.paid = True
             db_session.add(db_order)
             db_session.commit()
-            return otransaction
+            return order_transaction
         elif (
-            otransaction.status
-            in [
-                TransactionStatus.PENDING,
-                TransactionStatus.AUTHORIZED,
-            ]
-            and otransaction.id != transaction.id
+            order_transaction.status
+            in [TransactionStatus.PENDING, TransactionStatus.AUTHORIZED]
+            and order_transaction.id != transaction.id
         ):
-            raise ServerConflictException(
-                message=f"You must cancel any pending or authorized transactions on this order"
-            )
+            # Void on PayPal if already authorized, then cancel locally.
+            _void_transaction(state, authorizationsapi, order_transaction)
+            order_transaction.status = TransactionStatus.CANCELED
+            db_session.add(order_transaction)
 
-    # attempt transaction authorization
+    # Step 1: authorize — locks the funds on the buyer's account.
     try:
-        result = api.orders_authorize(transaction.transaction_id)
-        # verify details (amount, currency) match our order
-        if (
-            not result.purchase_units
-            or len(result.purchase_units) == 0
-            or not result.purchase_units[0].payments
-            or not result.purchase_units[0].payments.authorizations
-            or len(result.purchase_units[0].payments.authorizations) == 0
-            or not result.purchase_units[0].payments.authorizations[0].invoice_id
-            == str(transaction.id)
-            or not result.purchase_units[0].payments.authorizations[0].custom_id
-            == str(db_order.id)
-            or not result.purchase_units[0].payments.authorizations[0].amount
-            or not result.purchase_units[0].payments.authorizations[0].amount.value
-            == f"{transaction.price:.2f}"
-            or not result.purchase_units[0]
-            .payments.authorizations[0]
-            .amount.currency_code
-            == db_order.currency.value
-        ):
-            raise ServerException(message="Invalid PayPal order details")
+        auth_result = ordersapi.orders_authorize(transaction.transaction_id)
+        transaction.authorization_id = _get_authorization(auth_result)
+        if not transaction.authorization_id:
+            raise ServerException(message="No authorization ID returned from PayPal")
+        _verify_authorization(transaction, db_order, auth_result)
+        transaction.status = TransactionStatus.AUTHORIZED
+        transaction.price = db_order.price
+        db_session.add(transaction)
+        db_session.flush()
+    except ServerException:
+        raise
     except Exception as e:
         state["logger"].error(f"Failed to authorize PayPal order: {e}")
+        _void_transaction(state, authorizationsapi, transaction)
+        transaction.status = TransactionStatus.FAILED
+        db_session.add(transaction)
+        db_session.commit()
         raise ServerException(message="Failed to authorize PayPal order")
 
+    # Step 2: capture — transfers the authorized funds to the merchant.
     try:
-        result = api.orders_capture(transaction.transaction_id)
-        if result.status == paypal.OrderStatus.COMPLETED:
+        capture_result = authorizationsapi.authorizations_capture(
+            transaction.authorization_id
+        )
+        if capture_result.status == "COMPLETED":
             transaction.status = TransactionStatus.COMPLETED
             db_order.paid = True
+        elif capture_result.status == "PENDING":
+            # PayPal is reviewing the transaction (e.g. fraud checks).
+            transaction.status = TransactionStatus.PENDING
         else:
             transaction.status = TransactionStatus.FAILED
     except paypal.ApiException as e:
-        state["logger"].error(f"Failed to capture PayPal order: {e}")
+        state["logger"].error(f"Failed to capture PayPal authorization: {e}")
         try:
             error = paypal.Error.model_validate_json(
                 e.body  # pyright: ignore[reportArgumentType, reportUnknownMemberType]
             )
             if error.details and error.details[0].issue == "INSTRUMENT_DECLINED":
+                # Buyer's payment method was declined — leave PENDING so they can retry.
                 transaction.status = TransactionStatus.PENDING
             else:
                 transaction.status = TransactionStatus.FAILED
@@ -251,3 +253,54 @@ async def capture_paypal_order(request: Request, id: str, user: User) -> Transac
     db_session.refresh(transaction)
 
     return transaction
+
+
+def _get_authorization(auth_result: paypal.OrderAuthorizeResponse) -> str | None:
+    return (
+        auth_result.purchase_units[0].payments.authorizations[0].id
+        if auth_result.purchase_units
+        and auth_result.purchase_units[0].payments
+        and auth_result.purchase_units[0].payments.authorizations
+        else None
+    )
+
+
+def _verify_authorization(
+    transaction: Transaction,
+    db_order: Order,
+    auth_result: paypal.OrderAuthorizeResponse,
+):
+    authorizations = (
+        auth_result.purchase_units[0].payments.authorizations
+        if auth_result.purchase_units and auth_result.purchase_units[0].payments
+        else None
+    )
+    if not authorizations or len(authorizations) == 0:
+        raise ServerException(message="No authorization returned from PayPal")
+    authorization = authorizations[0]
+    # Verify the authorized amount/currency matches what we expect.
+    if (
+        authorization.invoice_id != str(transaction.id)
+        or authorization.custom_id != str(db_order.id)
+        or not authorization.amount
+        or authorization.amount.value != f"{db_order.price:.2f}"
+        or authorization.amount.currency_code != db_order.currency.value
+    ):
+        raise ServerException(message="Invalid PayPal order details")
+
+
+def _void_transaction(
+    state: State,
+    authorizationsapi: paypal.AuthorizationsApi,
+    order_transaction: Transaction,
+):
+    if (
+        order_transaction.status == TransactionStatus.AUTHORIZED
+        and order_transaction.authorization_id
+    ):
+        try:
+            authorizationsapi.authorizations_void(order_transaction.authorization_id)
+        except Exception as e:
+            state["logger"].warning(
+                f"Failed to void authorization {order_transaction.authorization_id}: {e}"
+            )
