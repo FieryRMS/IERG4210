@@ -84,7 +84,6 @@ export default function MePage({ loaderData }: Route.ComponentProps) {
             { key: "provider" },
         ]),
     };
-    console.log(loaderData.transactions);
 
     const joinedDate = user.created_at
         ? new Date(user.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })

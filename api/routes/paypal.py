@@ -1,5 +1,5 @@
+import os
 import uuid
-from time import time
 
 import paypal
 import requests
@@ -20,34 +20,48 @@ from sqlmodel import select
 
 from .users import with_user
 
+AUTH_KEY = "paypal:auth"
+USERNAME = os.getenv("VITE_O_AUTH_CLIENT_ID", "test")
+PASSWORD = os.getenv("O_AUTH_CLIENT_SECRET", "test")
+
+config = paypal.Configuration(
+    host=os.getenv("PAYPAL_API_BASE_URL", "https://api-m.sandbox.paypal.com"),
+    username=USERNAME,
+    password=PASSWORD,
+)
+
+api_client = paypal.ApiClient(config)
+
+
+async def get_authorization(state: State) -> Authorization:
+    redis = state["redis"]
+    raw = await redis.get(AUTH_KEY)
+    if raw:
+        auth = Authorization.model_validate_json(raw)
+        if not auth.is_expired:
+            return auth
+    state["logger"].info("Refreshing PayPal access token")
+    response = requests.post(
+        f"{config.host}/v1/oauth2/token",
+        auth=(USERNAME, PASSWORD),
+        data={"grant_type": "client_credentials"},
+    )
+    if response.status_code == 200:
+        auth = Authorization(**response.json())
+        await redis.set(AUTH_KEY, auth.model_dump_json(), ex=auth.expires_in)
+        return auth
+
+    raise ServerException(message="Failed to authenticate with PayPal")
+
 
 async def setup_paypal(request: Request):
-    state: State = request.state # pyright: ignore[reportAssignmentType]
-    auth: Authorization = state["authorization"]
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
 
-    api_client = state["OrdersApi"].api_client # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType] # fmt: skip
-    assert isinstance(api_client, paypal.ApiClient)
-
-    if auth.expires_in + auth.created_at < time():
-        state["logger"].info("Refreshing PayPal access token")
-        config = state["paypal_config"]
-        response = requests.post(
-            f"{config.host}/v1/oauth2/token",
-            auth=(config.username or "", config.password or ""),
-            data={"grant_type": "client_credentials"},
-        )
-        if response.status_code == 200:
-            state["authorization"].update_model(Authorization(**response.json()))
-            api_client.set_default_header(  # pyright: ignore[reportUnknownMemberType]
-                "Authorization",
-                f"Bearer {state['authorization'].access_token}",
-            )
-            state["logger"].info("PayPal access token refreshed")
-        else:
-            state["logger"].error(
-                f"Failed to refresh PayPal access token: {response.status_code} {response.text}"
-            )
-
+    auth = await get_authorization(state)
+    api_client.set_default_header(  # pyright: ignore[reportUnknownMemberType]
+        "Authorization",
+        f"Bearer {auth.access_token}",
+    )
     api_client.set_default_header(  # pyright: ignore[reportUnknownMemberType]
         "PayPal-Request-Id", str(uuid.uuid4())
     )
@@ -66,9 +80,9 @@ router = APIRouter(
 async def create_paypal_order(
     request: Request, id: uuid.UUID, user: User
 ) -> Transaction:
+    api = paypal.OrdersApi(api_client)
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     db_session = state["session"]
-    api = state["OrdersApi"]
     db_order = db_session.get(Order, id)
     if not db_order or db_order.user_id != user.id:
         raise ServerNotFoundException
@@ -140,8 +154,8 @@ async def create_paypal_order(
 @with_user()
 async def capture_paypal_order(request: Request, id: str, user: User) -> Transaction:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
+    api = paypal.OrdersApi(api_client)
     db_session = state["session"]
-    api = state["OrdersApi"]
     transaction = db_session.exec(
         select(Transaction).where(
             Transaction.transaction_id == id

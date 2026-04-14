@@ -2,9 +2,9 @@ from logging import Logger
 from time import time
 from typing import TypedDict
 
-import paypal
+import redis.asyncio as redis
 from models.base import BaseModel
-from pydantic import Field
+from pydantic import Field, computed_field
 from sqlalchemy import Engine
 from sqlmodel import Session
 
@@ -13,11 +13,18 @@ class Authorization(BaseModel):
     access_token: str
     token_type: str
     app_id: str
-    expires_in: int
     nonce: str
-    created_at: float = Field(
-        default_factory=lambda: time() - 100
-    )  # Set created_at to 100 seconds ago by default
+    created_at: float = Field(default_factory=lambda: time())
+
+    expires_in: int
+
+    @computed_field
+    @property
+    def is_expired(self) -> bool:
+        return self.expires_in + self.created_at < time()
+
+    def model_post_init(self, __context: object) -> None:
+        self.expires_in = self.expires_in - 60
 
 
 class State(TypedDict):
@@ -25,9 +32,7 @@ class State(TypedDict):
     engine: Engine
     session: Session
     debug: bool
-    OrdersApi: paypal.OrdersApi
-    authorization: Authorization
-    paypal_config: paypal.Configuration
+    redis: redis.Redis
 
 
 __all__ = ["State", "Authorization"]

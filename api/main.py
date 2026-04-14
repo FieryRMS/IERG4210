@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import dotenv
-import paypal
+import redis.asyncio as redis
 import routes
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -19,12 +19,7 @@ dotenv.load_dotenv()  # Load environment variables from .env file
 
 DEBUG = os.getenv("EXE_MODE", "prod") == "dev"
 POSTGRES_URL = os.getenv("POSTGRES_URL")
-
-config = paypal.Configuration(
-    host=os.getenv("PAYPAL_API_BASE_URL", "https://api-m.sandbox.paypal.com"),
-    username=os.getenv("VITE_O_AUTH_CLIENT_ID"),
-    password=os.getenv("O_AUTH_CLIENT_SECRET"),
-)
+REDIS_URL = os.getenv("REDIS_URL")
 
 
 class ColoredFormatter(logging.Formatter):
@@ -102,20 +97,14 @@ async def lifespan(app: FastAPI):
         state["logger"].addFilter(EF)
         app.openapi()  # check if openapi can be generated at startup
 
-    api_client = paypal.ApiClient(config)
-    state["paypal_config"] = config
-    state["OrdersApi"] = paypal.OrdersApi(api_client)
-    state["authorization"] = Authorization(
-        access_token="",
-        token_type="",
-        app_id="",
-        expires_in=0,
-        nonce="",
-    )
+    assert REDIS_URL is not None, "REDIS_URL environment variable must be set"
+    state["redis"] = redis.from_url(REDIS_URL)
+    state["logger"].info(f"Redis Status: {await state['redis'].ping()}") # pyright: ignore[reportGeneralTypeIssues, reportUnknownMemberType] # fmt: skip
 
     state["logger"].info("API started")
     yield
     state["engine"].dispose()
+    await state["redis"].close()
     state["logger"].info("API stopped")
 
 
