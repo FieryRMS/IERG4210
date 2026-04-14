@@ -1,9 +1,9 @@
 import type { Route } from "./+types/api.paypal.$id";
-import { sdk, applyAuth, forward } from "@/lib/server.utils";
+import { sdk, getAuth, forward } from "@/lib/server.utils";
 import { ServerMethodNotAllowedException } from "@/lib/errors";
 
 export async function action({ request, params }: Route.ActionArgs) {
-    const auth = await applyAuth(request);
+    const auth = await getAuth(request);
     const { id } = params;
 
     if (request.method === "POST" && id) {

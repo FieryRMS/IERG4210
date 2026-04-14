@@ -19,7 +19,7 @@ import { ButtonGroup } from "@/components/ui/button-group";
 import { toast } from "sonner";
 import { fileStorageConfig, UPLOAD_URL } from "@/config";
 import { CsrfContext, UserContext } from "@/lib/security.server";
-import { sdk, applyAuth } from "@/lib/server.utils";
+import { sdk, getAuth } from "@/lib/server.utils";
 import { TableGenerator, type Config, FieldConfigDefaults } from "@/components/tablegenerator";
 import { redirect } from "react-router";
 import React, { useEffect, useState } from "react";
@@ -136,7 +136,7 @@ const url = z.union([
 export async function loader({ request, context }: Route.LoaderArgs) {
     const user = context.get(UserContext);
     if (!user || user.role !== "admin") throw redirect("/");
-    const auth = await applyAuth(request);
+    const auth = await getAuth(request);
     const { request: _prq, response: _prs, ...products } = await sdk.products.getProducts(auth);
     const { request: _crq, response: _crs, ...categories } = await sdk.categories.getCategories(auth);
     const { request: _irq, response: _irs, ...images } = await sdk.images.getImages(auth);

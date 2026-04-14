@@ -15,7 +15,7 @@ import { ShoppingCart, User as UserIcon, Settings, CalendarDays, Mail, Shield } 
 import { AuthForm } from "@/components/navbar/login-form";
 import React from "react";
 import { UserContext } from "@/lib/security.server";
-import { applyAuth, sdk } from "@/lib/server.utils";
+import { getAuth, sdk } from "@/lib/server.utils";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 
 export const handle: PageHandle<Route.ComponentProps["loaderData"]> = {
@@ -30,7 +30,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const user = context.get(UserContext);
     if (!user) throw redirect("/");
 
-    const auth = await applyAuth(request);
+    const auth = await getAuth(request);
     const { request: _orq, response: _ors, ...orders } = await sdk.orders.getOrdersMe(auth);
     return { orders };
 }

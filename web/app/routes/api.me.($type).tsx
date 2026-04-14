@@ -1,11 +1,11 @@
 import type { Route } from "./+types/api.me.($type)";
-import { sdk, applyAuth, forward } from "@/lib/server.utils";
+import { sdk, getAuth, forward } from "@/lib/server.utils";
 import { ServerBadRequestException, ServerMethodNotAllowedException } from "@/lib/errors";
 
 export async function action({ request, params }: Route.ActionArgs) {
     if (!["POST", "DELETE", "PUT"].includes(request.method)) throw new ServerMethodNotAllowedException();
 
-    const auth = await applyAuth(request);
+    const auth = await getAuth(request);
 
     if (request.method === "DELETE") {
         return forward(() => sdk.users.deleteUsersMe(auth));

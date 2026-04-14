@@ -3,23 +3,23 @@ import { sessionCookie } from "@/lib/security.server";
 import { createClient } from "./generated/client";
 import { ServerException } from "./errors";
 
+export const server = createClient({
+    baseUrl: process.env.API_URL,
+});
+
 const getSdk = () => {
     try {
         return Sdk.__registry.get();
     } catch {
-        const client = createClient({
-            baseUrl: process.env.API_URL,
-        });
         // client.interceptors.error.use((err, res, req, opt) => {
         //     console.error(err, res, req, opt);
         //     return err;
         // });
-
-        return new Sdk({ client });
+        return new Sdk({ client: server });
     }
 };
 
-export const applyAuth = async (request: Request) => {
+export const getAuth = async (request: Request) => {
     const session: string | null = await sessionCookie.parse(request.headers.get("Cookie"));
     return { auth: session || undefined };
 };
@@ -39,15 +39,15 @@ export const applySessionCookie = async (
 
 export const sdk = getSdk();
 export async function forward<T, E>(
-    call: () => Promise<{ data?: T; error?: E; response: Response }>,
+    call: () => Promise<{ data?: T; error?: E; response: Response; }>,
     raw: true,
 ): Promise<T>;
 export async function forward<T, E>(
-    call: () => Promise<{ data?: T; error?: E; response: Response }>,
+    call: () => Promise<{ data?: T; error?: E; response: Response; }>,
     raw?: false,
 ): Promise<Response>;
 export async function forward<T, E>(
-    call: () => Promise<{ data?: T; error?: E; response: Response }>,
+    call: () => Promise<{ data?: T; error?: E; response: Response; }>,
     raw: boolean = false,
 ): Promise<Response | T> {
     const { data, error, response } = await call();

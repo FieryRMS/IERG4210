@@ -3,7 +3,7 @@ import type { Order, OrderWithProducts, Transaction } from "@/lib/generated/type
 import type { PageHandle } from "@/types";
 import { redirect, useNavigate } from "react-router";
 import { useState } from "react";
-import { sdk, applyAuth, forward } from "@/lib/server.utils";
+import { sdk, getAuth, forward } from "@/lib/server.utils";
 import { UserContext } from "@/lib/security.server";
 import { useCart, type CartProviderState } from "@/hooks/cart";
 import { useAuth } from "@/hooks/auth";
@@ -30,7 +30,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     if (!id) return null;
     const user = context.get(UserContext);
     if (!user) throw redirect("/");
-    const auth = await applyAuth(request);
+    const auth = await getAuth(request);
     return forward(() => sdk.orders.getOrdersMeById({ ...auth, path: { id } }), true);
 }
 

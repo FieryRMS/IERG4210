@@ -34,14 +34,14 @@ import {
     nonceContext,
 } from "@/lib/security.server";
 import { Toaster } from "@/components/ui/sonner";
-import { sdk, applyAuth, applySessionCookie } from "./lib/server.utils";
+import { sdk, getAuth, applySessionCookie } from "./lib/server.utils";
 import { ServerException, ServerForbiddenException } from "./lib/errors";
 import { ErrorPage } from "@/components/error-page";
 import { getReasonPhrase } from "http-status-codes";
 import { PayPalScriptProvider, type ReactPayPalScriptOptions } from "@paypal/react-paypal-js";
 
 const authMiddleware: Route.MiddlewareFunction = async ({ request, context }, next) => {
-    const { data, response: sdkResponse } = await sdk.users.getUsersMe(await applyAuth(request));
+    const { data, response: sdkResponse } = await sdk.users.getUsersMe(await getAuth(request));
     context.set(UserContext, data || null);
     const response = await next();
     await applySessionCookie(sdkResponse.headers, response.headers);
@@ -57,7 +57,7 @@ const nonceMiddleware: Route.MiddlewareFunction = async ({ context }, next) => {
 const csrfMiddleware: Route.MiddlewareFunction = async ({ request, context }, next) => {
     const cookieHeader = request.headers.get("Cookie");
     let csrfSalt = await csrfCookie.parse(cookieHeader);
-    if (["POST", "PUT", "DELETE"].includes(request.method)) {
+    if (["POST", "PUT", "DELETE", "PATCH"].includes(request.method)) {
         const csrfToken = request.headers.get("X-CSRF-Token");
         if (!csrfToken || !csrfSalt || !cstfTokenGenerator.verifySignedToken(csrfToken, csrfSalt)) {
             throw new ServerForbiddenException();
@@ -94,7 +94,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     return {
         theme,
         system: theme === Theme.System ? request.headers.get("Sec-Ch-Prefers-Color-Scheme") || "" : "",
-        categories: (await sdk.categories.getCategories(await applyAuth(request))).data || [],
+        categories: (await sdk.categories.getCategories(await getAuth(request))).data || [],
         csrfToken: context.get(CsrfContext),
         user: context.get(UserContext),
         nonce: context.get(nonceContext),

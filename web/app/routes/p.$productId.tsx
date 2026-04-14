@@ -16,7 +16,7 @@ import type { PageHandle } from "@/types";
 import type { Product } from "@/lib/generated/types.gen";
 import { useCart } from "@/hooks/cart";
 import { Img } from "@/components/img-wrapper";
-import { sdk, applyAuth } from "@/lib/server.utils";
+import { sdk, getAuth } from "@/lib/server.utils";
 import { ServerNotFoundException } from "@/lib/errors";
 
 export function meta({ loaderData }: Route.MetaArgs) {
@@ -29,7 +29,7 @@ export function meta({ loaderData }: Route.MetaArgs) {
 export async function loader({ params, request }: Route.LoaderArgs) {
     const { data, error } = await sdk.products.getProductsByProductId({
         path: { product_id: params.productId },
-        ...await applyAuth(request),
+        ...await getAuth(request),
     });
     if (error || !data) throw new ServerNotFoundException();
     return data;

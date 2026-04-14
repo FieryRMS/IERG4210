@@ -3,7 +3,7 @@ import { fileStorageConfig } from "@/config";
 import { FormData2Any } from "@/lib/utils";
 import { parseFormData, type FileUpload } from "@remix-run/form-data-parser";
 import { getStorageKey, fileStorage } from "@/storage";
-import { sdk, applyAuth, forward } from "@/lib/server.utils";
+import { sdk, getAuth, forward } from "@/lib/server.utils";
 import { ServerBadRequestException, ServerMethodNotAllowedException } from "@/lib/errors";
 import type {
     CategoryCreate,
@@ -41,7 +41,7 @@ async function formParser(request: Request, fileFields: string[] = []) {
 export async function action({ request, params }: Route.ActionArgs) {
     if (!["POST", "PUT", "DELETE"].includes(request.method)) throw new ServerMethodNotAllowedException();
 
-    const auth = await applyAuth(request);
+    const auth = await getAuth(request);
 
     const type = params.type;
 
