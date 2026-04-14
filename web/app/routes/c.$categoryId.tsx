@@ -1,7 +1,8 @@
 import type { PageHandle } from "@/types";
 import type { Route } from "./+types/c.$categoryId";
 import { Category } from "@/components/category";
-import { sdk, getAuth } from "@/lib/server.utils";
+import { sdk } from "@/lib/utils";
+import { getAuth } from "@/lib/server.utils";
 import { ServerNotFoundException } from "@/lib/errors";
 
 export function meta({ loaderData }: Route.MetaArgs) {

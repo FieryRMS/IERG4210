@@ -23,7 +23,7 @@ import { Footer } from "@/components/footer";
 import type { LocationState, PageHandle } from "./types";
 import { CartProvider } from "./hooks/cart";
 import { AuthProvider } from "./hooks/auth";
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { prefsCookie } from "@/lib/cookies";
 import {
     csrfCookie,
@@ -34,7 +34,8 @@ import {
     nonceContext,
 } from "@/lib/security.server";
 import { Toaster } from "@/components/ui/sonner";
-import { sdk, getAuth, applySessionCookie } from "./lib/server.utils";
+import { getAuth, applySessionCookie } from "./lib/server.utils";
+import { sdk } from "@/lib/utils";
 import { ServerException, ServerForbiddenException } from "./lib/errors";
 import { ErrorPage } from "@/components/error-page";
 import { getReasonPhrase } from "http-status-codes";
@@ -114,7 +115,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         clientId: import.meta.env.VITE_O_AUTH_CLIENT_ID,
         dataCspNonce: nonce,
         currency: "HKD",
-        intent: "authorize"
+        intent: "authorize",
     };
     const shouldBlock = useCallback<BlockerFunction>(
         ({ currentLocation, nextLocation, historyAction }) => {
@@ -137,10 +138,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
     );
     useBlocker(shouldBlock);
 
-    useEffect(() => {
-        window.__csrf = loaderData?.csrfToken || "";
-    }, [loaderData?.csrfToken]);
-
     return (
         <html lang="en" className={`${loaderData?.theme} ${loaderData?.system} bg-background`}>
             <head>
@@ -151,8 +148,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <script nonce={nonce}>
                     {`
                     window.__csrf = "${loaderData?.csrfToken || ""}";
-                    const _f=window.fetch;
-                    window.fetch=(i,o)=>_f(i,{...o,headers:{"X-CSRF-Token":window.__csrf,...o?.headers}});
                     const classList = document.documentElement.classList;
                     const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: ${Theme.Dark})");
                     function setSystemTheme() {

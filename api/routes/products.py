@@ -52,10 +52,11 @@ async def get_products_by_category(
 async def new_product(request: Request, product: ProductCreate) -> Product:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
-    db_product = Product.model_validate(product)
     images = session.exec(select(Image).where(col(Image.id).in_(product.images))).all()
     if len(images) != len(product.images):
         raise ServerNotFoundException(message="One or more images not found")
+    product.images = []
+    db_product = Product.model_validate(product)
     db_product.images = list(images)
     session.add(db_product)
     session.commit()
@@ -71,10 +72,11 @@ async def update_product(request: Request, product: ProductUpdate) -> Product:
     db_product = session.get(Product, product.id)
     if not db_product:
         raise ServerNotFoundException
-    db_product.update_model(product)
     images = session.exec(select(Image).where(col(Image.id).in_(product.images))).all()
     if len(images) != len(product.images):
         raise ServerNotFoundException(message="One or more images not found")
+    product.images = []
+    db_product.update_model(product)
     db_product.images = list(images)
     session.add(db_product)
     session.commit()

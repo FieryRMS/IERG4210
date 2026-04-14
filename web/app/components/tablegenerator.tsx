@@ -4,7 +4,6 @@ import { z } from "zod";
 import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { ServerValidationException } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { useState, useMemo, type JSX } from "react";
 import { type HTMLFormMethod } from "react-router";
@@ -90,7 +89,7 @@ export type Config<T extends { id?: string }, TableTypes extends string = string
         config: Config<T, TableTypes, K>;
         method: HTMLFormMethod;
         value: Partial<Record<K, SchemaType>>;
-    }) => T | Promise<T | void>;
+    }) => T | Promise<T | void> | void;
     fields: FieldConfig<T, TableTypes>[];
 };
 
@@ -151,18 +150,13 @@ function RowGenerator<
     const [bState, setBState] = useState<
         "idle" | "edit" | "save" | "delete" | "create" | "ssubmit" | "dsubmit" | "csubmit"
     >("idle");
-    const state2method = (state: typeof bState): HTMLFormMethod | null => {
+    const state2method = (state: typeof bState) => {
         if (state === "ssubmit") return "put";
         if (state === "dsubmit") return "delete";
         if (state === "csubmit") return "post";
         return null;
     };
-    const method2schema = (method: ReturnType<typeof state2method>) => {
-        if (method === "post") return config.methods?.post;
-        if (method === "put") return config.methods?.put;
-        if (method === "delete") return config.methods?.delete;
-        return null;
-    };
+
     const form = useAppForm({
         defaultValues,
         validators: {
@@ -187,8 +181,13 @@ function RowGenerator<
             onChangeAsyncDebounceMs: 300,
             onSubmitAsync: async ({ formApi }) => {
                 const method = state2method(bState);
-                const schema = method2schema(method);
-                if (!schema || !method) {
+                if (!method) {
+                    toast.error("Unexpected action: Report this to the developers!");
+                    return;
+                }
+                const schema = config.methods?.[method];
+
+                if (!schema) {
                     toast.error("Unexpected action: Report this to the developers!");
                     return;
                 }
@@ -206,7 +205,6 @@ function RowGenerator<
                     rollback();
                     return errors;
                 }
-                const value = schema.parse(formApi.state.values);
 
                 const dirtyFields = new Set(
                     Object.keys(formApi.fieldInfo)
@@ -218,26 +216,24 @@ function RowGenerator<
                         .map(String),
                 );
                 const updatedValue: Partial<Record<K, SchemaType>> = {};
-                for (const key of Object.keys(value) as K[]) {
+                for (const key of Object.keys(formApi.state.values) as K[]) {
                     if (dirtyFields.has(key) || (key === "id" && method !== "post")) {
-                        updatedValue[key] = value[key] as SchemaType;
+                        updatedValue[key] = formApi.state.values[key] as SchemaType;
                     }
                 }
 
+                const value = schema.parse(updatedValue) as Partial<Record<K, SchemaType>>;
                 try {
-                    await onSubmit({ config, method, value: updatedValue });
+                    await onSubmit({ config, method, value });
                 } catch (e) {
-                    let ret: ServerValidationException["errors"] = {
+                    rollback();
+                    return {
                         form: {
                             _errors: [{ message: "Server Error", code: "SERVER_ERROR", path: [] }],
                         },
                         fields: {},
+                        ...((e as { errors?: object })?.errors || {}),
                     };
-                    if (e instanceof ServerValidationException) {
-                        ret = e.errors;
-                    }
-                    rollback();
-                    return ret;
                 }
                 setBState("idle");
             },
@@ -511,7 +507,7 @@ export function TableGenerator<
                         config={config}
                         onSubmit={async ({ config, method, value }) => {
                             const result = await config.onSubmit({ config, method, value });
-
+                            console.log(result)
                             if (result) {
                                 const next = data.map((row) =>
                                     row.id === item.id ? ({ ...row, ...result } as T) : row,

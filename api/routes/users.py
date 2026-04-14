@@ -20,7 +20,12 @@ from sqlmodel import select
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
-_session_scheme = APIKeyHeader(name="X-Session-Token", auto_error=False)
+_session_scheme = APIKeyHeader(
+    name="X-Session-Token",
+    auto_error=False,
+    scheme_name="SessionToken",
+    description="A token that represents the user's session. It should be included in the request header with the name 'X-Session-Token'.",
+)
 
 
 def _set_session_headers(response: Response, user_session: UserSession | None):

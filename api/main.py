@@ -2,14 +2,15 @@ import logging
 import os
 from collections.abc import Callable
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Annotated, Any
 
 import dotenv
 import redis.asyncio as redis
 import routes
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
+from fastapi.security import APIKeyHeader
 from models import *
 from pydantic import TypeAdapter
 from sqlmodel import Session as SQLSession
@@ -20,6 +21,7 @@ dotenv.load_dotenv()  # Load environment variables from .env file
 DEBUG = os.getenv("EXE_MODE", "prod") == "dev"
 POSTGRES_URL = os.getenv("POSTGRES_URL")
 REDIS_URL = os.getenv("REDIS_URL")
+APPLICATION_TOKEN = os.getenv("APPLICATION_TOKEN")
 
 
 class ColoredFormatter(logging.Formatter):
@@ -112,6 +114,21 @@ def custom_generate_unique_id(route: APIRoute):
     return f"{route.tags[0]}-{route.name}"
 
 
+_application_scheme = APIKeyHeader(
+    name="X-Application-Token",
+    auto_error=False,
+    scheme_name="ApplicationToken",
+    description="A token that authorizes the client application to access the API. It should be included in the request header with the name 'X-Application-Token'.",
+)
+
+
+async def verify_application_token(
+    token: Annotated[str | None, Depends(_application_scheme)],
+) -> None:
+    if token != APPLICATION_TOKEN:
+        raise ServerUnauthorizedException()
+
+
 errs: list[type[ServerException]] = [*ServerException.__subclasses__(), ServerException]
 
 app = FastAPI(
@@ -121,6 +138,7 @@ app = FastAPI(
     responses={
         err.STATUS_CODE: {"description": err.desc(), "model": err} for err in errs
     },
+    dependencies=[Depends(verify_application_token)],
 )
 
 

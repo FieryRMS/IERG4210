@@ -1,27 +1,17 @@
-import { Sdk } from "./generated/sdk.gen";
 import { sessionCookie } from "@/lib/security.server";
-import { createClient } from "./generated/client";
 import { ServerException } from "./errors";
+import type { Config } from "./generated/client";
 
-export const server = createClient({
-    baseUrl: process.env.API_URL,
-});
 
-const getSdk = () => {
-    try {
-        return Sdk.__registry.get();
-    } catch {
-        // client.interceptors.error.use((err, res, req, opt) => {
-        //     console.error(err, res, req, opt);
-        //     return err;
-        // });
-        return new Sdk({ client: server });
-    }
-};
-
-export const getAuth = async (request: Request) => {
+export const getAuth = async (request: Request): Promise<{ auth: Config["auth"]; }> => {
     const session: string | null = await sessionCookie.parse(request.headers.get("Cookie"));
-    return { auth: session || undefined };
+    return {
+        auth: (auth) => {
+            if (auth.name === "X-Session-Token") return session || undefined;
+            else if (auth.name === "X-Application-Token") return process.env.APPLICATION_TOKEN;
+            return undefined;
+        }
+    };
 };
 
 export const applySessionCookie = async (
@@ -37,7 +27,6 @@ export const applySessionCookie = async (
 };
 
 
-export const sdk = getSdk();
 export async function forward<T, E>(
     call: () => Promise<{ data?: T; error?: E; response: Response; }>,
     raw: true,

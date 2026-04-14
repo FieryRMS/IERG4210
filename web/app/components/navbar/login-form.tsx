@@ -5,25 +5,23 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { clientForward, parseWithSchema } from "@/lib/utils";
+import { parseWithSchema, sdk } from "@/lib/utils";
 import { useState } from "react";
 import { useAuth } from "@/hooks/auth";
-import type { User } from "@/lib/generated/types.gen";
+import type { ServerValidationException, User } from "@/lib/generated/types.gen";
 import { Link } from "react-router";
 import { LayoutDashboard, LogOut, UserRound } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../ui/item";
 import { zUserChangePassword, zUserCreate, zUserLogin } from "@/lib/generated/zod.gen";
-import { ServerValidationException } from "@/lib/errors";
 import { toast } from "sonner";
 
-export type AuthFormType = "login" | "register" | "change";
-
-const schemas: Record<AuthFormType, typeof zUserLogin | typeof zUserCreate | typeof zUserChangePassword> = {
+const schemas = {
     login: zUserLogin,
     register: zUserCreate,
     change: zUserChangePassword,
 };
+export type AuthFormType = keyof typeof schemas;
 
 export function NavLoginForm() {
     const { user, setUser } = useAuth();
@@ -81,12 +79,14 @@ export function NavLoginForm() {
                         variant="destructive"
                         className="w-full gap-2"
                         onClick={async () => {
-                            await clientForward(() => fetch("/api/me", { method: "DELETE" })).catch((e) => {
-                                toast.error(`Failed to sign out: ${e.message}`);
+                            sdk.users.deleteUsersMe().then(({ error }) => {
+                                if (error) {
+                                    toast.error(`Failed to sign out: ${error.message}`);
+                                    return;
+                                }
+                                toast.success("Signed out successfully!");
+                                setUser(null);
                             });
-
-                            toast.success("Signed out successfully!");
-                            setUser(null);
                         }}
                     >
                         <LogOut className="size-3.5" />
@@ -122,11 +122,10 @@ export function AuthForm({
     onCancel?: () => void;
 }) {
     const [submitError, setSubmitError] = useState<string | null>(null);
-    const apiSchema = schemas[type];
     const schema =
         type === "login"
-            ? apiSchema
-            : (apiSchema as z.ZodObject<{ password: z.ZodString } & Record<string, z.ZodTypeAny>>)
+            ? schemas[type]
+            : (schemas[type] as z.ZodObject<{ password: z.ZodString } & Record<string, z.ZodTypeAny>>)
                   .extend({ confirm_password: z.string() })
                   .refine((data) => data.password === data.confirm_password, {
                       message: "Passwords do not match",
@@ -142,7 +141,7 @@ export function AuthForm({
         },
     };
     const form = useAppForm({
-        defaultValues: Object.fromEntries(Object.keys(fields).map((key) => [key, ""])) as z.infer<typeof schema>,
+        defaultValues: Object.fromEntries(Object.keys(fields).map((key) => [key, ""])),
         validators: {
             onChangeAsync: async ({ value, formApi }) => {
                 const dirtyFields = Object.keys(formApi.fieldInfo).filter(
@@ -158,27 +157,28 @@ export function AuthForm({
                     setSubmitError("Invalid input!");
                     return errors;
                 }
-                return clientForward<User>(() =>
-                    fetch(`/api/me/${type}`, {
-                        method: type === "change" ? "PUT" : "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(apiSchema.parse(parsed)),
-                    }),
-                )
-                    .then((data) => {
-                        toast.success(
-                            `${type === "change" ? "Password changed" : type === "login" ? "Logged in" : "Registered"} successfully!`,
-                        );
-                        onSuccess?.(data);
-                    })
-                    .catch((error) => {
-                        toast.error(
-                            `Failed to ${type === "change" ? "change password" : type === "login" ? "login" : "register"}: ${error.message}`,
-                        );
-                        setSubmitError(error.message);
-                        if (error instanceof ServerValidationException) return error.errors;
-                        return { form: { _error: error.message } };
-                    });
+                const { error, data } = await (async () => {
+                    switch (type) {
+                        case "change":
+                            return await sdk.users.putUsersChangePassword({ body: schemas[type].parse(parsed) });
+                        case "login":
+                            return await sdk.users.postUsersMe({ body: schemas[type].parse(parsed) });
+                        case "register":
+                            return await sdk.users.postUsersRegister({ body: schemas[type].parse(parsed) });
+                    }
+                })();
+                if (error) {
+                    toast.error(
+                        `Failed to ${type === "change" ? "change password" : type === "login" ? "login" : "register"}: ${error.message}`,
+                    );
+                    setSubmitError(error.message!);
+                    if ((error as ServerValidationException).errors) return (error as ServerValidationException).errors;
+                    return { form: { form: error.message || "Server error", fields: {} } };
+                }
+                toast.success(
+                    `${type === "change" ? "Password changed" : type === "login" ? "Logged in" : "Registered"} successfully!`,
+                );
+                onSuccess?.(data || null);
             },
         },
         onSubmit: async () => {},

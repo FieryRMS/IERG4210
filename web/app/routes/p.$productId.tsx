@@ -16,7 +16,8 @@ import type { PageHandle } from "@/types";
 import type { Product } from "@/lib/generated/types.gen";
 import { useCart } from "@/hooks/cart";
 import { Img } from "@/components/img-wrapper";
-import { sdk, getAuth } from "@/lib/server.utils";
+import {  getAuth } from "@/lib/server.utils";
+import { sdk } from "@/lib/utils";
 import { ServerNotFoundException } from "@/lib/errors";
 
 export function meta({ loaderData }: Route.MetaArgs) {

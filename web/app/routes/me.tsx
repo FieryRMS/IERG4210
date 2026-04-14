@@ -15,7 +15,8 @@ import { ShoppingCart, User as UserIcon, Settings, CalendarDays, Mail, Shield } 
 import { AuthForm } from "@/components/navbar/login-form";
 import React from "react";
 import { UserContext } from "@/lib/security.server";
-import { getAuth, sdk } from "@/lib/server.utils";
+import { getAuth } from "@/lib/server.utils";
+import { sdk } from "@/lib/utils";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 
 export const handle: PageHandle<Route.ComponentProps["loaderData"]> = {

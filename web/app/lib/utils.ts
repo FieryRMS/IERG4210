@@ -5,6 +5,8 @@ import type { ZodObject } from "zod";
 import type { $ZodIssue, ParseContext } from "zod/v4/core";
 import { ServerException } from "./errors";
 import { z } from "zod";
+import { Sdk } from "./generated/sdk.gen";
+import { createClient } from "./generated/client";
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -59,14 +61,17 @@ function prefixSchemaToErrors(
     return Object.fromEntries(schema);
 }
 
-export function parseWithSchema
-    ({ value, schema, fields = [], params }: { value: unknown; schema: ZodObject; fields?: string[]; params?: ParseContext<$ZodIssue>; }): {
+export function parseWithSchema<T extends ZodObject = ZodObject>
+    ({ value, schema, fields = [], params }: { value: z.infer<T>; schema: T; fields?: string[]; params?: ParseContext<$ZodIssue>; }): {
         parsed: null;
         errors: ReturnType<typeof standardSchemaValidators["validate"]>;
-    } | { parsed: unknown; errors: null; } {
+    } | { parsed: z.infer<T>; errors: null; } {
     const result = schema.safeParse(value, params);
     if (result.success) {
-        return { parsed: Object.fromEntries(Object.entries(result.data).filter(([k]) => fields.length == 0 || fields.includes(k))), errors: null };
+        return {
+            parsed: Object.fromEntries(Object.entries(result.data).filter(([k]) => fields.length == 0 || fields.includes(k))) as z.infer<T>,
+            errors: null
+        };
     };
     const errors = prefixSchemaToErrors(result.error.issues, value);
     const issues = Object.fromEntries(Object.entries(errors).filter(([key]) => fields.length == 0 || fields.includes(key)));
@@ -190,3 +195,19 @@ export async function clientForward<T extends ZodObject>(
 
     return data;
 }
+
+export const server = createClient({
+    baseUrl: typeof window === "undefined" ? process.env.API_URL : "/api",
+    headers: {
+        "X-CSRF-Token": typeof window !== "undefined" ? window.__csrf : undefined,
+    },
+});
+
+const getSdk = () => {
+    try {
+        return Sdk.__registry.get();
+    } catch {
+        return new Sdk({ client: server });
+    }
+};
+export const sdk = getSdk();

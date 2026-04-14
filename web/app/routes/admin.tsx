@@ -2,9 +2,17 @@ import type { Route } from "./+types/admin";
 import type { PageHandle } from "@/types";
 import type {
     Product,
+    ProductCreate,
+    ProductUpdate,
     Category,
+    CategoryCreate,
+    CategoryUpdate,
     Image,
+    ImageCreate,
+    ImageUpdate,
     User,
+    UserCreate,
+    UserUpdate,
     Session,
     Order,
     Transaction,
@@ -12,14 +20,15 @@ import type {
 } from "@/lib/generated/types.gen";
 import { z } from "zod";
 import { Input } from "@/components/ui/input";
-import { Any2FormData, clientForward, cn } from "@/lib/utils";
+import { Any2FormData, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Img } from "@/components/img-wrapper";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { toast } from "sonner";
-import { fileStorageConfig, UPLOAD_URL } from "@/config";
+import { getConfig, UPLOAD_URL } from "@/config";
 import { CsrfContext, UserContext } from "@/lib/security.server";
-import { sdk, getAuth } from "@/lib/server.utils";
+import { sdk } from "@/lib/utils";
+import { getAuth } from "@/lib/server.utils";
 import { TableGenerator, type Config, FieldConfigDefaults } from "@/components/tablegenerator";
 import { redirect } from "react-router";
 import React, { useEffect, useState } from "react";
@@ -124,13 +133,20 @@ function ForeignKeyCombobox<T extends { id?: string }>({
     );
 }
 
+const config = getConfig("/images", "post")!;
+
 const url = z.union([
     z.url({
         protocol: /^https?$/,
         hostname: z.regexes.domain,
     }),
     z.string().regex(new RegExp(`^${UPLOAD_URL}`)),
-    z.file().max(fileStorageConfig.maxFileSize!),
+    z
+        .file()
+        .max(config.maxFileSize)
+        .refine((file) => file.type.match(config.type), {
+            message: "Invalid file type",
+        }),
 ]);
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -188,34 +204,6 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         }
     }, [user, navigate]);
 
-    const onSubmit = async <
-        T extends { id?: string },
-        TableTypes extends string = string,
-        K extends keyof T & string = keyof T & string,
-    >(
-        ...[{ config, method, value }]: Parameters<Config<T, TableTypes, K>["onSubmit"]>
-    ) => {
-        const form = Any2FormData(value);
-        return clientForward(() =>
-            fetch(`/api/admin/${config.TableType}`, {
-                method,
-                body: form,
-            }),
-        )
-            .then((data) => {
-                toast.success(
-                    `${config.TableType} ${method === "post" ? "created" : method === "put" ? "updated" : "deleted"} successfully`,
-                );
-                return data;
-            })
-            .catch((e) => {
-                toast.error(
-                    `Failed to ${method === "post" ? "create" : method === "put" ? "update" : "delete"} ${config.TableType}: ${e.message}`,
-                );
-                throw e;
-            }) as Promise<never>;
-    };
-
     const PConfig: Config<Product, TableTypes> = {
         TableType: "Product",
         desc: "Product CRUD",
@@ -224,7 +212,33 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             put: zProductUpdate,
             delete: zDeleteProductsByIdData.shape.path,
         },
-        onSubmit: onSubmit<Product, TableTypes>,
+        onSubmit: async ({ method, value }) => {
+            switch (method) {
+                case "post":
+                    return sdk.products.postProducts({ body: value as ProductCreate }).then(({ data, error }) => {
+                        if (error || !data) {
+                            toast.error(`Failed to create product: ${error.message!}`);
+                            throw error;
+                        }
+                        return data;
+                    });
+                case "put":
+                    return sdk.products.putProducts({ body: value as ProductUpdate }).then(({ data, error }) => {
+                        if (error || !data) {
+                            toast.error(`Failed to update product: ${error.message}`);
+                            throw error;
+                        }
+                        return data;
+                    });
+                case "delete":
+                    return sdk.products.deleteProductsById({ path: { id: value.id! as string } }).then(({ error }) => {
+                        if (error) {
+                            toast.error(`Failed to delete product: ${error.message}`);
+                            throw error;
+                        }
+                    });
+            }
+        },
         fields: FieldConfigDefaults<Product, TableTypes>([
             { key: "id", disabled: () => true },
             { key: "created_at", disabled: () => true },
@@ -248,6 +262,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 ),
             },
             {
+                // TODO: image is always sent, empty array resets images, need to fix
                 key: "images",
                 toSchemaType: (data) => (Array.isArray(data) ? data.map((d) => String(d.id)) : []),
                 fromSchemaType: (value) =>
@@ -317,7 +332,35 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             put: zCategoryUpdate,
             delete: zDeleteCategoriesByIdData.shape.path,
         },
-        onSubmit: onSubmit<Category, TableTypes>,
+        onSubmit: async ({ method, value }) => {
+            switch (method) {
+                case "post":
+                    return sdk.categories.postCategories({ body: value as CategoryCreate }).then(({ data, error }) => {
+                        if (error || !data) {
+                            toast.error(`Failed to create category: ${error.message!}`);
+                            throw error;
+                        }
+                        return data;
+                    });
+                case "put":
+                    return sdk.categories.putCategories({ body: value as CategoryUpdate }).then(({ data, error }) => {
+                        if (error || !data) {
+                            toast.error(`Failed to update category: ${error.message}`);
+                            throw error;
+                        }
+                        return data;
+                    });
+                case "delete":
+                    return sdk.categories
+                        .deleteCategoriesById({ path: { id: value.id! as string } })
+                        .then(({ error }) => {
+                            if (error) {
+                                toast.error(`Failed to delete category: ${error.message}`);
+                                throw error;
+                            }
+                        });
+            }
+        },
         fields: FieldConfigDefaults<Category>([
             { key: "id", disabled: () => true },
             { key: "created_at", disabled: () => true },
@@ -335,7 +378,47 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             delete: zDeleteImagesByIdData.shape.path,
         },
         desc: "Image CRUD",
-        onSubmit: onSubmit<Image, TableTypes>,
+        onSubmit: async ({ method, value }) => {
+            switch (method) {
+                case "post":
+                    return sdk.images
+                        .postImages({
+                            body: Any2FormData(value) as unknown as ImageCreate,
+                            headers: {
+                                "Content-Type": "multipart/form-data",
+                            },
+                        })
+                        .then(({ data, error }) => {
+                            if (error || !data) {
+                                toast.error(`Failed to create image: ${error.message!}`);
+                                throw error;
+                            }
+                            return data;
+                        });
+                case "put":
+                    return sdk.images
+                        .putImages({
+                            body: Any2FormData(value) as unknown as ImageUpdate,
+                            headers: {
+                                "Content-Type": "multipart/form-data",
+                            },
+                        })
+                        .then(({ data, error }) => {
+                            if (error || !data) {
+                                toast.error(`Failed to update image: ${error.message}`);
+                                throw error;
+                            }
+                            return data;
+                        });
+                case "delete":
+                    return sdk.images.deleteImagesById({ path: { id: value.id! as string } }).then(({ error }) => {
+                        if (error) {
+                            toast.error(`Failed to delete image: ${error.message}`);
+                            throw error;
+                        }
+                    });
+            }
+        },
         fields: FieldConfigDefaults<Image>([
             { key: "id", disabled: () => true },
             { key: "created_at", disabled: () => true },
@@ -414,7 +497,33 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             delete: zDeleteUsersByIdData.shape.path,
         },
         desc: "User CRUD",
-        onSubmit: onSubmit<User, TableTypes>,
+        onSubmit: async ({ method, value }) => {
+            switch (method) {
+                case "post":
+                    return sdk.users.postUsers({ body: value as UserCreate }).then(({ data, error }) => {
+                        if (error || !data) {
+                            toast.error(`Failed to create user: ${error.message!}`);
+                            throw error;
+                        }
+                        return data;
+                    });
+                case "put":
+                    return sdk.users.putUsers({ body: value as UserUpdate }).then(({ data, error }) => {
+                        if (error || !data) {
+                            toast.error(`Failed to update user: ${error.message}`);
+                            throw error;
+                        }
+                        return data;
+                    });
+                case "delete":
+                    return sdk.users.deleteUsersById({ path: { id: value.id! as string } }).then(({ error }) => {
+                        if (error) {
+                            toast.error(`Failed to delete user: ${error.message}`);
+                            throw error;
+                        }
+                    });
+            }
+        },
         fields: FieldConfigDefaults<User, TableTypes>([
             { key: "id", disabled: () => true },
             { key: "created_at", disabled: () => true },
@@ -423,6 +532,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             { key: "username" },
             { key: "role" },
             {
+                // TODO: fix wrong password hashing
                 key: "password",
             },
             {
@@ -436,7 +546,18 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     methods: {
                         delete: zDeleteUsersSessionsByIdData.shape.path,
                     },
-                    onSubmit: onSubmit<Session, TableTypes>,
+                    onSubmit: async ({ method, value }) => {
+                        if (method === "delete") {
+                            return sdk.users
+                                .deleteUsersSessionsById({ path: { id: value.id! as string } })
+                                .then(({ error }) => {
+                                    if (error) {
+                                        toast.error(`Failed to delete session: ${error.message}`);
+                                        throw error;
+                                    }
+                                });
+                        }
+                    },
                     fields: FieldConfigDefaults<Session, TableTypes>([
                         { key: "id", disabled: () => true },
                         { key: "created_at", disabled: () => true },
@@ -451,7 +572,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     const OConfig: Config<Order, TableTypes> = {
         TableType: "Order",
         desc: "Order CRUD",
-        onSubmit: onSubmit<Order, TableTypes>,
+        onSubmit: () => {},
         fields: FieldConfigDefaults<Order, TableTypes>([
             { key: "id", disabled: () => true },
             { key: "created_at", disabled: () => true },
@@ -466,9 +587,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 nested: {
                     TableType: "Product",
                     desc: "Products for Order",
-                    onSubmit: ({ value }) => {
-                        return value as ProductOrder;
-                    },
+                    onSubmit: () => {},
                     fields: FieldConfigDefaults<ProductOrder, TableTypes>([
                         { key: "id", disabled: () => true },
                         {

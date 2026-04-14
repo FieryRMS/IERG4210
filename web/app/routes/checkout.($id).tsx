@@ -1,9 +1,10 @@
 import type { Route } from "./+types/checkout.($id)";
-import type { Order, OrderWithProducts, Transaction } from "@/lib/generated/types.gen";
+import type { OrderWithProducts } from "@/lib/generated/types.gen";
 import type { PageHandle } from "@/types";
 import { redirect, useNavigate } from "react-router";
 import { useState } from "react";
-import { sdk, getAuth, forward } from "@/lib/server.utils";
+import { sdk } from "@/lib/utils";
+import { getAuth, forward } from "@/lib/server.utils";
 import { UserContext } from "@/lib/security.server";
 import { useCart, type CartProviderState } from "@/hooks/cart";
 import { useAuth } from "@/hooks/auth";
@@ -15,7 +16,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { CartContents } from "@/components/cart";
 import { toast } from "sonner";
 import { PayPalButtons } from "@paypal/react-paypal-js";
-import { clientForward } from "@/lib/utils";
 
 export const handle: PageHandle<Route.ComponentProps["loaderData"]> = {
     breadcrumb: () => ({ pathname: "/checkout", name: "Checkout" }),
@@ -74,14 +74,14 @@ function OrderView({ order }: { order: OrderWithProducts }) {
                     clearCart={
                         !order.order.paid
                             ? () => {
-                                  clientForward(() => fetch(`/api/order/${order.order.id}`, { method: "DELETE" }))
-                                      .then(() => {
-                                          toast.success("Order cancelled");
-                                          navigate("/me");
-                                      })
-                                      .catch((e) => {
-                                          toast.error(`Failed to cancel order: ${e.message}`);
-                                      });
+                                  sdk.orders.deleteOrdersMeById({ path: { id: order.order.id! } }).then(({ error }) => {
+                                      if (error) {
+                                          toast.error("Failed to cancel order: " + error.message);
+                                          return;
+                                      }
+                                      toast.success("Order cancelled");
+                                      navigate("/me");
+                                  });
                               }
                             : undefined
                     }
@@ -95,35 +95,34 @@ function OrderView({ order }: { order: OrderWithProducts }) {
                         }}
                         className="w-full p-2 bg-white rounded disabled:cursor-not-allowed disabled:opacity-50 z-0!"
                         createOrder={async () => {
-                            return clientForward<Transaction>(() =>
-                                fetch(`/api/paypal/${order.order.id}`, { method: "POST" }),
-                            )
-                                .then((data) => data.transaction_id)
-                                .catch((e) => {
-                                    toast.error(`Failed to create PayPal order: ${e.message}`);
-                                    throw e;
+                            return sdk.paypal
+                                .postPaypalMeById({ path: { id: order.order.id! } })
+                                .then(({ data, error }) => {
+                                    if (error || !data) {
+                                        toast.error(
+                                            `Failed to create PayPal order: ${error?.message || "Unknown error"}`,
+                                        );
+                                        throw new Error(error?.message || "Unknown error");
+                                    }
+                                    return data.transaction_id;
                                 });
                         }}
                         onApprove={async (data, actions) => {
-                            clientForward<Transaction>(() =>
-                                fetch(`/api/paypal/${data.orderID}`, {
-                                    method: "PUT",
-                                }),
-                            )
-                                .then((data) => {
-                                    if (data.status === "COMPLETED") {
-                                        toast.success("Payment successful!");
-                                        navigate(0);
-                                    } else if (data.status === "PENDING") {
-                                        toast("Payment could not be completed. Try again");
-                                        actions.restart();
-                                    } else {
-                                        toast.error(`Payment failed with status: ${data.status}`);
-                                    }
-                                })
-                                .catch((e) => {
-                                    toast.error(`Failed to capture PayPal order: ${e.message}`);
-                                });
+                            sdk.paypal.putPaypalMeById({ path: { id: data.orderID } }).then(({ data, error }) => {
+                                if (error || !data) {
+                                    toast.error(`Failed to capture PayPal order: ${error?.message || "Unknown error"}`);
+                                    return;
+                                }
+                                if (data.status === "COMPLETED") {
+                                    toast.success("Payment successful!");
+                                    navigate(0);
+                                } else if (data.status === "PENDING") {
+                                    toast.error("Payment could not be completed. Try again");
+                                    actions.restart();
+                                } else {
+                                    toast.error(`Payment failed with status: ${data.status}`);
+                                }
+                            });
                         }}
                     />
                 )}
@@ -144,31 +143,27 @@ function CartView() {
             return;
         }
         setSubmitting(true);
-        clientForward<Order>(() =>
-            fetch("/api/order", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(
-                    zOrderCreate.parse({
-                        user_id: user.id,
-                        ray_id: c.ray_id,
-                        products: Object.values(c.products).map(({ p, q }) => ({
-                            id: p.id,
-                            price: p.price,
-                            count: q,
-                            name: p.name,
-                        })),
-                    }),
-                ),
-            }),
-        )
-            .then((order) => {
+        sdk.orders
+            .postOrdersMe({
+                body: zOrderCreate.parse({
+                    user_id: user.id,
+                    ray_id: c.ray_id,
+                    products: Object.values(c.products).map(({ p, q }) => ({
+                        id: p.id,
+                        price: p.price,
+                        count: q,
+                        name: p.name,
+                    })),
+                }),
+            })
+            .then(({ data, error }) => {
+                if (error || !data) {
+                    toast.error("Failed to place order: " + error?.message || "Unknown error");
+                    return;
+                }
                 clearCart();
                 toast.success("Order placed! Redirecting...");
-                navigate(`/checkout/${order.id}`);
-            })
-            .catch((e) => {
-                toast.error("Failed to place order: " + e.message);
+                navigate(`/checkout/${data.id}`);
             })
             .finally(() => {
                 setSubmitting(false);
