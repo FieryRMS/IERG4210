@@ -2,12 +2,10 @@ import logging
 import os
 from collections.abc import Callable
 from contextlib import asynccontextmanager
-from time import time
 from typing import Any
 
 import dotenv
 import paypal
-import requests
 import routes
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -208,47 +206,12 @@ async def log_requests(
 async def inject_state(
     request: Request[State], call_next: Callable[..., Any]
 ) -> Response:
-    appstate: State = request.app.state
-    request.state["logger"] = appstate["logger"]
-    request.state["debug"] = appstate["debug"]
-    request.state["engine"] = appstate["engine"]
-    request.state["session"] = SQLSession(appstate["engine"])
-    request.state["paypal_config"] = appstate["paypal_config"]
-    request.state["OrdersApi"] = appstate["OrdersApi"]
-    request.state["authorization"] = appstate["authorization"]
+    for key in request.app.state:
+        request.state[key] = request.app.state[key]
+    request.state["session"] = SQLSession(request.state["engine"])
     res = await call_next(request)
     request.state["session"].close()
     return res
-
-
-@app.middleware("http")
-async def refresh_paypal_token(
-    request: Request[State], call_next: Callable[..., Any]
-) -> Response:
-    state: State = request.app.state
-    auth: Authorization = state["authorization"]
-    if auth.expires_in + auth.created_at < time():
-        state["logger"].info("Refreshing PayPal access token")
-        config = state["paypal_config"]
-        response = requests.post(
-            f"{config.host}/v1/oauth2/token",
-            auth=(config.username or "", config.password or ""),
-            data={"grant_type": "client_credentials"},
-        )
-        if response.status_code == 200:
-            state["authorization"] = Authorization(**response.json())
-            state[
-                "OrdersApi"
-            ].api_client.set_default_header(  # pyright: ignore[reportUnknownMemberType]
-                "Authorization",
-                f"Bearer {state['authorization'].access_token}",
-            )
-            state["logger"].info("PayPal access token refreshed")
-        else:
-            state["logger"].error(
-                f"Failed to refresh PayPal access token: {response.status_code} {response.text}"
-            )
-    return await call_next(request)
 
 
 app.include_router(routes.root.router)

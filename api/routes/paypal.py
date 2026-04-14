@@ -1,8 +1,11 @@
 import uuid
+from time import time
 
 import paypal
-from fastapi import APIRouter, Request, status
+import requests
+from fastapi import APIRouter, Depends, Request, status
 from models import (
+    Authorization,
     Order,
     PaymentProvider,
     ServerConflictException,
@@ -17,7 +20,45 @@ from sqlmodel import select
 
 from .users import with_user
 
-router = APIRouter(prefix="/paypal", tags=["Paypal"])
+
+async def setup_paypal(request: Request):
+    state: State = request.state # pyright: ignore[reportAssignmentType]
+    auth: Authorization = state["authorization"]
+
+    api_client = state["OrdersApi"].api_client # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType] # fmt: skip
+    assert isinstance(api_client, paypal.ApiClient)
+
+    if auth.expires_in + auth.created_at < time():
+        state["logger"].info("Refreshing PayPal access token")
+        config = state["paypal_config"]
+        response = requests.post(
+            f"{config.host}/v1/oauth2/token",
+            auth=(config.username or "", config.password or ""),
+            data={"grant_type": "client_credentials"},
+        )
+        if response.status_code == 200:
+            state["authorization"].update_model(Authorization(**response.json()))
+            api_client.set_default_header(  # pyright: ignore[reportUnknownMemberType]
+                "Authorization",
+                f"Bearer {state['authorization'].access_token}",
+            )
+            state["logger"].info("PayPal access token refreshed")
+        else:
+            state["logger"].error(
+                f"Failed to refresh PayPal access token: {response.status_code} {response.text}"
+            )
+
+    api_client.set_default_header(  # pyright: ignore[reportUnknownMemberType]
+        "PayPal-Request-Id", str(uuid.uuid4())
+    )
+    api_client.set_default_header(  # pyright: ignore[reportUnknownMemberType]
+        "Prefer", "return=minimal"
+    )
+
+
+router = APIRouter(
+    prefix="/paypal", tags=["Paypal"], dependencies=[Depends(setup_paypal)]
+)
 
 
 @router.post("/me/{id}", status_code=status.HTTP_200_OK)
@@ -80,8 +121,7 @@ async def create_paypal_order(
                         ],
                     )
                 ],
-            ),
-            prefer="return=minimal",
+            )
         )
         if not result.id:
             raise ServerException()
