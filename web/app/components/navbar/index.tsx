@@ -65,7 +65,7 @@ export function Navbar({ categories }: { categories: Category[] }) {
                     <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
                         <ul className="grid gap-3 p-1 md:w-100 md:grid-cols-2 list-none w-full">
                             {categories.map((category) => (
-                                <ListItem key={category.id} title={category.name} href={`/c/${category.id}`}>
+                                <ListItem key={category.id} title={category.name} href={`/c/${category.id}/${category.name}`}>
                                     {category.description}
                                 </ListItem>
                             ))}

@@ -1,5 +1,5 @@
 import type { PageHandle } from "@/types";
-import type { Route } from "./+types/c.$categoryId";
+import type { Route } from "./+types/c.$categoryId.($catname)";
 import { Category } from "@/components/category";
 import { sdk } from "@/lib/utils";
 import { getAuth } from "@/lib/server.utils";

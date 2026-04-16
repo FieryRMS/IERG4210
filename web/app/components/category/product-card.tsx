@@ -17,7 +17,11 @@ export function ProductCard({ product }: { product: Product }) {
     const { setQuantity: addToCart } = useCart();
     return (
         <Card className="w-full max-w-sm p-0 relative overflow-hidden flex max-h-fit">
-            <Link to={`/p/${product.id}`} viewTransition style={product.id ? {} : { pointerEvents: "none" }}>
+            <Link
+                to={`/p/${product.id}/${product.category_name}/${product.name}`}
+                viewTransition
+                style={product.id ? {} : { pointerEvents: "none" }}
+            >
                 <AspectRatio ratio={3 / 4}>
                     <Img
                         src={`${product?.images?.[0]?.url}?resize`}

@@ -48,5 +48,10 @@ class Product(_Product, SQLModel, table=True):
     def _images(self) -> list["Image"]:
         return self.images
 
+    @computed_field()
+    @property
+    def category_name(self) -> str:
+        return self.category.name
+
 
 __all__ = ["Product", "ProductCreate", "ProductUpdate"]
