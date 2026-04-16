@@ -19,6 +19,7 @@ class BaseModel(_BaseModel):
 
     def update_model(self, model: BaseModel, update: Mapping[str, Any] = {}):
         merged = {**model.model_dump(exclude_unset=True), **update}
+        updated_fields: set[str] = set()
 
         for name, field in type(self).model_fields.items():
             if name in self.DISABLE_UPDATES:
@@ -52,6 +53,15 @@ class BaseModel(_BaseModel):
 
             if value is not PydanticUndefined:
                 setattr(self, name, value)
+                updated_fields.add(name)
+
+        for name in update.keys():
+            if (
+                name not in updated_fields
+                and name not in self.DISABLE_UPDATES
+                and hasattr(self, name)
+            ):
+                setattr(self, name, update[name])
 
 
 # unused: https://github.com/fastapi/sqlmodel/issues/59#issuecomment-2085514089
@@ -74,5 +84,6 @@ class SQLModel(BaseModel, _SQLModel):
     def update_model(self, model: BaseModel, update: Mapping[str, Any] = {}):
         super().update_model(model, update)
         self.updated_at = datetime.now(timezone.utc)
+
 
 __all__ = ["BaseModel", "SQLModel"]

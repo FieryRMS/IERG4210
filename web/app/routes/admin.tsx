@@ -262,7 +262,6 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 ),
             },
             {
-                // TODO: image is always sent, empty array resets images, need to fix
                 key: "images",
                 toSchemaType: (data) => (Array.isArray(data) ? data.map((d) => String(d.id)) : []),
                 fromSchemaType: (value) =>

@@ -215,14 +215,12 @@ function RowGenerator<
                         )
                         .map(String),
                 );
-                const updatedValue: Partial<Record<K, SchemaType>> = {};
+                const value: Partial<Record<K, SchemaType>> = {};
                 for (const key of Object.keys(formApi.state.values) as K[]) {
                     if (dirtyFields.has(key) || (key === "id" && method !== "post")) {
-                        updatedValue[key] = formApi.state.values[key] as SchemaType;
+                        value[key] = formApi.state.values[key] as SchemaType;
                     }
                 }
-
-                const value = schema.parse(updatedValue) as Partial<Record<K, SchemaType>>;
                 try {
                     await onSubmit({ config, method, value });
                 } catch (e) {
@@ -507,7 +505,7 @@ export function TableGenerator<
                         config={config}
                         onSubmit={async ({ config, method, value }) => {
                             const result = await config.onSubmit({ config, method, value });
-                            console.log(result)
+                            console.log(result);
                             if (result) {
                                 const next = data.map((row) =>
                                     row.id === item.id ? ({ ...row, ...result } as T) : row,

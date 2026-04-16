@@ -55,9 +55,7 @@ async def new_product(request: Request, product: ProductCreate) -> Product:
     images = session.exec(select(Image).where(col(Image.id).in_(product.images))).all()
     if len(images) != len(product.images):
         raise ServerNotFoundException(message="One or more images not found")
-    product.images = []
-    db_product = Product.model_validate(product)
-    db_product.images = list(images)
+    db_product = Product.model_validate(product, update={"images": images})
     session.add(db_product)
     session.commit()
     session.refresh(db_product)
@@ -72,12 +70,16 @@ async def update_product(request: Request, product: ProductUpdate) -> Product:
     db_product = session.get(Product, product.id)
     if not db_product:
         raise ServerNotFoundException
-    images = session.exec(select(Image).where(col(Image.id).in_(product.images))).all()
-    if len(images) != len(product.images):
+    images = (
+        session.exec(select(Image).where(col(Image.id).in_(product.images))).all()
+        if "images" in product.model_fields_set
+        else None
+    )
+    if images != None and len(images) != len(product.images):
         raise ServerNotFoundException(message="One or more images not found")
-    product.images = []
-    db_product.update_model(product)
-    db_product.images = list(images)
+    db_product.update_model(
+        product, update={"images": images} if images != None else {}
+    )
     session.add(db_product)
     session.commit()
     session.refresh(db_product)
