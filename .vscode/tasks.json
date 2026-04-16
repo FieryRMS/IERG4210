@@ -1,0 +1,59 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "dev",
+            "dependsOrder": "parallel",
+            "dependsOn": [
+                "fastapi-dev",
+                "npm-dev",
+                "npm-gen"
+            ]
+        },
+        {
+            "label": "fastapi-dev",
+            "type": "shell",
+            "command": "uv run fastapi dev",
+            "isBackground": true,
+            "options": {
+                "cwd": "${workspaceFolder}/api"
+            },
+            "presentation": {
+                "panel": "dedicated"
+            },
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^$"
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": ".",
+                    "endsPattern": "API started"
+                }
+            }
+        },
+        {
+            "label": "npm-dev",
+            "type": "shell",
+            "command": "npm run dev",
+            "options": {
+                "cwd": "${workspaceFolder}/web"
+            },
+            "presentation": {
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "npm-gen",
+            "type": "shell",
+            "command": "npm run gen",
+            "dependsOn": ["fastapi-dev"],
+            "options": {
+                "cwd": "${workspaceFolder}/web"
+            },
+            "presentation": {
+                "panel": "dedicated"
+            }
+        }
+    ]
+}
