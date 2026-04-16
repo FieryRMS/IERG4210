@@ -212,6 +212,7 @@ async def create_user(request: Request, user: UserCreate) -> User:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
     db_user = User.model_validate(user)
+    db_user.set_password(user.password)
     session.add(db_user)
     session.commit()
     session.refresh(db_user)

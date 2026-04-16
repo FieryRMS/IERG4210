@@ -531,8 +531,19 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             { key: "username" },
             { key: "role" },
             {
-                // TODO: fix wrong password hashing
                 key: "password",
+                Render: ({ disabled, field, className }) => {
+                    return (
+                        <Input
+                            type="password"
+                            value={field.state.value ?? ""}
+                            name={field.name}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                            className={cn("field-sizing-content", className)}
+                            readOnly={disabled}
+                        />
+                    );
+                },
             },
             {
                 key: "sessions",
