@@ -430,7 +430,9 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     const src =
                         field.state.value instanceof File
                             ? URL.createObjectURL(field.state.value)
-                            : `${field.state.value}?resize=0.1`;
+                            : field.state.value && (field.state.meta.isPristine || field.state.meta.isValid)
+                              ? `${field.state.value}?resize=0.1`
+                              : undefined;
                     return <Img src={src} alt="Image preview" className="h-20 w-20 object-cover m-auto rounded-md" />;
                 },
             },
@@ -438,8 +440,94 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 key: "url",
                 file: true,
                 Render: ({ disabled, field, className }) => {
+                    const [isDragging, setIsDragging] = useState(false);
+                    const dragDepthRef = React.useRef(0);
+
+                    useEffect(() => {
+                        const hasFiles = (e: DragEvent) =>
+                            !!e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files");
+                        const resetDragging = () => {
+                            dragDepthRef.current = 0;
+                            setIsDragging(false);
+                        };
+
+                        const onDragEnter = (e: DragEvent) => {
+                            if (!hasFiles(e)) return;
+                            dragDepthRef.current += 1;
+                            setIsDragging(true);
+                        };
+
+                        const onDragLeave = (e: DragEvent) => {
+                            if (!hasFiles(e)) return;
+                            dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+                            if (dragDepthRef.current === 0) {
+                                setIsDragging(false);
+                            }
+                        };
+
+                        const onDragOver = (e: DragEvent) => {
+                            if (!hasFiles(e)) return;
+                            e.preventDefault(); 
+                        };
+
+                        const onDrop = () => {
+                            resetDragging();
+                        };
+
+                        const onDragEnd = () => {
+                            resetDragging();
+                        };
+
+                        const onWindowBlur = () => {
+                            resetDragging();
+                        };
+                        if (!disabled) {
+                            window.addEventListener("dragenter", onDragEnter, true);
+                            window.addEventListener("dragleave", onDragLeave, true);
+                            window.addEventListener("dragover", onDragOver, true);
+                            window.addEventListener("drop", onDrop, true);
+                            window.addEventListener("dragend", onDragEnd, true);
+                            window.addEventListener("blur", onWindowBlur);
+                        }
+
+                        return () => {
+                            window.removeEventListener("dragenter", onDragEnter, true);
+                            window.removeEventListener("dragleave", onDragLeave, true);
+                            window.removeEventListener("dragover", onDragOver, true);
+                            window.removeEventListener("drop", onDrop, true);
+                            window.removeEventListener("dragend", onDragEnd, true);
+                            window.removeEventListener("blur", onWindowBlur);
+                        };
+                    }, [disabled]);
+
+                    const setFile = (file?: File) => {
+                        if (file) {
+                            // TODO: Active bug in Tanstack: https://github.com/TanStack/form/issues/1932#issuecomment-3656323010
+                            Object.defineProperties(file, {
+                                name: { value: file.name, enumerable: true },
+                                size: { value: file.size, enumerable: true },
+                                type: { value: file.type, enumerable: true },
+                            });
+                            field.handleChange(file);
+                        }
+                    };
+
                     return (
-                        <ButtonGroup className="w-full">
+                        <ButtonGroup
+                            className="w-full relative"
+                            onDragOver={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                e.dataTransfer.dropEffect = "copy";
+                            }}
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                dragDepthRef.current = 0;
+                                setIsDragging(false);
+                                setFile(e.dataTransfer.files[0]);
+                            }}
+                        >
                             <Input
                                 onChange={(e) => field.handleChange(e.target.value)}
                                 readOnly={disabled}
@@ -463,23 +551,21 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                                     accept="image/*"
                                     className="hidden"
                                     onChange={(e) => {
-                                        if (e.target.files) {
-                                            const file = e.target.files[0];
-                                            if (file) {
-                                                // TODO: Active bug in Tanstack: https://github.com/TanStack/form/issues/1932#issuecomment-3656323010
-                                                Object.defineProperties(file, {
-                                                    name: { value: file.name, enumerable: true },
-                                                    size: { value: file.size, enumerable: true },
-                                                    type: { value: file.type, enumerable: true },
-                                                });
-                                                field.handleChange(file);
-                                            }
-                                        }
+                                        setFile(e.target.files?.[0]);
                                         e.currentTarget.value = "";
                                     }}
                                 />
                                 File
                             </Button>
+                            <span data-base-ui-inert className={cn((disabled || !isDragging) && "hidden")}>
+                                <Input
+                                    readOnly={true}
+                                    className={cn(
+                                        "absolute inset-0 bg-background! border-dashed border-accent-foreground text-center",
+                                    )}
+                                    defaultValue="Drag & Drop"
+                                />
+                            </span>
                         </ButtonGroup>
                     );
                 },
