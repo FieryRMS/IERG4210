@@ -7,8 +7,24 @@ from pydantic import AliasChoices, AliasPath
 from pydantic import BaseModel as _BaseModel
 from pydantic import ConfigDict
 from pydantic_core import PydanticUndefined
+from sqlalchemy.sql.functions import GenericFunction
 from sqlmodel import DateTime, Field
 from sqlmodel import SQLModel as _SQLModel
+
+
+class make_interval(GenericFunction[DateTime]):
+    def __init__(
+        self,
+        years: int = 0,
+        months: int = 0,
+        weeks: int = 0,
+        days: int = 0,
+        hours: int = 0,
+        mins: int = 0,
+        secs: int = 0,
+        **kw: Any,
+    ):
+        super().__init__(years, months, weeks, days, hours, mins, secs, **kw)
 
 
 class BaseModel(_BaseModel):

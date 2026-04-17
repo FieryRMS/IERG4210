@@ -13,7 +13,7 @@ from fastapi.routing import APIRoute
 from fastapi.security import APIKeyHeader
 from models import *
 from pydantic import TypeAdapter
-from sqlmodel import Session as SQLSession
+from sqlmodel import Session as DBSession
 from sqlmodel import create_engine
 
 dotenv.load_dotenv()  # Load environment variables from .env file
@@ -215,7 +215,7 @@ async def inject_state(
 ) -> Response:
     for key in request.app.state:
         request.state[key] = request.app.state[key]
-    request.state["session"] = SQLSession(request.state["engine"])
+    request.state["session"] = DBSession(request.state["engine"])
     res = await call_next(request)
     request.state["session"].close()
     return res

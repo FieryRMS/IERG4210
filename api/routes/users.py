@@ -28,6 +28,13 @@ _session_scheme = APIKeyHeader(
 )
 
 
+def _get_client_ip(request: Request) -> str | None:
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip() or None
+    return None
+
+
 def _set_session_headers(response: Response, user_session: UserSession | None):
     expires = (
         user_session.created_at + timedelta(seconds=user_session.max_age)
@@ -89,9 +96,11 @@ def with_user(*, roles: list[Role] = [], inject: bool | None = None):
 
 @router.get("/me", status_code=status.HTTP_200_OK)
 @with_session()
-async def get_current_user(session: UserSession | None) -> User | None:
+async def get_current_user(request: Request, session: UserSession | None) -> User | None:
     if session is None:
         return None
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    UserSession.delete_expired(state["session"])
     return session.user
 
 
@@ -112,7 +121,11 @@ async def login(request: Request, response: Response, credentials: UserLogin) ->
     if not db_user or not db_user.verify_password(credentials.password):
         raise ServerUnauthorizedException(message="Invalid username/email or password")
 
-    user_session = UserSession(user_id=db_user.id)
+    user_session = UserSession(
+        user_id=db_user.id,
+        ip_address=_get_client_ip(request),
+        user_agent=request.headers.get("x-forwarded-user-agent"),
+    )
     session.add(user_session)
     session.commit()
     session.refresh(db_user)
@@ -133,6 +146,18 @@ async def logout(request: Request, response: Response, session: UserSession | No
     _set_session_headers(response, None)
 
 
+@router.delete("/me/sessions/{id}", status_code=status.HTTP_204_NO_CONTENT)
+@with_user()
+async def delete_own_session(request: Request, id: uuid.UUID, user: User):
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    db_session = state["session"]
+    user_session = db_session.get(UserSession, id)
+    if not user_session or user_session.user_id != user.id:
+        raise ServerNotFoundException
+    db_session.delete(user_session)
+    db_session.commit()
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(request: Request, response: Response, user: UserCreate) -> User:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
@@ -140,7 +165,11 @@ async def register(request: Request, response: Response, user: UserCreate) -> Us
 
     db_user = User.model_validate(user)
     db_user.set_password(user.password)
-    user_session = UserSession(user_id=db_user.id)
+    user_session = UserSession(
+        user_id=db_user.id,
+        ip_address=_get_client_ip(request),
+        user_agent=request.headers.get("x-forwarded-user-agent"),
+    )
     session.add(db_user)
     session.add(user_session)
     try:
@@ -192,6 +221,7 @@ async def change_password(
 async def get_users(request: Request) -> list[User]:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
+    UserSession.delete_expired(session)
     return list(session.exec(select(User)).all())
 
 

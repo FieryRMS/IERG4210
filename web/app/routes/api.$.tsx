@@ -7,6 +7,7 @@ import { parseFormData, type FileUpload } from "@remix-run/form-data-parser";
 import { getStorageKey, fileStorage } from "@/storage";
 import { ServerBadRequestException, ServerForbiddenException, ServerUnauthorizedException } from "@/lib/errors";
 import { UserContext } from "@/lib/security.server";
+import { getClientIPAddress } from "@/lib/get-client-ip-address";
 
 async function formParser(request: Request, config?: UploadConfig) {
     async function uploadHandler(fileUpload: FileUpload) {
@@ -46,6 +47,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const contentType = request.headers.get("Content-Type");
     const isForm = contentType?.startsWith("multipart/form-data");
     const body = !contentType ? undefined : isForm ? await formParser(request, config) : await request.json();
+
+    const ipAddress = getClientIPAddress(request);
+    const clientUserAgent = request.headers.get("user-agent");
+
     return forward(() =>
         server.request({
             method: request.method as Uppercase<HttpMethod>,
@@ -56,6 +61,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
             ],
             ...auth,
             body,
+            headers: {
+                ...(ipAddress && { "X-Forwarded-For": ipAddress }),
+                ...(clientUserAgent && { "X-Forwarded-User-Agent": clientUserAgent }),
+            },
         }),
     );
 }

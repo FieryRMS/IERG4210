@@ -11,13 +11,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ShoppingCart, User as UserIcon, Settings, CalendarDays, Mail, Shield } from "lucide-react";
+import { ShoppingCart, User as UserIcon, Settings, CalendarDays, Mail, Shield, Trash2, Monitor, MapPin, Clock } from "lucide-react";
 import { AuthForm } from "@/components/navbar/login-form";
-import React from "react";
+import React, { useState } from "react";
 import { UserContext } from "@/lib/security.server";
 import { getAuth } from "@/lib/server.utils";
 import { sdk } from "@/lib/utils";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
+import type { Session } from "@/lib/generated/types.gen";
 
 export const handle: PageHandle<Route.ComponentProps["loaderData"]> = {
     breadcrumb: () => ({ pathname: "/me", name: "My Account" }),
@@ -39,6 +46,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 export default function MePage({ loaderData }: Route.ComponentProps) {
     const { setUser, ...temp } = useAuth();
     const user = temp.user!;
+    const [sessions, setSessions] = useState<Session[]>(user.sessions ?? []);
 
     const initials = user.username
         .split(/\s+/)
@@ -112,14 +120,30 @@ export default function MePage({ loaderData }: Route.ComponentProps) {
                                 )}
                             </div>
 
-                            {user.sessions && user.sessions.length > 0 && (
+                            {sessions.length > 0 && (
                                 <>
                                     <Separator />
                                     <div>
-                                        <p className="text-sm font-medium mb-2">Active Sessions</p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {user.sessions.length} active session(s)
+                                        <p className="text-sm font-medium mb-3">
+                                            Active Sessions
+                                            <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                                ({sessions.length})
+                                            </span>
                                         </p>
+                                        <SessionsTable
+                                            sessions={sessions}
+                                            onDelete={async (id) => {
+                                                const { error } = await sdk.users.deleteUsersMeSessionsById({
+                                                    path: { id },
+                                                });
+                                                if (error) {
+                                                    toast.error("Failed to revoke session.");
+                                                    return;
+                                                }
+                                                setSessions((prev) => prev.filter((s) => s.id !== id));
+                                                toast.success("Session revoked.");
+                                            }}
+                                        />
                                     </div>
                                 </>
                             )}
@@ -234,5 +258,101 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
                 <p className="text-sm font-medium truncate">{value}</p>
             </div>
         </div>
+    );
+}
+
+function SessionsTable({
+    sessions,
+    onDelete,
+}: {
+    sessions: Session[];
+    onDelete: (id: string) => Promise<void>;
+}) {
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    const handleDelete = async (id: string) => {
+        setDeletingId(id);
+        await onDelete(id);
+        setDeletingId(null);
+    };
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>
+                        <span className="flex items-center gap-1.5"><Clock className="size-3.5" />Created</span>
+                    </TableHead>
+                    <TableHead>
+                        <span className="flex items-center gap-1.5"><MapPin className="size-3.5" />Location</span>
+                    </TableHead>
+                    <TableHead>
+                        <span className="flex items-center gap-1.5"><Monitor className="size-3.5" />Device</span>
+                    </TableHead>
+                    <TableHead />
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {sessions.map((session) => (
+                    <TableRow key={session.id}>
+                        <TableCell className="text-muted-foreground text-xs">
+                            {session.created_at
+                                ? new Date(session.created_at).toLocaleString()
+                                : "—"}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                                <span className="font-medium">
+                                    {session.location ?? "Unknown"}
+                                </span>
+                                <span className="text-muted-foreground font-mono">
+                                    {session.ip_address ?? "Unknown IP"}
+                                </span>
+                            </div>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-48">
+                            <span className="truncate block" title={session.user_agent ?? undefined}>
+                                {session.user_agent ?? "Unknown"}
+                            </span>
+                        </TableCell>
+                        <TableCell>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="size-7 text-muted-foreground hover:text-destructive"
+                                        disabled={deletingId === session.id}
+                                    >
+                                        <Trash2 className="size-3.5" />
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Revoke session?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            This will immediately sign out the device at{" "}
+                                            <span className="font-medium text-foreground">
+                                                {session.location ?? session.ip_address ?? "unknown location"}
+                                            </span>
+                                            . This cannot be undone.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction
+                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                            onClick={() => handleDelete(session.id!)}
+                                        >
+                                            Revoke
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
     );
 }
