@@ -79,9 +79,11 @@ export type TableTypes =
     | "Password Reset Token"
     | "Email Verification Token";
 
-function ForeignKeyCombobox<T extends { id?: string }>({
+function TableCombobox<T>({
     items,
     getLabel,
+    getIndex,
+    getValue,
     placeholder,
     disabled,
     field,
@@ -90,6 +92,8 @@ function ForeignKeyCombobox<T extends { id?: string }>({
 }: {
     items: T[];
     getLabel: (item: T) => string;
+    getIndex: (item: T) => string;
+    getValue: (item: T) => unknown;
     placeholder?: string;
     disabled: boolean;
     field: AnyFieldApi;
@@ -127,7 +131,7 @@ function ForeignKeyCombobox<T extends { id?: string }>({
                     <ComboboxEmpty>{field.name} not found.</ComboboxEmpty>
                     <ComboboxList>
                         {(item: T) => (
-                            <ComboboxItem key={item.id} value={item.id ?? ""} className="w-full">
+                            <ComboboxItem key={getIndex(item)} value={getValue(item)} className="w-full">
                                 <ComboboxItemIndicator />
                                 <div className="col-start-2 text-nowrap text-center w-full">{getLabel(item)}</div>
                             </ComboboxItem>
@@ -262,9 +266,11 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 key: "catid",
 
                 Render: ({ disabled, field, className, form }) => (
-                    <ForeignKeyCombobox
+                    <TableCombobox
                         items={categories}
                         getLabel={(item) => item.name ?? item.id!}
+                        getIndex={(item) => item.id!}
+                        getValue={(item) => item.id!}
                         placeholder="Category ID"
                         disabled={disabled}
                         field={field}
@@ -319,9 +325,11 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                         {
                             key: "id",
                             Render: ({ disabled, field, className, form }) => (
-                                <ForeignKeyCombobox
+                                <TableCombobox
                                     items={images}
                                     getLabel={(item) => item.alt ?? item.id!}
+                                    getIndex={(item) => item.id!}
+                                    getValue={(item) => item.id!}
                                     placeholder="Image ID"
                                     disabled={disabled}
                                     field={field}
@@ -479,7 +487,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
 
                         const onDragOver = (e: DragEvent) => {
                             if (!hasFiles(e)) return;
-                            e.preventDefault(); 
+                            e.preventDefault();
                         };
 
                         const onDrop = () => {
@@ -627,13 +635,33 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             { key: "updated_at", disabled: () => true },
             { key: "email" },
             { key: "username" },
-            { key: "verified" },
+            {
+                key: "verified",
+                Render: ({ disabled, field, className, form }) => (
+                    <TableCombobox
+                        items={[true, false]}
+                        getLabel={(item) => String(item)}
+                        getIndex={(item) => String(item)}
+                        getValue={(item) => item}
+                        placeholder="Verified"
+                        disabled={disabled}
+                        field={field}
+                        className={className}
+                        form={form}
+                    />
+                ),
+            },
             {
                 key: "role",
                 Render: ({ disabled, field, className, form }) => (
-                    <ForeignKeyCombobox
-                        items={[{ id: "admin", name: "admin" }, { id: "user", name: "user" }]}
+                    <TableCombobox
+                        items={[
+                            { id: "admin", name: "admin" },
+                            { id: "user", name: "user" },
+                        ]}
                         getLabel={(item) => item.name}
+                        getIndex={(item) => item.id!}
+                        getValue={(item) => item.id!}
                         placeholder="Role"
                         disabled={disabled}
                         field={field}

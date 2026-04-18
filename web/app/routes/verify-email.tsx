@@ -14,12 +14,12 @@ export default function VerifyEmailPage() {
     const navigate = useNavigate();
 
     useEffect(() => {
+        navigate("/");
         const id = searchParams.get("id");
         const token = searchParams.get("token");
 
         if (!id || !token) {
             toast.error("Invalid verification link.");
-            navigate("/");
             return;
         }
 
@@ -29,7 +29,6 @@ export default function VerifyEmailPage() {
             } else {
                 toast.success("Email verified! You can now sign in.");
             }
-            navigate("/");
         });
     }, []);
 

@@ -11,7 +11,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ShoppingCart, User as UserIcon, Settings, CalendarDays, Mail, Shield, Trash2, Monitor, MapPin, Clock } from "lucide-react";
+import {
+    ShoppingCart,
+    User as UserIcon,
+    Settings,
+    CalendarDays,
+    Mail,
+    Shield,
+    Trash2,
+    Monitor,
+    MapPin,
+    Clock,
+} from "lucide-react";
 import { AuthForm } from "@/components/navbar/login-form";
 import React, { useState } from "react";
 import { UserContext } from "@/lib/security.server";
@@ -20,8 +31,15 @@ import { sdk } from "@/lib/utils";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import type { Session } from "@/lib/generated/types.gen";
@@ -44,8 +62,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 }
 
 export default function MePage({ loaderData }: Route.ComponentProps) {
-    const { setUser, ...temp } = useAuth();
-    const user = temp.user!;
+    const { setUser, user } = useAuth();
+    if (!user) {
+        throw redirect("/");
+    }
+
     const [sessions, setSessions] = useState<Session[]>(user.sessions ?? []);
 
     const initials = user.username
@@ -261,13 +282,7 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
     );
 }
 
-function SessionsTable({
-    sessions,
-    onDelete,
-}: {
-    sessions: Session[];
-    onDelete: (id: string) => Promise<void>;
-}) {
+function SessionsTable({ sessions, onDelete }: { sessions: Session[]; onDelete: (id: string) => Promise<void> }) {
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
     const handleDelete = async (id: string) => {
@@ -281,13 +296,22 @@ function SessionsTable({
             <TableHeader>
                 <TableRow>
                     <TableHead>
-                        <span className="flex items-center gap-1.5"><Clock className="size-3.5" />Created</span>
+                        <span className="flex items-center gap-1.5">
+                            <Clock className="size-3.5" />
+                            Created
+                        </span>
                     </TableHead>
                     <TableHead>
-                        <span className="flex items-center gap-1.5"><MapPin className="size-3.5" />Location</span>
+                        <span className="flex items-center gap-1.5">
+                            <MapPin className="size-3.5" />
+                            Location
+                        </span>
                     </TableHead>
                     <TableHead>
-                        <span className="flex items-center gap-1.5"><Monitor className="size-3.5" />Device</span>
+                        <span className="flex items-center gap-1.5">
+                            <Monitor className="size-3.5" />
+                            Device
+                        </span>
                     </TableHead>
                     <TableHead />
                 </TableRow>
@@ -296,37 +320,34 @@ function SessionsTable({
                 {sessions.map((session) => (
                     <TableRow key={session.id}>
                         <TableCell className="text-muted-foreground text-xs">
-                            {session.created_at
-                                ? new Date(session.created_at).toLocaleString()
-                                : "—"}
+                            {session.created_at ? new Date(session.created_at).toLocaleString() : "—"}
                         </TableCell>
                         <TableCell className="text-xs">
                             <div className="flex flex-col gap-0.5 min-w-0">
-                                <span className="font-medium">
-                                    {session.location ?? "Unknown"}
-                                </span>
+                                <span className="font-medium">{session.location ?? "Unknown"}</span>
                                 <span className="text-muted-foreground font-mono">
                                     {session.ip_address ?? "Unknown IP"}
                                 </span>
                             </div>
                         </TableCell>
-                        <TableCell className="text-xs text-muted-foreground max-w-48">
+                        <TableCell className="text-xs text-muted-foreground justify-center items-center">
                             <span className="truncate block" title={session.user_agent ?? undefined}>
                                 {session.user_agent ?? "Unknown"}
                             </span>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="w-0">
                             <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="size-7 text-muted-foreground hover:text-destructive"
-                                        disabled={deletingId === session.id}
-                                    >
-                                        <Trash2 className="size-3.5" />
-                                    </Button>
-                                </AlertDialogTrigger>
+                                <AlertDialogTrigger
+                                    render={
+                                        <Button
+                                            variant="ghost"
+                                            className="text-muted-foreground hover:text-destructive"
+                                            disabled={deletingId === session.id}
+                                        >
+                                            <Trash2 className="size-3.5" />
+                                        </Button>
+                                    }
+                                />
                                 <AlertDialogContent>
                                     <AlertDialogHeader>
                                         <AlertDialogTitle>Revoke session?</AlertDialogTitle>

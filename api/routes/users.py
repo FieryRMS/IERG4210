@@ -135,7 +135,7 @@ async def login(request: Request, response: Response, credentials: UserLogin) ->
             select(User).where(User.username == credentials.username)
         ).first()
     if not db_user or not db_user.verified:
-        raise ServerUnauthorizedException(message="User has not verified their email address")
+        raise ServerUnauthorizedException(message="User has not verified their email address, try registering again to resend the verification email")
 
     if not db_user or not db_user.verify_password(credentials.password):
         raise ServerUnauthorizedException(message="Invalid username/email or password")
