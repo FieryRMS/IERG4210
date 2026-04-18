@@ -17,6 +17,8 @@ import type {
     Order,
     Transaction,
     ProductOrder,
+    PasswordResetToken,
+    EmailVerificationToken,
 } from "@/lib/generated/types.gen";
 import { z } from "zod";
 import { Input } from "@/components/ui/input";
@@ -39,7 +41,9 @@ import {
     zDeleteImagesByIdData,
     zDeleteProductsByIdData,
     zDeleteUsersByIdData,
+    zDeleteUsersResetTokensByIdData,
     zDeleteUsersSessionsByIdData,
+    zDeleteUsersVerifyTokensByIdData,
     zImageCreate,
     zImageUpdate,
     zProductCreate,
@@ -71,7 +75,9 @@ export type TableTypes =
     | "Session"
     | "Product Images"
     | "Order"
-    | "Transaction";
+    | "Transaction"
+    | "Password Reset Token"
+    | "Email Verification Token";
 
 function ForeignKeyCombobox<T extends { id?: string }>({
     items,
@@ -159,6 +165,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const { request: _urq, response: _urs, ...users } = await sdk.users.getUsers(auth);
     const { request: _orq, response: _ors, ...orders } = await sdk.orders.getOrders(auth);
     const { request: _ptrq, response: _ptrs, ...transactions } = await sdk.transactions.getTransactions(auth);
+    const { request: _rtrq, response: _rtrs, ...resetTokens } = await sdk.users.getUsersResetTokens(auth);
+    const { request: _vtrq, response: _vtrs, ...verifyTokens } = await sdk.users.getUsersVerifyTokens(auth);
     const csrf = context.get(CsrfContext);
 
     return {
@@ -168,6 +176,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         users,
         orders,
         transactions,
+        resetTokens,
+        verifyTokens,
         csrf,
     };
 }
@@ -179,6 +189,8 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     const [users, setUsers] = useState(loaderData.users.data ?? []);
     const [orders, setOrders] = useState(loaderData.orders.data ?? []);
     const [transactions, setTransactions] = useState(loaderData.transactions.data ?? []);
+    const [resetTokens, setResetTokens] = useState(loaderData.resetTokens.data ?? []);
+    const [verifyTokens, setVerifyTokens] = useState(loaderData.verifyTokens.data ?? []);
     const { user } = useAuth();
     const navigate = useNavigate();
 
@@ -615,7 +627,21 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             { key: "updated_at", disabled: () => true },
             { key: "email" },
             { key: "username" },
-            { key: "role" },
+            { key: "verified" },
+            {
+                key: "role",
+                Render: ({ disabled, field, className, form }) => (
+                    <ForeignKeyCombobox
+                        items={[{ id: "admin", name: "admin" }, { id: "user", name: "user" }]}
+                        getLabel={(item) => item.name}
+                        placeholder="Role"
+                        disabled={disabled}
+                        field={field}
+                        className={className}
+                        form={form}
+                    />
+                ),
+            },
             {
                 key: "password",
                 Render: ({ disabled, field, className }) => {
@@ -710,6 +736,52 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         ]),
     };
 
+    const RTConfig: Config<PasswordResetToken, TableTypes> = {
+        TableType: "Password Reset Token",
+        desc: "Password Reset Tokens",
+        onSubmit: async ({ method, value }) => {
+            if (method === "delete") {
+                return sdk.users.deleteUsersResetTokensById({ path: { id: value.id! as string } }).then(({ error }) => {
+                    if (error) {
+                        toast.error(`Failed to delete token: ${error.message}`);
+                        throw error;
+                    }
+                });
+            }
+        },
+        methods: { delete: zDeleteUsersResetTokensByIdData.shape.path },
+        fields: FieldConfigDefaults<PasswordResetToken, TableTypes>([
+            { key: "id", disabled: () => true },
+            { key: "created_at", disabled: () => true },
+            { key: "user_id", disabled: () => true },
+            { key: "max_age", disabled: () => true },
+        ]),
+    };
+
+    const VTConfig: Config<EmailVerificationToken, TableTypes> = {
+        TableType: "Email Verification Token",
+        desc: "Email Verification Tokens",
+        onSubmit: async ({ method, value }) => {
+            if (method === "delete") {
+                return sdk.users
+                    .deleteUsersVerifyTokensById({ path: { id: value.id! as string } })
+                    .then(({ error }) => {
+                        if (error) {
+                            toast.error(`Failed to delete token: ${error.message}`);
+                            throw error;
+                        }
+                    });
+            }
+        },
+        methods: { delete: zDeleteUsersVerifyTokensByIdData.shape.path },
+        fields: FieldConfigDefaults<EmailVerificationToken, TableTypes>([
+            { key: "id", disabled: () => true },
+            { key: "created_at", disabled: () => true },
+            { key: "user_id", disabled: () => true },
+            { key: "max_age", disabled: () => true },
+        ]),
+    };
+
     const TConfig: Config<Transaction, TableTypes> = {
         TableType: "Transaction",
         desc: "Transaction CRUD",
@@ -793,6 +865,28 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                         </p>
                     ) : (
                         <TableGenerator data={transactions ?? []} config={TConfig} onSubmit={setTransactions} />
+                    )}
+                </div>
+                <div className="p-4 rounded shadow">
+                    <h2 className="text-xl font-semibold mb-2 w-full text-center">Password Reset Tokens</h2>
+                    {loaderData.resetTokens.error ? (
+                        <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
+                            Failed to load tokens:{" "}
+                            {`${loaderData.resetTokens.error.name} - ${loaderData.resetTokens.error.message}`}
+                        </p>
+                    ) : (
+                        <TableGenerator data={resetTokens ?? []} config={RTConfig} onSubmit={setResetTokens} />
+                    )}
+                </div>
+                <div className="p-4 rounded shadow">
+                    <h2 className="text-xl font-semibold mb-2 w-full text-center">Email Verification Tokens</h2>
+                    {loaderData.verifyTokens.error ? (
+                        <p className="text-xl font-semibold mb-2 w-full text-center text-red-500">
+                            Failed to load tokens:{" "}
+                            {`${loaderData.verifyTokens.error.name} - ${loaderData.verifyTokens.error.message}`}
+                        </p>
+                    ) : (
+                        <TableGenerator data={verifyTokens ?? []} config={VTConfig} onSubmit={setVerifyTokens} />
                     )}
                 </div>
             </div>

@@ -10,15 +10,15 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/auth";
 import type { ServerValidationException, User } from "@/lib/generated/types.gen";
 import { Link } from "react-router";
-import { LayoutDashboard, LogOut, UserRound } from "lucide-react";
+import { LayoutDashboard, LogOut } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../ui/item";
-import { zUserChangePassword, zUserCreate, zUserLogin } from "@/lib/generated/zod.gen";
+import { zUserChangePassword, zUserLogin, zUserRegister } from "@/lib/generated/zod.gen";
 import { toast } from "sonner";
 
 const schemas = {
     login: zUserLogin,
-    register: zUserCreate,
+    register: zUserRegister,
     change: zUserChangePassword,
 };
 export type AuthFormType = keyof typeof schemas;
@@ -37,7 +37,7 @@ export function NavLoginForm() {
         return (
             <div className="p-2 space-y-4">
                 <ItemGroup>
-                    <Item variant="outline" render={<a href="#" />} role="listitem">
+                    <Item variant="outline" render={<Link to="/me" />} role="listitem">
                         <ItemMedia
                             variant="image"
                             className="bg-primary items-center justify-center text-primary-foreground"
@@ -68,13 +68,6 @@ export function NavLoginForm() {
                         </Link>
                     )}
 
-                    <Link to="/me">
-                        <Button variant="outline" className="w-full gap-2">
-                            <UserRound />
-                            My Account
-                        </Button>
-                    </Link>
-
                     <Button
                         variant="destructive"
                         className="w-full gap-2"
@@ -104,8 +97,15 @@ export function NavLoginForm() {
                 <TabsTrigger value="register">Register</TabsTrigger>
             </TabsList>
             {(["login", "register"] satisfies AuthFormType[]).map((t) => (
-                <TabsContent key={t} value={t} className="mt-4">
+                <TabsContent key={t} value={t} className="mt-4 space-y-3">
                     <AuthForm type={t} onSuccess={setUser} />
+                    {t === "login" && (
+                        <div className="text-center text-xs text-muted-foreground pb-2">
+                            <Link to="/forgot-password" className="underline underline-offset-4">
+                                Forgot password?
+                            </Link>
+                        </div>
+                    )}
                 </TabsContent>
             ))}
         </Tabs>
@@ -174,6 +174,11 @@ export function AuthForm({
                     setSubmitError(error.message!);
                     if ((error as ServerValidationException).errors) return (error as ServerValidationException).errors;
                     return { form: { form: error.message || "Server error", fields: {} } };
+                }
+                if (data && !data.verified) {
+                    toast.info("Please check your email to verify your account before signing in.");
+                    onSuccess?.(null);
+                    return;
                 }
                 toast.success(
                     `${type === "change" ? "Password changed" : type === "login" ? "Logged in" : "Registered"} successfully!`,

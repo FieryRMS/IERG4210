@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
@@ -7,6 +8,10 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.security import APIKeyHeader
 from fastapi_decorators import depends
 from models import (
+    EmailVerificationToken,
+    ForgotPassword,
+    PasswordResetToken,
+    ResetPassword,
     Role,
     ServerBadRequestException,
     ServerForbiddenException,
@@ -14,9 +19,21 @@ from models import (
     ServerUnauthorizedException,
 )
 from models import Session as UserSession
-from models import State, User, UserChangePassword, UserCreate, UserLogin, UserUpdate
+from models import (
+    State,
+    User,
+    UserChangePassword,
+    UserCreate,
+    UserLogin,
+    UserRegister,
+    UserUpdate,
+    VerifyEmail,
+)
+from routes.common import render_email, send_email
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
+
+WEB_URL = os.environ.get("WEB_URL", "")
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -117,6 +134,8 @@ async def login(request: Request, response: Response, credentials: UserLogin) ->
         db_user = session.exec(
             select(User).where(User.username == credentials.username)
         ).first()
+    if not db_user or not db_user.verified:
+        raise ServerUnauthorizedException(message="User has not verified their email address")
 
     if not db_user or not db_user.verify_password(credentials.password):
         raise ServerUnauthorizedException(message="Invalid username/email or password")
@@ -158,20 +177,47 @@ async def delete_own_session(request: Request, id: uuid.UUID, user: User):
     db_session.commit()
 
 
+async def _send_verification_email(db_user: User, verification_token: EmailVerificationToken) -> None:
+    verify_url = f"{WEB_URL}/verify-email?id={verification_token.id}&token={verification_token.token}"
+    html = render_email(
+        "email_action.html",
+        username=db_user.username,
+        title="Verify your email address",
+        body="click the button below to verify your email address and activate your account. This link expires in 24 hours.",
+        action_url=verify_url,
+        action_label="Verify email",
+        footer="If you didn't create an account, you can safely ignore this email.",
+    )
+    await send_email(db_user.email, "Verify your email address", html)
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register(request: Request, response: Response, user: UserCreate) -> User:
+async def register(request: Request, user: UserRegister) -> User:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
 
+    # Check if the exact same username+email already exists and is unverified → resend
+    existing = session.exec(
+        select(User).where(User.email == user.email, User.username == user.username)
+    ).first()
+    if existing:
+        if existing.verified:
+            raise ServerBadRequestException(message="Email is already registered")
+        for t in session.exec(
+            select(EmailVerificationToken).where(EmailVerificationToken.user_id == existing.id)
+        ).all():
+            session.delete(t)
+        verification_token = EmailVerificationToken(user_id=existing.id)
+        session.add(verification_token)
+        session.commit()
+        await _send_verification_email(existing, verification_token)
+        return existing
+
     db_user = User.model_validate(user)
     db_user.set_password(user.password)
-    user_session = UserSession(
-        user_id=db_user.id,
-        ip_address=_get_client_ip(request),
-        user_agent=request.headers.get("x-forwarded-user-agent"),
-    )
+    verification_token = EmailVerificationToken(user_id=db_user.id)
     session.add(db_user)
-    session.add(user_session)
+    session.add(verification_token)
     try:
         session.commit()
     except IntegrityError as e:
@@ -183,10 +229,68 @@ async def register(request: Request, response: Response, user: UserCreate) -> Us
             raise ServerBadRequestException(message="Email is already registered")
         raise ServerBadRequestException
     session.refresh(db_user)
-    session.refresh(user_session)
 
-    _set_session_headers(response, user_session)
+    await _send_verification_email(db_user, verification_token)
     return db_user
+
+
+@router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)
+async def forgot_password(request: Request, body: ForgotPassword):
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    session = state["session"]
+    db_user = session.exec(select(User).where(User.email == body.email)).first()
+    if not db_user:
+        return
+
+    reset_token = PasswordResetToken(user_id=db_user.id)
+    session.add(reset_token)
+    session.commit()
+
+    reset_url = f"{WEB_URL}/reset-password?id={reset_token.id}&token={reset_token.token}"
+    html = render_email(
+        "email_action.html",
+        username=db_user.username,
+        title="Reset your password",
+        body="we received a request to reset your password. Click the button below to choose a new one. This link expires in 1 hour.",
+        action_url=reset_url,
+        action_label="Reset password",
+        footer="If you didn't request a password reset, you can safely ignore this email. Your password will not be changed.",
+    )
+    await send_email(db_user.email, "Reset your password", html)
+
+
+@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+async def reset_password(request: Request, response: Response, body: ResetPassword):
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    session = state["session"]
+    token = session.get(PasswordResetToken, body.id)
+    if not token or token.token != body.token or token.is_expired(token.max_age):
+        raise ServerBadRequestException(message="Invalid or expired token")
+
+    user = token.user
+    user.set_password(body.password)
+    session.add(user)
+    session.delete(token)
+    for s in user.sessions:
+        session.delete(s)
+    session.commit()
+
+    _set_session_headers(response, None)
+
+
+@router.post("/verify-email", status_code=status.HTTP_204_NO_CONTENT)
+async def verify_email(request: Request, body: VerifyEmail):
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    session = state["session"]
+    token = session.get(EmailVerificationToken, body.id)
+    if not token or token.token != body.token or token.is_expired(token.max_age):
+        raise ServerBadRequestException(message="Invalid or expired token")
+
+    user = token.user
+    user.verified = True
+    session.add(user)
+    session.delete(token)
+    session.commit()
 
 
 @router.put("/change-password", status_code=status.HTTP_204_NO_CONTENT)
@@ -287,4 +391,44 @@ async def delete_user(request: Request, id: uuid.UUID):
     if not user:
         raise ServerNotFoundException
     session.delete(user)
+    session.commit()
+
+
+@router.get("/reset-tokens/", status_code=status.HTTP_200_OK)
+@with_user(roles=[Role.admin])
+async def get_reset_tokens(request: Request) -> list[PasswordResetToken]:
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    session = state["session"]
+    return list(session.exec(select(PasswordResetToken)).all())
+
+
+@router.delete("/reset-tokens/{id}", status_code=status.HTTP_204_NO_CONTENT)
+@with_user(roles=[Role.admin])
+async def delete_reset_token(request: Request, id: uuid.UUID):
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    session = state["session"]
+    token = session.get(PasswordResetToken, id)
+    if not token:
+        raise ServerNotFoundException
+    session.delete(token)
+    session.commit()
+
+
+@router.get("/verify-tokens/", status_code=status.HTTP_200_OK)
+@with_user(roles=[Role.admin])
+async def get_verify_tokens(request: Request) -> list[EmailVerificationToken]:
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    session = state["session"]
+    return list(session.exec(select(EmailVerificationToken)).all())
+
+
+@router.delete("/verify-tokens/{id}", status_code=status.HTTP_204_NO_CONTENT)
+@with_user(roles=[Role.admin])
+async def delete_verify_token(request: Request, id: uuid.UUID):
+    state: State = request.state  # pyright: ignore[reportAssignmentType]
+    session = state["session"]
+    token = session.get(EmailVerificationToken, id)
+    if not token:
+        raise ServerNotFoundException
+    session.delete(token)
     session.commit()

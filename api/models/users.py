@@ -3,7 +3,7 @@ import secrets
 import uuid
 from datetime import datetime, timezone
 from functools import cached_property
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
 import requests
 from argon2 import PasswordHasher
@@ -23,6 +23,15 @@ if TYPE_CHECKING:
 
 _ph = PasswordHasher()
 
+Password = Annotated[
+    str,
+    PydanticField(
+        min_length=8,
+        max_length=128,
+        pattern=r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).*",
+    ),
+]
+
 
 class Role(str, enum.Enum):
     admin = "admin"
@@ -32,40 +41,32 @@ class Role(str, enum.Enum):
 class _User(BaseModel):
     username: str = Field(unique=True)
     email: EmailStr = Field(unique=True)
+    role: Role = Role.user
+    verified: bool = Field(default=False)
 
 
-class PasswordMixin(BaseModel):
-    password: str = PydanticField(
-        min_length=8,
-        max_length=128,
-        pattern=r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).*",
-    )
+class UserCreate(_User, PartialModelMixin):
+    password: Password
 
-
-class UserCreate(PasswordMixin, _User, PartialModelMixin):
-    pass
 
 
 class UserUpdate(UserCreate.as_partial(), BaseModel):
     id: uuid.UUID
-    role: Role = Role.user
     pass
 
 
-class _UsernameMixin(BaseModel):  # for ordering
+class UserLogin(BaseModel):
     username: str  # email or username
+    password: Password
 
+class UserRegister(BaseModel):
+    username: str
+    email: EmailStr
+    password: Password
 
-class UserLogin(PasswordMixin, _UsernameMixin):
-    pass
-
-
-class _OldPasswordMixin(BaseModel):  # for ordering
+class UserChangePassword(BaseModel):
     old_password: str
-
-
-class UserChangePassword(PasswordMixin, _OldPasswordMixin):
-    pass
+    password: Password
 
 
 class User(_User, SQLModel, table=True):
@@ -157,6 +158,7 @@ __all__ = [
     "UserCreate",
     "UserUpdate",
     "UserLogin",
+    "UserRegister",
     "UserChangePassword",
     "Role",
 ]

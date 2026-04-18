@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ title }}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e4e4e7;">
+          <tr>
+            <td style="padding:40px 48px;">
+              <h1 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#18181b;">{{ title }}</h1>
+              <p style="margin:0 0 24px;color:#71717a;font-size:15px;line-height:1.6;">
+                Hi {{ username }}, {{ body }}
+              </p>
+              <a href="{{ action_url }}"
+                 style="display:inline-block;padding:12px 28px;background:#18181b;color:#ffffff;text-decoration:none;border-radius:6px;font-size:15px;font-weight:500;">
+                {{ action_label }}
+              </a>
+              <p style="margin:24px 0 0;color:#a1a1aa;font-size:13px;line-height:1.6;">
+                Or copy this link into your browser:<br />
+                <span style="color:#71717a;word-break:break-all;">{{ action_url }}</span>
+              </p>
+              <hr style="margin:32px 0;border:none;border-top:1px solid #e4e4e7;" />
+              <p style="margin:0;color:#a1a1aa;font-size:12px;">{{ footer }}</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

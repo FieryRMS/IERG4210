@@ -7,4 +7,5 @@ from .links import *
 from .orders import *
 from .products import *
 from .root import *
+from .tokens import *
 from .users import *
