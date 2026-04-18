@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
+import requests
 from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.security import APIKeyHeader
@@ -43,6 +44,28 @@ _session_scheme = APIKeyHeader(
     scheme_name="SessionToken",
     description="A token that represents the user's session. It should be included in the request header with the name 'X-Session-Token'.",
 )
+
+
+async def _get_location_from_ip(ip: str | None, state: State) -> str | None:
+    redis = state["redis"]
+    if ip is None:
+        return None
+    redis_key = f"ip_location:{ip}"
+    cached_location: str | None = await redis.get(redis_key)
+    if cached_location is not None:
+        return cached_location
+    try:
+        response = requests.get(f"https://ipapi.co/{ip}/json/")
+        response.raise_for_status()
+        data = response.json()
+        city = data.get("city")
+        region = data.get("region")
+        country = data.get("country_name")
+        location = ", ".join(filter(None, [city, region, country]))
+        await redis.setex(redis_key, 7 * 24 * 60 * 60, location)  # Cache for 7 days
+        return location
+    except Exception:
+        return None
 
 
 def _get_client_ip(request: Request) -> str | None:
@@ -113,7 +136,9 @@ def with_user(*, roles: list[Role] = [], inject: bool | None = None):
 
 @router.get("/me", status_code=status.HTTP_200_OK)
 @with_session()
-async def get_current_user(request: Request, session: UserSession | None) -> User | None:
+async def get_current_user(
+    request: Request, session: UserSession | None
+) -> User | None:
     if session is None:
         return None
     state: State = request.state  # pyright: ignore[reportAssignmentType]
@@ -135,7 +160,9 @@ async def login(request: Request, response: Response, credentials: UserLogin) ->
             select(User).where(User.username == credentials.username)
         ).first()
     if not db_user or not db_user.verified:
-        raise ServerUnauthorizedException(message="User has not verified their email address, try registering again to resend the verification email")
+        raise ServerUnauthorizedException(
+            message="User has not verified their email address, try registering again to resend the verification email"
+        )
 
     if not db_user or not db_user.verify_password(credentials.password):
         raise ServerUnauthorizedException(message="Invalid username/email or password")
@@ -144,6 +171,7 @@ async def login(request: Request, response: Response, credentials: UserLogin) ->
         user_id=db_user.id,
         ip_address=_get_client_ip(request),
         user_agent=request.headers.get("x-forwarded-user-agent"),
+        location=await _get_location_from_ip(_get_client_ip(request), state),
     )
     session.add(user_session)
     session.commit()
@@ -177,7 +205,9 @@ async def delete_own_session(request: Request, id: uuid.UUID, user: User):
     db_session.commit()
 
 
-async def _send_verification_email(db_user: User, verification_token: EmailVerificationToken, raw_token: str) -> None:
+async def _send_verification_email(
+    db_user: User, verification_token: EmailVerificationToken, raw_token: str
+) -> None:
     verify_url = f"{WEB_URL}/verify-email?id={verification_token.id}&token={raw_token}"
     html = render_email(
         "email_action.html",
@@ -204,7 +234,9 @@ async def register(request: Request, user: UserRegister) -> User:
         if existing.verified:
             raise ServerBadRequestException(message="Email is already registered")
         for t in session.exec(
-            select(EmailVerificationToken).where(EmailVerificationToken.user_id == existing.id)
+            select(EmailVerificationToken).where(
+                EmailVerificationToken.user_id == existing.id
+            )
         ).all():
             session.delete(t)
         verification_token = EmailVerificationToken(user_id=existing.id)
@@ -267,7 +299,11 @@ async def reset_password(request: Request, response: Response, body: ResetPasswo
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
     token = session.get(PasswordResetToken, body.id)
-    if not token or not token.verify_token(body.token) or token.is_expired(token.max_age):
+    if (
+        not token
+        or not token.verify_token(body.token)
+        or token.is_expired(token.max_age)
+    ):
         raise ServerBadRequestException(message="Invalid or expired token")
 
     user = token.user
@@ -286,7 +322,11 @@ async def verify_email(request: Request, body: VerifyEmail):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
     token = session.get(EmailVerificationToken, body.id)
-    if not token or not token.verify_token(body.token) or token.is_expired(token.max_age):
+    if (
+        not token
+        or not token.verify_token(body.token)
+        or token.is_expired(token.max_age)
+    ):
         raise ServerBadRequestException(message="Invalid or expired token")
 
     user = token.user

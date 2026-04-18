@@ -2,10 +2,8 @@ import enum
 import secrets
 import uuid
 from datetime import datetime, timezone
-from functools import cached_property
 from typing import TYPE_CHECKING, Annotated
 
-import requests
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError
 from pydantic import EmailStr
@@ -49,7 +47,6 @@ class UserCreate(_User, PartialModelMixin):
     password: Password
 
 
-
 class UserUpdate(UserCreate.as_partial(), BaseModel):
     id: uuid.UUID
     pass
@@ -59,10 +56,12 @@ class UserLogin(BaseModel):
     username: str  # email or username
     password: Password
 
+
 class UserRegister(BaseModel):
     username: str
     email: EmailStr
     password: Password
+
 
 class UserChangePassword(BaseModel):
     old_password: str
@@ -106,6 +105,7 @@ class Session(SQLModel, table=True):
     )
     max_age: int = 60 * 60 * 24 * 2  # 2 days in seconds
     ip_address: str | None = Field(default=None)
+    location: str | None = Field(default=None)
     user_agent: str | None = Field(default=None)
 
     user: User = Relationship(back_populates="sessions")
@@ -129,27 +129,14 @@ class Session(SQLModel, table=True):
                   WHERE created_at + (max_age * interval '1 second') < NOW()$$
             );
         """
-        result = db.exec(delete(Session).where(
-            Session.created_at + func.make_interval(secs=Session.max_age) < func.now()
-        ))
+        result = db.exec(
+            delete(Session).where(
+                Session.created_at + func.make_interval(secs=Session.max_age)
+                < func.now()
+            )
+        )
         db.commit()
         return result.rowcount
-
-    @computed_field()
-    @cached_property
-    def location(self) -> None | str:
-        if self.ip_address is None:
-            return None
-        try:
-            response = requests.get(f"https://ipapi.co/{self.ip_address}/json/")
-            response.raise_for_status()
-            data = response.json()
-            city = data.get("city")
-            region = data.get("region")
-            country = data.get("country_name")
-            return ", ".join(filter(None, [city, region, country]))
-        except Exception:
-            return None
 
 
 __all__ = [
