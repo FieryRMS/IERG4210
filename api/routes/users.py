@@ -177,8 +177,8 @@ async def delete_own_session(request: Request, id: uuid.UUID, user: User):
     db_session.commit()
 
 
-async def _send_verification_email(db_user: User, verification_token: EmailVerificationToken) -> None:
-    verify_url = f"{WEB_URL}/verify-email?id={verification_token.id}&token={verification_token.token}"
+async def _send_verification_email(db_user: User, verification_token: EmailVerificationToken, raw_token: str) -> None:
+    verify_url = f"{WEB_URL}/verify-email?id={verification_token.id}&token={raw_token}"
     html = render_email(
         "email_action.html",
         username=db_user.username,
@@ -208,14 +208,16 @@ async def register(request: Request, user: UserRegister) -> User:
         ).all():
             session.delete(t)
         verification_token = EmailVerificationToken(user_id=existing.id)
+        raw_token = verification_token.generate_token()
         session.add(verification_token)
         session.commit()
-        await _send_verification_email(existing, verification_token)
+        await _send_verification_email(existing, verification_token, raw_token)
         return existing
 
     db_user = User.model_validate(user)
     db_user.set_password(user.password)
     verification_token = EmailVerificationToken(user_id=db_user.id)
+    raw_token = verification_token.generate_token()
     session.add(db_user)
     session.add(verification_token)
     try:
@@ -230,7 +232,7 @@ async def register(request: Request, user: UserRegister) -> User:
         raise ServerBadRequestException
     session.refresh(db_user)
 
-    await _send_verification_email(db_user, verification_token)
+    await _send_verification_email(db_user, verification_token, raw_token)
     return db_user
 
 
@@ -243,10 +245,11 @@ async def forgot_password(request: Request, body: ForgotPassword):
         return
 
     reset_token = PasswordResetToken(user_id=db_user.id)
+    raw_token = reset_token.generate_token()
     session.add(reset_token)
     session.commit()
 
-    reset_url = f"{WEB_URL}/reset-password?id={reset_token.id}&token={reset_token.token}"
+    reset_url = f"{WEB_URL}/reset-password?id={reset_token.id}&token={raw_token}"
     html = render_email(
         "email_action.html",
         username=db_user.username,
@@ -264,7 +267,7 @@ async def reset_password(request: Request, response: Response, body: ResetPasswo
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
     token = session.get(PasswordResetToken, body.id)
-    if not token or token.token != body.token or token.is_expired(token.max_age):
+    if not token or not token.verify_token(body.token) or token.is_expired(token.max_age):
         raise ServerBadRequestException(message="Invalid or expired token")
 
     user = token.user
@@ -283,7 +286,7 @@ async def verify_email(request: Request, body: VerifyEmail):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
     token = session.get(EmailVerificationToken, body.id)
-    if not token or token.token != body.token or token.is_expired(token.max_age):
+    if not token or not token.verify_token(body.token) or token.is_expired(token.max_age):
         raise ServerBadRequestException(message="Invalid or expired token")
 
     user = token.user
