@@ -111,7 +111,10 @@ export class ServerConflictException extends ServerException {
     static { this.register(this); }
 }
 
-
+export class ServerTooManyRequestsException extends ServerException {
+    static override readonly STATUS_CODE = StatusCodes.TOO_MANY_REQUESTS;
+    static { this.register(this); }
+}
 
 export class ServerValidationException extends ServerException {
     static override readonly STATUS_CODE = StatusCodes.UNPROCESSABLE_ENTITY;

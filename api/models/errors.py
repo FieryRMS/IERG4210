@@ -94,6 +94,11 @@ class ServerConflictException(ServerException):
 
 
 @dataclass(kw_only=True)
+class ServerTooManyRequestsException(ServerException):
+    STATUS_CODE: ClassVar[int] = status.HTTP_429_TOO_MANY_REQUESTS
+
+
+@dataclass(kw_only=True)
 class ServerValidationException(ServerException):
     STATUS_CODE: ClassVar[int] = status.HTTP_422_UNPROCESSABLE_CONTENT
     errors: FormValidationError = Field(default_factory=FormValidationError)
@@ -113,5 +118,6 @@ __all__ = [
     "ServerNotFoundException",
     "ServerMethodNotAllowedException",
     "ServerConflictException",
+    "ServerTooManyRequestsException",
     "ServerValidationException",
 ]

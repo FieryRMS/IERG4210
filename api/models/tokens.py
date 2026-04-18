@@ -32,9 +32,14 @@ class VerifyEmail(BaseModel):
 class _TokenMixin(SQLModel):
     user_id: uuid.UUID = Field(foreign_key="users.id", ondelete="CASCADE")
     token_hash: str = ""
+    timeout: ClassVar[int] = 5 * 60  # 5 minutes between requests
 
     def is_expired(self, max_age: int) -> bool:
         return (datetime.now(timezone.utc) - self.created_at).total_seconds() > max_age
+
+    def within_timeout(self) -> bool:
+        """Returns True if the token was created recently enough that a new one should not be issued."""
+        return (datetime.now(timezone.utc) - self.created_at).total_seconds() < self.timeout
 
     def generate_token(self) -> str:
         token = secrets.token_urlsafe(32)

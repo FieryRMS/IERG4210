@@ -17,6 +17,7 @@ from models import (
     ServerBadRequestException,
     ServerForbiddenException,
     ServerNotFoundException,
+    ServerTooManyRequestsException,
     ServerUnauthorizedException,
 )
 from models import Session as UserSession
@@ -233,12 +234,18 @@ async def register(request: Request, user: UserRegister) -> User:
     if existing:
         if existing.verified:
             raise ServerBadRequestException(message="Email is already registered")
-        for t in session.exec(
+        existing_token = session.exec(
             select(EmailVerificationToken).where(
                 EmailVerificationToken.user_id == existing.id
             )
-        ).all():
-            session.delete(t)
+        ).first()
+        if existing_token:
+            if existing_token.within_timeout():
+                raise ServerTooManyRequestsException(
+                    message="A verification email was already sent recently. Please wait a few minutes before trying again."
+                )
+            session.delete(existing_token)
+            session.commit()
         verification_token = EmailVerificationToken(user_id=existing.id)
         raw_token = verification_token.generate_token()
         session.add(verification_token)
@@ -275,6 +282,17 @@ async def forgot_password(request: Request, body: ForgotPassword):
     db_user = session.exec(select(User).where(User.email == body.email)).first()
     if not db_user:
         return
+
+    existing_token = session.exec(
+        select(PasswordResetToken).where(PasswordResetToken.user_id == db_user.id)
+    ).first()
+    if existing_token:
+        if existing_token.within_timeout():
+            raise ServerTooManyRequestsException(
+                message="A password reset email was already sent recently. Please wait a few minutes before trying again."
+            )
+        session.delete(existing_token)
+        session.commit()
 
     reset_token = PasswordResetToken(user_id=db_user.id)
     raw_token = reset_token.generate_token()
