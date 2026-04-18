@@ -712,7 +712,6 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                         { key: "id", disabled: () => true },
                         { key: "created_at", disabled: () => true },
                         { key: "user_id", disabled: () => true },
-                        { key: "max_age", disabled: () => true },
                     ]),
                 },
             },
@@ -782,7 +781,6 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             { key: "id", disabled: () => true },
             { key: "created_at", disabled: () => true },
             { key: "user_id", disabled: () => true },
-            { key: "max_age", disabled: () => true },
         ]),
     };
 
@@ -806,7 +804,6 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             { key: "id", disabled: () => true },
             { key: "created_at", disabled: () => true },
             { key: "user_id", disabled: () => true },
-            { key: "max_age", disabled: () => true },
         ]),
     };
 

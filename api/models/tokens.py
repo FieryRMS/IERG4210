@@ -1,6 +1,7 @@
 import secrets
 import uuid
 from datetime import datetime, timezone
+from typing import ClassVar
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError
@@ -53,7 +54,7 @@ class _TokenMixin(SQLModel):
 class PasswordResetToken(_TokenMixin, table=True):
     __tablename__ = "password_reset_tokens"  # pyright: ignore[reportAssignmentType]
 
-    max_age: int = Field(default=60 * 60)  # 1 hour
+    max_age: ClassVar[int] = 60 * 60  # 1 hour
 
     user: User = Relationship()
 
@@ -61,7 +62,7 @@ class PasswordResetToken(_TokenMixin, table=True):
 class EmailVerificationToken(_TokenMixin, table=True):
     __tablename__ = "email_verification_tokens"  # pyright: ignore[reportAssignmentType]
 
-    max_age: int = Field(default=60 * 60 * 24)  # 24 hours
+    max_age: ClassVar[int] = 60 * 60 * 24  # 24 hours
 
     user: User = Relationship()
 

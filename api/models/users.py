@@ -2,7 +2,7 @@ import enum
 import secrets
 import uuid
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, ClassVar
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError
@@ -103,7 +103,7 @@ class Session(SQLModel, table=True):
     token: str = Field(
         unique=True, default_factory=lambda: secrets.token_urlsafe(32), exclude=True
     )
-    max_age: int = 60 * 60 * 24 * 2  # 2 days in seconds
+    max_age: ClassVar[int] = 60 * 60 * 24 * 2  # 2 days in seconds
     ip_address: str | None = Field(default=None)
     location: str | None = Field(default=None)
     user_agent: str | None = Field(default=None)

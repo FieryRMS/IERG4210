@@ -85,7 +85,6 @@ class Order(OrderDetails, SQLModel, table=True):
     __table_args__ = (UniqueConstraint("user_id", "ray_id"),)
 
     price: float
-    max_age: int = 60 * 60 * 24 * 7  # 7 days in seconds
     paid: bool = False
 
     transactions: list["Transaction"] = Relationship(back_populates="order")
