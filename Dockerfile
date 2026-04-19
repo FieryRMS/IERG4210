@@ -22,7 +22,6 @@ WORKDIR /app
 COPY api/ .
 COPY --from=api-prod /app/.venv /app/.venv
 COPY --from=api-prod /root/.local/share/uv/python /root/.local/share/uv/python
-RUN ls -la /app/.venv/Lib/site-packages
 RUN python -c "import main, json; print(json.dumps(main.app.openapi()))" > openapi.json
 CMD ["fastapi", "run"]
 
