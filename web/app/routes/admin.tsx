@@ -676,6 +676,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     return (
                         <Input
                             type="password"
+                            autoComplete="off"
                             value={field.state.value ?? ""}
                             name={field.name}
                             onChange={(e) => field.handleChange(e.target.value)}
