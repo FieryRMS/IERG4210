@@ -58,6 +58,7 @@ jobs:
         docker build \
           --target web \
           --cache-from ${{ vars.REGISTRY_URL }}/api:latest \
+          --build-arg VITE_O_AUTH_CLIENT_ID=${{ vars.VITE_O_AUTH_CLIENT_ID }} \
           -t ${{ vars.REGISTRY_URL }}/web:${{ github.sha }} .
         docker push ${{ vars.REGISTRY_URL }}/web:${{ github.sha }}
 
