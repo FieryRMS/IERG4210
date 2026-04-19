@@ -194,6 +194,17 @@ async def rate_limit_exceeded_handler(
     )
 
 
+@app.exception_handler(404)
+async def not_found_handler(request: Request, exc: Any) -> Response:
+    adapter = TypeAdapter(ServerNotFoundException)
+    obj = ServerNotFoundException(message=f"{request.url.path} not found")
+    return Response(
+        content=adapter.dump_json(obj),
+        status_code=obj.code,
+        media_type="application/json",
+    )
+
+
 @app.exception_handler(ServerException)
 async def http_exception_handler(request: Request, exc: ServerException) -> Response:
     adapter = TypeAdapter(exc.__class__)

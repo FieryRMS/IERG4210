@@ -35,7 +35,13 @@ async function formParser(request: Request, config?: UploadConfig) {
 
 export async function loader({ request, context }: Route.LoaderArgs) {
     const url = new URL(request.url);
-    const path = request.url.replace(url.origin + "/api", "");
+    url.pathname = url.pathname.replace(/^\/api(?=\/|$)/, "");
+    if (/^\/(docs|redoc|openapi\.json)(\/|$)/.test(url.pathname)) {
+        throw new ServerForbiddenException().toResponse();
+    }
+    const path = url.toString().replace(url.origin, "");
+    console.log(`API Request: ${request.method} ${path}`);
+
     const auth = await getAuth(request);
     const user = context.get(UserContext);
     const config = getConfig(path, request.method);
@@ -51,7 +57,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const ipAddress = getClientIPAddress(request);
     const clientUserAgent = request.headers.get("user-agent");
 
-    console.log(`API Request: ${request.method} ${path} from ${ipAddress} (${clientUserAgent})`);
     return forward(() =>
         server.request({
             method: request.method as Uppercase<HttpMethod>,

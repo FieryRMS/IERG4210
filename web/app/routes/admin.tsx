@@ -396,9 +396,8 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     return sdk.images
                         .postImages({
                             body: Any2FormData(value) as unknown as ImageCreate,
-                            headers: {
-                                "Content-Type": "multipart/form-data",
-                            },
+                            headers: { "Content-Type": null },
+                            bodySerializer: null,
                         })
                         .then(({ data, error }) => {
                             if (error || !data) {
@@ -411,9 +410,8 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     return sdk.images
                         .putImages({
                             body: Any2FormData(value) as unknown as ImageUpdate,
-                            headers: {
-                                "Content-Type": "multipart/form-data",
-                            },
+                            headers: { "Content-Type": null },
+                            bodySerializer: null,
                         })
                         .then(({ data, error }) => {
                             if (error || !data) {
