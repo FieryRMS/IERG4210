@@ -2,7 +2,8 @@ name: Deploy to Azure Container Apps
 
 on:
   push:
-    branches: azure/deploy
+    branches: [azure/deploy]
+    paths: ["web/**", "api/**", "Dockerfile", ".github/workflows/azure.yml"]
   workflow_dispatch:
 
 permissions:
@@ -47,7 +48,7 @@ jobs:
       run: az acr login --name ${{ vars.REGISTRY_URL }}
 
     - name: Build and Push API Image
-      if: steps.changes.outputs.WEB == 'true' || steps.changes.outputs.API == 'true'
+      if: steps.changes.outputs.API == 'true'
       run: |
         docker pull ${{ vars.REGISTRY_URL }}/api:latest || true
         docker build \
@@ -61,12 +62,16 @@ jobs:
     - name: Build and Push Web Image
       if: steps.changes.outputs.WEB == 'true'
       run: |
+        docker pull ${{ vars.REGISTRY_URL }}/web:latest || true
         docker build \
           --target web \
-          --cache-from ${{ vars.REGISTRY_URL }}/api:latest \
+          --cache-from ${{ vars.REGISTRY_URL }}/web:latest \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
           --build-arg VITE_O_AUTH_CLIENT_ID=${{ vars.VITE_O_AUTH_CLIENT_ID }} \
-          -t ${{ vars.REGISTRY_URL }}/web:${{ github.sha }} .
+          -t ${{ vars.REGISTRY_URL }}/web:${{ github.sha }} \
+          -t ${{ vars.REGISTRY_URL }}/web:latest .
         docker push ${{ vars.REGISTRY_URL }}/web:${{ github.sha }}
+        docker push ${{ vars.REGISTRY_URL }}/web:latest
 
     - name: Deploy to Web Container App
       if: steps.changes.outputs.WEB == 'true'
