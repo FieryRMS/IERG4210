@@ -48,9 +48,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const isForm = contentType?.startsWith("multipart/form-data");
     const body = !contentType ? undefined : isForm ? await formParser(request, config) : await request.json();
 
-    const ipAddress = getClientIPAddress(request);
+    const ipAddress = getClientIPAddress(request) || "1.1.1.1:1";
     const clientUserAgent = request.headers.get("user-agent");
 
+    console.log(`API Request: ${request.method} ${path} from ${ipAddress} (${clientUserAgent})`);
     return forward(() =>
         server.request({
             method: request.method as Uppercase<HttpMethod>,
@@ -63,6 +64,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
             body,
             headers: {
                 ...(ipAddress && { "X-Forwarded-For": ipAddress }),
+                ...{ "X-Forwarded-Proto": url.protocol.replace(":", "") },
                 ...(clientUserAgent && { "X-Forwarded-User-Agent": clientUserAgent }),
             },
         }),

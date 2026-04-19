@@ -16,16 +16,22 @@ export function meta() {
 
 export default function ForgotPasswordPage() {
     const [sent, setSent] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
 
     const form = useAppForm({
         defaultValues: { email: "" },
         validators: {
             onSubmitAsync: async ({ value }) => {
+                setSubmitError(null);
                 const parsed = zForgotPassword.safeParse(value);
                 if (!parsed.success) {
                     return { form: { form: "Invalid email", fields: { email: parsed.error.issues } } };
                 }
-                await sdk.users.postUsersForgotPassword({ body: parsed.data });
+                const { error } = await sdk.users.postUsersForgotPassword({ body: parsed.data });
+                if (error) {
+                    setSubmitError(error.message ?? "Something went wrong. Please try again.");
+                    return;
+                }
                 setSent(true);
             },
         },
@@ -71,6 +77,9 @@ export default function ForgotPasswordPage() {
                                         </form.Item>
                                     )}
                                 </form.AppField>
+                                {submitError && (
+                                    <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{submitError}</p>
+                                )}
                                 <form.Subscribe selector={(s) => s.isSubmitting}>
                                     {(isSubmitting) => (
                                         <Button type="submit" className="w-full" disabled={isSubmitting}>

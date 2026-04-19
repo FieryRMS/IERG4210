@@ -3,7 +3,6 @@ import { twMerge } from "tailwind-merge";
 import { standardSchemaValidators, type StandardSchemaV1Issue } from "@tanstack/form-core";
 import type { ZodObject } from "zod";
 import type { $ZodIssue, ParseContext } from "zod/v4/core";
-import { ServerException } from "./errors";
 import { z } from "zod";
 import { Sdk } from "./generated/sdk.gen";
 import { createClient } from "./generated/client";
@@ -161,40 +160,6 @@ export function FormData2Any(formData: FormData, parentKey = "root"): JSONLikeTy
     return deserialize(formData, parentKey, buildChildIndex(formData));
 }
 
-export async function clientForward<T extends ZodObject>(
-    call: () => Promise<Response>,
-    schema: T
-): Promise<z.infer<T>>;
-export async function clientForward<T = unknown>(
-    call: () => Promise<Response>
-): Promise<T>;
-export async function clientForward<T extends ZodObject>(
-    call: () => Promise<Response>,
-    schema?: T,
-): Promise<unknown> {
-    const response = await call();
-    if (!response.ok) {
-        const error = await response.json();
-        throw ServerException.fromJson(error);
-    }
-
-    if (response.status === 204 || response.status === 205) {
-        return null;
-    }
-
-    const data = await response.json();
-
-    if (schema) {
-        const result = schema.safeParse(data);
-        if (!result.success) {
-            // Create a more specific error for Zod validation failure
-            throw new Error(`Zod validation failed: ${result.error.message}`);
-        }
-        return result.data;
-    }
-
-    return data;
-}
 
 export const server = createClient({
     baseUrl: typeof window === "undefined" ? process.env.API_URL : "/api",

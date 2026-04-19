@@ -8,6 +8,7 @@ from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.security import APIKeyHeader
 from fastapi_decorators import depends
+from limiter import limiter
 from models import (
     EmailVerificationToken,
     ForgotPassword,
@@ -32,6 +33,7 @@ from models import (
     VerifyEmail,
 )
 from routes.common import render_email, send_email
+from slowapi.util import get_remote_address
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
@@ -49,7 +51,7 @@ _session_scheme = APIKeyHeader(
 
 async def _get_location_from_ip(ip: str | None, state: State) -> str | None:
     redis = state["redis"]
-    if ip is None:
+    if ip is None or ip.startswith("127.") or ip == "localhost":
         return None
     redis_key = f"ip_location:{ip}"
     cached_location: str | None = await redis.get(redis_key)
@@ -59,6 +61,8 @@ async def _get_location_from_ip(ip: str | None, state: State) -> str | None:
         response = requests.get(f"https://ipapi.co/{ip}/json/")
         response.raise_for_status()
         data = response.json()
+        if "error" in data:
+            return None
         city = data.get("city")
         region = data.get("region")
         country = data.get("country_name")
@@ -67,13 +71,6 @@ async def _get_location_from_ip(ip: str | None, state: State) -> str | None:
         return location
     except Exception:
         return None
-
-
-def _get_client_ip(request: Request) -> str | None:
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip() or None
-    return None
 
 
 def _set_session_headers(response: Response, user_session: UserSession | None):
@@ -148,6 +145,7 @@ async def get_current_user(
 
 
 @router.post("/me", status_code=status.HTTP_200_OK)
+@limiter.limit("20/minute") # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType] # fmt: skip
 async def login(request: Request, response: Response, credentials: UserLogin) -> User:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
@@ -168,11 +166,12 @@ async def login(request: Request, response: Response, credentials: UserLogin) ->
     if not db_user or not db_user.verify_password(credentials.password):
         raise ServerUnauthorizedException(message="Invalid username/email or password")
 
+    ip = get_remote_address(request)
     user_session = UserSession(
         user_id=db_user.id,
-        ip_address=_get_client_ip(request),
+        ip_address=ip,
         user_agent=request.headers.get("x-forwarded-user-agent"),
-        location=await _get_location_from_ip(_get_client_ip(request), state),
+        location=await _get_location_from_ip(ip, state),
     )
     session.add(user_session)
     session.commit()
@@ -223,6 +222,7 @@ async def _send_verification_email(
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute") # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType] # fmt: skip
 async def register(request: Request, user: UserRegister) -> User:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
@@ -276,6 +276,7 @@ async def register(request: Request, user: UserRegister) -> User:
 
 
 @router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("5/minute") # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType] # fmt: skip
 async def forgot_password(request: Request, body: ForgotPassword):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
@@ -313,6 +314,7 @@ async def forgot_password(request: Request, body: ForgotPassword):
 
 
 @router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("10/minute") # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType] # fmt: skip
 async def reset_password(request: Request, response: Response, body: ResetPassword):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
@@ -336,6 +338,7 @@ async def reset_password(request: Request, response: Response, body: ResetPasswo
 
 
 @router.post("/verify-email", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("10/minute") # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType] # fmt: skip
 async def verify_email(request: Request, body: VerifyEmail):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
@@ -355,6 +358,7 @@ async def verify_email(request: Request, body: VerifyEmail):
 
 
 @router.put("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("10/minute") # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType] # fmt: skip
 @with_session()
 async def change_password(
     request: Request,

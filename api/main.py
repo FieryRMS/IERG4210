@@ -1,22 +1,25 @@
+from dotenv import load_dotenv
+
+load_dotenv()
 import logging
 import os
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
-import dotenv
 import redis.asyncio as redis
 import routes
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from fastapi.security import APIKeyHeader
+from limiter import limiter
 from models import *
 from pydantic import TypeAdapter
+from slowapi.errors import RateLimitExceeded
 from sqlmodel import Session as DBSession
 from sqlmodel import create_engine
-
-dotenv.load_dotenv()  # Load environment variables from .env file
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 DEBUG = os.getenv("EXE_MODE", "prod") == "dev"
 POSTGRES_URL = os.getenv("POSTGRES_URL")
@@ -90,6 +93,7 @@ async def lifespan(app: FastAPI):
     app.state.debug = DEBUG
     state: State = app.state  # pyright: ignore[reportAssignmentType]
     state["logger"] = logging.getLogger("IERG4210-API")
+    state["logger"].info("Starting API...")
 
     assert POSTGRES_URL is not None, "POSTGRES_URL environment variable must be set"
     state["engine"] = create_engine(POSTGRES_URL)
@@ -100,7 +104,7 @@ async def lifespan(app: FastAPI):
         app.openapi()  # check if openapi can be generated at startup
 
     assert REDIS_URL is not None, "REDIS_URL environment variable must be set"
-    state["redis"] = redis.from_url(REDIS_URL)
+    state["redis"] = redis.from_url(REDIS_URL.replace("async+", "", 1))
     state["logger"].info(f"Redis Status: {await state['redis'].ping()}") # pyright: ignore[reportGeneralTypeIssues, reportUnknownMemberType] # fmt: skip
 
     state["logger"].info("API started")
@@ -141,6 +145,9 @@ app = FastAPI(
     dependencies=[Depends(verify_application_token)],
 )
 
+app.state.limiter = limiter
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(
@@ -167,6 +174,19 @@ async def validation_exception_handler(
             }
         }
     )
+    return Response(
+        content=adapter.dump_json(obj),
+        status_code=obj.code,
+        media_type="application/json",
+    )
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_exceeded_handler(
+    request: Request, exc: RateLimitExceeded
+) -> Response:
+    adapter = TypeAdapter(ServerTooManyRequestsException)
+    obj = ServerTooManyRequestsException(message=f"Rate limit exceeded: {exc.detail}")
     return Response(
         content=adapter.dump_json(obj),
         status_code=obj.code,
@@ -201,10 +221,15 @@ async def generic_exception_handler(request: Request, exc: Exception) -> Respons
 async def log_requests(
     request: Request[State], call_next: Callable[..., Any]
 ) -> Response:
-    request.state["logger"].debug(f"Request: {request.method} {request.url.path}")
+    addr = (
+        f"{request.client.host}:{request.client.port}" if request.client else "unknown"
+    )
+    request.state["logger"].debug(
+        f"Request: {addr} {request.method} {request.url.path}"
+    )
     response: Response = await call_next(request)
     request.state["logger"].debug(
-        f"Response: {request.method} {request.url.path} {response.status_code}"
+        f"Response: {addr} {request.method} {request.url.path} {response.status_code}"
     )
     return response
 

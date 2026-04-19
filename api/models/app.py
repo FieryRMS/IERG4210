@@ -5,6 +5,7 @@ from typing import TypedDict
 import redis.asyncio as redis
 from models.base import BaseModel
 from pydantic import Field, computed_field
+from slowapi import Limiter
 from sqlalchemy import Engine
 from sqlmodel import Session
 
@@ -30,6 +31,7 @@ class State(TypedDict):
     session: Session
     debug: bool
     redis: redis.Redis
+    limiter: Limiter
 
 
 __all__ = ["State", "Authorization"]
