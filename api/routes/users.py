@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-import requests
+import httpx
 from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.security import APIKeyHeader
@@ -58,14 +58,15 @@ async def _get_location_from_ip(ip: str | None, state: State) -> str | None:
     if cached_location is not None:
         return cached_location
     try:
-        response = requests.get(f"https://ipapi.co/{ip}/json/")
-        response.raise_for_status()
-        data = response.json()
-        if "error" in data:
+        async with httpx.AsyncClient(timeout=5) as client:
+            response = await client.get(f"https://free.freeipapi.com/api/json/{ip}")
+            response.raise_for_status()
+            data = response.json()
+        if data.get("ipVersion") == None:
             return None
-        city = data.get("city")
-        region = data.get("region")
-        country = data.get("country_name")
+        city = data.get("cityName")
+        region = data.get("regionName")
+        country = data.get("countryName")
         location = ", ".join(filter(None, [city, region, country]))
         await redis.setex(redis_key, 7 * 24 * 60 * 60, location)  # Cache for 7 days
         return location

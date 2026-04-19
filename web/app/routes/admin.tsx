@@ -32,8 +32,8 @@ import { CsrfContext, UserContext } from "@/lib/security.server";
 import { sdk } from "@/lib/utils";
 import { getAuth } from "@/lib/server.utils";
 import { TableGenerator, type Config, FieldConfigDefaults } from "@/components/tablegenerator";
-import { redirect } from "react-router";
-import React, { useEffect, useState } from "react";
+import { Navigate, redirect } from "react-router";
+import React, { useState, useEffect } from "react";
 import {
     zCategoryCreate,
     zCategoryUpdate,
@@ -65,7 +65,6 @@ import { XIcon } from "lucide-react";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import type { AnyFieldApi, AnyFormApi } from "@tanstack/react-form";
 import { useAuth } from "@/hooks/auth";
-import { useNavigate } from "react-router";
 
 export type TableTypes =
     | "Product"
@@ -196,7 +195,6 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     const [resetTokens, setResetTokens] = useState(loaderData.resetTokens.data ?? []);
     const [verifyTokens, setVerifyTokens] = useState(loaderData.verifyTokens.data ?? []);
     const { user } = useAuth();
-    const navigate = useNavigate();
 
     const imageMap = React.useMemo(() => {
         const map = new Map<unknown, Image>();
@@ -213,12 +211,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         });
         return map;
     }, [products]);
-
-    useEffect(() => {
-        if (user?.role !== "admin") {
-            navigate("/");
-        }
-    }, [user, navigate]);
+    if (user?.role !== "admin") return <Navigate to="/" />;
 
     const PConfig: Config<Product, TableTypes> = {
         TableType: "Product",
