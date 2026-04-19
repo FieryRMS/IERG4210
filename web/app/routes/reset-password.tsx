@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAppForm } from "@/components/ui/form-tanstack";
-import { sdk } from "@/lib/utils";
+import { parseWithSchema, sdk } from "@/lib/utils";
 import { zResetPassword } from "@/lib/generated/zod.gen";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
@@ -28,18 +28,33 @@ export default function ResetPasswordPage() {
     const id = searchParams.get("id") ?? "";
     const token = searchParams.get("token") ?? "";
 
+    const errorMap: z.core.ParseContext<z.core.$ZodIssue> = {
+        error: (issue) => {
+            if (issue.code === "invalid_format" && issue.format === "regex" && issue.path?.includes("password")) {
+                return { message: "Must include uppercase, lowercase, number, and special character" };
+            }
+            return undefined;
+        },
+    };
+
     const form = useAppForm({
-        defaultValues: { password: "", confirm_password: "" },
+        defaultValues: { id, token, password: "", confirm_password: "" },
         validators: {
+            onChangeAsync: async ({ value, formApi }) => {
+                const dirtyFields = Object.keys(formApi.fieldInfo).filter(
+                    (key) => formApi.getFieldMeta(key as keyof typeof formApi.fieldInfo)!.isDirty,
+                );
+                return parseWithSchema({ value, schema, fields: dirtyFields, params: errorMap }).errors;
+            },
+            onChangeAsyncDebounceMs: 300,
             onSubmitAsync: async ({ value }) => {
-                const parsed = schema.safeParse({ ...value, id, token });
-                if (!parsed.success) {
-                    const issues = Object.fromEntries(
-                        parsed.error.issues.map((i) => [i.path.join("."), i.message]),
-                    );
-                    return { form: { form: "Invalid input", fields: issues } };
-                }
-                const { error } = await sdk.users.postUsersResetPassword({ body: parsed.data });
+                const { parsed, errors } = parseWithSchema({
+                    value,
+                    schema,
+                    params: errorMap,
+                });
+                if (errors) return errors;
+                const { error } = await sdk.users.postUsersResetPassword({ body: parsed! });
                 if (error) {
                     toast.error(error.message ?? "Failed to reset password.");
                     return { form: { form: error.message ?? "Error", fields: {} } };
@@ -53,19 +68,19 @@ export default function ResetPasswordPage() {
 
     if (!id || !token) {
         return (
-            <main className="container mx-auto flex min-h-[60vh] items-center justify-center px-4">
+            <div className="container mx-auto flex min-h-[60vh] items-center justify-center px-4">
                 <p className="text-muted-foreground text-sm">
                     Invalid reset link.{" "}
                     <Link to="/forgot-password" className="underline underline-offset-4">
                         Request a new one.
                     </Link>
                 </p>
-            </main>
+            </div>
         );
     }
 
     return (
-        <main className="container mx-auto flex min-h-[60vh] items-center justify-center px-4 py-10">
+        <div className="container mx-auto flex min-h-[60vh] items-center justify-center px-4 py-10">
             <Card className="w-full max-w-sm">
                 <CardHeader>
                     <CardTitle>Reset password</CardTitle>
@@ -86,7 +101,9 @@ export default function ResetPasswordPage() {
                                         <form.Item>
                                             <field.Control>
                                                 <Input
-                                                    placeholder={key === "password" ? "New password" : "Confirm password"}
+                                                    placeholder={
+                                                        key === "password" ? "New password" : "Confirm password"
+                                                    }
                                                     type="password"
                                                     autoComplete="new-password"
                                                     name={field.name}
@@ -111,6 +128,6 @@ export default function ResetPasswordPage() {
                     </form.AppForm>
                 </CardContent>
             </Card>
-        </main>
+        </div>
     );
 }

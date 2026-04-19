@@ -39,7 +39,7 @@ export default function ForgotPasswordPage() {
     });
 
     return (
-        <main className="container mx-auto flex min-h-[60vh] items-center justify-center px-4 py-10">
+        <div className="container mx-auto flex min-h-[60vh] items-center justify-center px-4 py-10">
             <Card className="w-full max-w-sm">
                 <CardHeader>
                     <CardTitle>Forgot password</CardTitle>
@@ -97,6 +97,6 @@ export default function ForgotPasswordPage() {
                     </CardContent>
                 )}
             </Card>
-        </main>
+        </div>
     );
 }

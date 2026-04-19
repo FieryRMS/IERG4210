@@ -79,7 +79,7 @@ export default function MePage({ loaderData }: Route.ComponentProps) {
         : null;
 
     return (
-        <main className="container mx-auto px-4 py-10">
+        <div className="container mx-auto px-4 py-10">
             <Tabs defaultValue="profile">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
                     <Avatar className="size-16 text-xl bg-primary text-primary-foreground">
@@ -264,7 +264,7 @@ export default function MePage({ loaderData }: Route.ComponentProps) {
                     </div>
                 </TabsContent>
             </Tabs>
-        </main>
+        </div>
     );
 }
 
