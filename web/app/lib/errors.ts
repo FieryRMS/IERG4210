@@ -97,7 +97,7 @@ export class ServerForbiddenException extends ServerException {
 }
 export class ServerNotFoundException extends ServerException {
     static override readonly STATUS_CODE = StatusCodes.NOT_FOUND;
-    message = "The requested resource has been permanently removed or does not exist.";
+    static override desc() { return "The requested resource has been permanently removed or does not exist."; }
     static { this.register(this); }
 }
 
