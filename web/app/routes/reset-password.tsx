@@ -27,6 +27,7 @@ export default function ResetPasswordPage() {
     const navigate = useNavigate();
     const id = searchParams.get("id") ?? "";
     const token = searchParams.get("token") ?? "";
+    const email = searchParams.get("email") ?? "";
 
     const errorMap: z.core.ParseContext<z.core.$ZodIssue> = {
         error: (issue) => {
@@ -66,7 +67,7 @@ export default function ResetPasswordPage() {
         onSubmit: async () => {},
     });
 
-    if (!id || !token) {
+    if (!id || !token || !email) {
         return (
             <div className="container mx-auto flex min-h-[60vh] items-center justify-center px-4">
                 <p className="text-muted-foreground text-sm">
@@ -95,6 +96,7 @@ export default function ResetPasswordPage() {
                             }}
                             className="space-y-3"
                         >
+                            <input type="email" name="email" autoComplete="username" value={email} readOnly hidden />
                             {(["password", "confirm_password"] as const).map((key) => (
                                 <form.AppField name={key} key={key}>
                                     {(field) => (

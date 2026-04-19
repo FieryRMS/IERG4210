@@ -140,11 +140,12 @@ function CheckoutView({
                 />
             </CardContent>
             <CardFooter>
-                {order && !order.order.paid ? (
+                <div className={order && !order.order.paid ? "w-full" : "hidden"}>
                     <PayPalButtons
                         style={{ disableMaxWidth: true }}
                         className="w-full p-2 bg-white rounded disabled:cursor-not-allowed disabled:opacity-50 z-0!"
                         createOrder={async () => {
+                            if (!order) throw new Error("No order");
                             const { data, error } = await sdk.paypal.postPaypalMeById({
                                 path: { id: order.order.id! },
                             });
@@ -155,6 +156,7 @@ function CheckoutView({
                             return data.transaction_id;
                         }}
                         onApprove={async (data, actions) => {
+                            if (!order) return;
                             const { data: result, error } = await sdk.paypal.putPaypalMeById({
                                 path: { id: data.orderID },
                             });
@@ -173,7 +175,8 @@ function CheckoutView({
                             }
                         }}
                     />
-                ) : !order ? (
+                </div>
+                {!order && (
                     <Button
                         className="w-full"
                         onClick={() => cart && handleCheckout(cart)}
@@ -181,7 +184,7 @@ function CheckoutView({
                     >
                         {submitting ? <Spinner /> : "Checkout"}
                     </Button>
-                ) : null}
+                )}
             </CardFooter>
         </Card>
     );

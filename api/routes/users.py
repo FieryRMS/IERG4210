@@ -2,6 +2,7 @@ import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
+from urllib.parse import quote
 
 import httpx
 from email_validator import EmailNotValidError, validate_email
@@ -298,7 +299,7 @@ async def forgot_password(request: Request, body: ForgotPassword):
     session.add(reset_token)
     session.commit()
 
-    reset_url = f"{WEB_URL}/reset-password?id={reset_token.id}&token={raw_token}"
+    reset_url = f"{WEB_URL}/reset-password?id={reset_token.id}&token={raw_token}&email={quote(db_user.email, safe='')}"
     html = render_email(
         "email_action.html",
         username=db_user.username,
