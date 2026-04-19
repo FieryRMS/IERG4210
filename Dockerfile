@@ -4,7 +4,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 FROM api-uv AS api-dev
 WORKDIR /app
-COPY api/pyproject.toml api/.python-version api/uv.lock ./
+COPY api/pyproject.toml api/.python-version api/uv.lock api/openapi-merge.json ./
 RUN apk add --no-cache openjdk11
 RUN uv sync --frozen --only-dev
 RUN poe build
@@ -41,6 +41,8 @@ RUN npm ci --omit=dev
 FROM web-dev AS web-build
 COPY --from=api /app/openapi.json /app/openapi.json
 WORKDIR /app
+ARG VITE_O_AUTH_CLIENT_ID
+ENV VITE_O_AUTH_CLIENT_ID=${VITE_O_AUTH_CLIENT_ID}
 RUN npm run build
 
 FROM node:20-alpine AS web

@@ -48,7 +48,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const isForm = contentType?.startsWith("multipart/form-data");
     const body = !contentType ? undefined : isForm ? await formParser(request, config) : await request.json();
 
-    const ipAddress = getClientIPAddress(request) || "1.1.1.1:1";
+    const ipAddress = getClientIPAddress(request);
     const clientUserAgent = request.headers.get("user-agent");
 
     console.log(`API Request: ${request.method} ${path} from ${ipAddress} (${clientUserAgent})`);
