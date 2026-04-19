@@ -135,6 +135,11 @@ class Transaction(SQLModel, table=True):
     order: Order | None = Relationship(back_populates="transactions")
     user: User | None = Relationship(back_populates="transactions")
 
+    @computed_field(alias="order")
+    @property
+    def _order(self) -> Order | None:
+        return self.order
+
 
 __all__ = [
     "Order",

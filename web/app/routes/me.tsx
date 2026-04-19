@@ -2,7 +2,7 @@
 
 import type { Route } from "./+types/me";
 import type { PageHandle } from "@/types";
-import { Link, redirect } from "react-router";
+import { Link, Navigate, redirect } from "react-router";
 import { useAuth } from "@/hooks/auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,11 +63,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
 export default function MePage({ loaderData }: Route.ComponentProps) {
     const { setUser, user } = useAuth();
-    if (!user) {
-        throw redirect("/");
-    }
+    const [sessions, setSessions] = useState<Session[]>(user?.sessions ?? []);
 
-    const [sessions, setSessions] = useState<Session[]>(user.sessions ?? []);
+    if (!user) return <Navigate to="/" />;
 
     const initials = user.username
         .split(/\s+/)
