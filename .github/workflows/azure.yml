@@ -3,6 +3,7 @@ name: Deploy to Azure Container Apps
 on:
   push:
     branches: azure/deploy
+  workflow_dispatch:
 
 permissions:
   id-token: write
@@ -21,12 +22,17 @@ jobs:
     - name: Check changed files
       id: changes
       run: |
-        git fetch origin ${{ github.event.before }} ${{ github.sha }}
-        if git diff --name-only ${{ github.event.before }} ${{ github.sha }} -- . | grep -q '^web/'; then
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           echo "WEB=true" >> $GITHUB_OUTPUT
-        fi
-        if git diff --name-only ${{ github.event.before }} ${{ github.sha }} -- . | grep -q '^api/'; then
           echo "API=true" >> $GITHUB_OUTPUT
+        else
+          git fetch origin ${{ github.event.before }} ${{ github.sha }}
+          if git diff --name-only ${{ github.event.before }} ${{ github.sha }} -- . | grep -q '^web/'; then
+            echo "WEB=true" >> $GITHUB_OUTPUT
+          fi
+          if git diff --name-only ${{ github.event.before }} ${{ github.sha }} -- . | grep -q '^api/'; then
+            echo "API=true" >> $GITHUB_OUTPUT
+          fi
         fi
 
     - name: Azure Login
