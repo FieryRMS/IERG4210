@@ -158,13 +158,10 @@ async def login(request: Request, response: Response, credentials: UserLogin) ->
         db_user = session.exec(
             select(User).where(User.username == credentials.username)
         ).first()
-    if not db_user or not db_user.verified:
+    if not db_user or not db_user.verify_password(credentials.password) or not db_user.verified:
         raise ServerUnauthorizedException(
-            message="User has not verified their email address, try registering again to resend the verification email"
+            message="Invalid username/email or password. If you registered recently, please verify your email first."
         )
-
-    if not db_user or not db_user.verify_password(credentials.password):
-        raise ServerUnauthorizedException(message="Invalid username/email or password")
 
     ip = get_remote_address(request)
     user_session = UserSession(

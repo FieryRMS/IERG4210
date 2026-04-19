@@ -1,17 +1,15 @@
+import hashlib
+import hmac
 import secrets
 import uuid
 from datetime import datetime, timezone
 from typing import ClassVar
 
-from argon2 import PasswordHasher
-from argon2.exceptions import VerificationError
 from pydantic import EmailStr
 from sqlmodel import Field, Relationship
 
 from .base import BaseModel, SQLModel
 from .users import Password, User
-
-_ph = PasswordHasher()
 
 
 class ForgotPassword(BaseModel):
@@ -31,7 +29,7 @@ class VerifyEmail(BaseModel):
 
 class _TokenMixin(SQLModel):
     user_id: uuid.UUID = Field(foreign_key="users.id", ondelete="CASCADE")
-    token_hash: str = ""
+    token_hash: str = Field(exclude=True, default="")
     timeout: ClassVar[int] = 5 * 60  # 5 minutes between requests
 
     def is_expired(self, max_age: int) -> bool:
@@ -47,13 +45,11 @@ class _TokenMixin(SQLModel):
         return token
 
     def set_token(self, token: str):
-        self.token_hash = _ph.hash(token)
+        self.token_hash = hashlib.sha256(token.encode()).hexdigest()
 
     def verify_token(self, token: str) -> bool:
-        try:
-            return _ph.verify(self.token_hash, token)
-        except VerificationError:
-            return False
+        expected = hashlib.sha256(token.encode()).hexdigest()
+        return hmac.compare_digest(expected, self.token_hash)
 
 
 class PasswordResetToken(_TokenMixin, table=True):
