@@ -1,13 +1,12 @@
 import { PassThrough } from "node:stream";
 
-import type { RouterContextProvider, EntryContext, LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
+import type { RouterContextProvider, EntryContext, HandleErrorFunction } from "react-router";
 import { createReadableStreamFromReadable } from "@react-router/node";
 import { isRouteErrorResponse, ServerRouter } from "react-router";
 import { isbot } from "isbot";
 import type { RenderToPipeableStreamOptions } from "react-dom/server";
 import { renderToPipeableStream } from "react-dom/server";
-import { generateNonce, buildSecurityHeaders } from "@/lib/security.server";
-import { NonceContext } from "@/context/nonce";
+import { buildSecurityHeaders, nonceContext } from "@/lib/security.server";
 import { ServerException } from "./lib/errors";
 
 export const streamTimeout = 5_000;
@@ -17,9 +16,9 @@ export default function handleRequest(
     responseStatusCode: number,
     responseHeaders: Headers,
     routerContext: EntryContext,
-    _loadContext: RouterContextProvider,
+    loadContext: RouterContextProvider,
 ) {
-    const nonce = generateNonce();
+    const nonce = loadContext.get(nonceContext);
 
     responseHeaders.append("Critical-CH", "Sec-Ch-Prefers-Color-Scheme");
     responseHeaders.append("Accept-CH", "Sec-Ch-Prefers-Color-Scheme");
@@ -52,9 +51,7 @@ export default function handleRequest(
         let timeoutId: ReturnType<typeof setTimeout> | undefined = setTimeout(() => abort(), streamTimeout + 1000);
 
         const { pipe, abort } = renderToPipeableStream(
-            <NonceContext.Provider value={nonce}>
-                <ServerRouter context={routerContext} url={request.url} nonce={nonce} />
-            </NonceContext.Provider>,
+            <ServerRouter context={routerContext} url={request.url} nonce={nonce} />,
             {
                 nonce,
                 [readyOption]() {
@@ -97,14 +94,10 @@ export default function handleRequest(
     });
 }
 
-export function handleError(error: unknown, { request }: LoaderFunctionArgs | ActionFunctionArgs) {
+export const handleError: HandleErrorFunction = (error, { request }) => {
     if (!request.signal.aborted && !isRouteErrorResponse(error)) {
-        if (error instanceof ServerException) throw Response.json(error.toJson(), { status: error.constructor.code });
-        else {
+        if (!(error instanceof ServerException)) {
             console.error("Unexpected error in loader/action:", error);
-            if (import.meta.env.DEV) throw error; // Let the error boundary handle it in development for better debugging
-            const err = new ServerException();
-            throw Response.json(err.toJson(), { status: err.constructor.code });
         }
     }
-}
+};

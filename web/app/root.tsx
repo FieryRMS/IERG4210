@@ -13,41 +13,55 @@ import {
     type UIMatch,
     useLoaderData,
 } from "react-router";
-import { useNonce } from "@/context/nonce";
-import { ThemeProvider, Theme } from "@/hooks/theme-provider";
+import { NonceProvider } from "@/hooks/nonce";
+import { ThemeProvider, Theme } from "@/hooks/theme";
 
 import type { Route } from "./+types/root";
 import "./app.css";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import type { LocationState, PageHandle } from "./types";
-import { CartProvider } from "./hooks/cart-provider";
-import { AuthProvider } from "./hooks/auth-provider";
-import { useCallback, useEffect } from "react";
-import { prefsCookie } from "@/prefs.cookies";
-import { csrfCookie } from "@/cookies.server";
+import { CartProvider } from "./hooks/cart";
+import { AuthProvider } from "./hooks/auth";
+import { useCallback } from "react";
+import { prefsCookie } from "@/lib/cookies";
+import {
+    csrfCookie,
+    cstfTokenGenerator,
+    CsrfContext,
+    UserContext,
+    generateNonce,
+    nonceContext,
+} from "@/lib/security.server";
 import { Toaster } from "@/components/ui/sonner";
-import { cstfTokenGenerator } from "@/lib/security.server";
-import { CsrfContext, UserContext } from "./context.server";
-import { sdk, applyAuth, applySessionCookie } from "./lib/server.utils";
-import { ServerException } from "./lib/errors";
+import { getAuth, applySessionCookie } from "./lib/server.utils";
+import { sdk } from "@/lib/utils";
+import { ServerException, ServerForbiddenException } from "./lib/errors";
 import { ErrorPage } from "@/components/error-page";
+import { getReasonPhrase } from "http-status-codes";
+import { PayPalScriptProvider, type ReactPayPalScriptOptions } from "@paypal/react-paypal-js";
 
 const authMiddleware: Route.MiddlewareFunction = async ({ request, context }, next) => {
-    const { data, response: sdkResponse } = await sdk.users.getUsersMe(await applyAuth(request));
+    const { data, response: sdkResponse } = await sdk.users.getUsersMe(await getAuth(request));
     context.set(UserContext, data || null);
     const response = await next();
     await applySessionCookie(sdkResponse.headers, response.headers);
     return response;
 };
 
+const nonceMiddleware: Route.MiddlewareFunction = async ({ context }, next) => {
+    const nonce = generateNonce();
+    context.set(nonceContext, nonce);
+    return await next();
+};
+
 const csrfMiddleware: Route.MiddlewareFunction = async ({ request, context }, next) => {
     const cookieHeader = request.headers.get("Cookie");
     let csrfSalt = await csrfCookie.parse(cookieHeader);
-    if (["POST", "PUT", "DELETE"].includes(request.method)) {
+    if (["POST", "PUT", "DELETE", "PATCH"].includes(request.method)) {
         const csrfToken = request.headers.get("X-CSRF-Token");
         if (!csrfToken || !csrfSalt || !cstfTokenGenerator.verifySignedToken(csrfToken, csrfSalt)) {
-            return new Response("Invalid CSRF token", { status: 403 });
+            throw new ServerForbiddenException();
         }
     } else {
         if (!csrfSalt) csrfSalt = cstfTokenGenerator.generateSalt();
@@ -59,7 +73,7 @@ const csrfMiddleware: Route.MiddlewareFunction = async ({ request, context }, ne
     return response;
 };
 
-export const middleware: Route.MiddlewareFunction[] = [authMiddleware, csrfMiddleware];
+export const middleware: Route.MiddlewareFunction[] = [authMiddleware, csrfMiddleware, nonceMiddleware];
 
 export const links: Route.LinksFunction = () => [
     { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -81,21 +95,28 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     return {
         theme,
         system: theme === Theme.System ? request.headers.get("Sec-Ch-Prefers-Color-Scheme") || "" : "",
-        categories: (await sdk.categories.getCategories(await applyAuth(request))).data || [],
+        categories: (await sdk.categories.getCategories(await getAuth(request))).data || [],
         csrfToken: context.get(CsrfContext),
         user: context.get(UserContext),
+        nonce: context.get(nonceContext),
     };
 }
 
-export function Layout() {
-    const nonce = useNonce();
+export function Layout({ children }: { children: React.ReactNode }) {
     const loaderData = useLoaderData<Route.ComponentProps["loaderData"] | undefined>();
+    const nonce = loaderData?.nonce;
     const location: Location<LocationState> = useLocation();
     const matches = useMatches();
     const breadcrumbs = (matches as UIMatch<unknown, PageHandle>[])
         .filter((match) => match.handle && match.handle.breadcrumb)
         .map((match) => match.handle.breadcrumb!(match));
 
+    const initialOptions: ReactPayPalScriptOptions = {
+        clientId: import.meta.env.VITE_O_AUTH_CLIENT_ID,
+        dataCspNonce: nonce,
+        currency: "HKD",
+        intent: "authorize",
+    };
     const shouldBlock = useCallback<BlockerFunction>(
         ({ currentLocation, nextLocation, historyAction }) => {
             // if pushing new entry
@@ -117,10 +138,6 @@ export function Layout() {
     );
     useBlocker(shouldBlock);
 
-    useEffect(() => {
-        window.__csrf = loaderData?.csrfToken || "";
-    }, [loaderData?.csrfToken]);
-
     return (
         <html lang="en" className={`${loaderData?.theme} ${loaderData?.system} bg-background`}>
             <head>
@@ -131,8 +148,6 @@ export function Layout() {
                 <script nonce={nonce}>
                     {`
                     window.__csrf = "${loaderData?.csrfToken || ""}";
-                    const _f=window.fetch;
-                    window.fetch=(i,o)=>_f(i,{...o,headers:{"X-CSRF-Token":window.__csrf,...o?.headers}});
                     const classList = document.documentElement.classList;
                     const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: ${Theme.Dark})");
                     function setSystemTheme() {
@@ -143,26 +158,28 @@ export function Layout() {
                     `}
                 </script>
             </head>
-            <ThemeProvider defaultTheme={loaderData?.theme}>
-                <AuthProvider user={loaderData?.user ?? null}>
-                    <CartProvider>
-                        <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden grid grid-rows-[auto_1fr_auto]">
-                            <header className="sticky top-0 z-50 w-full bg-background pb-2">
-                                <Navbar categories={loaderData?.categories || []} />
-                            </header>
-                            <main className="py-4 w-full h-full">
-                                <Outlet />
-                            </main>
-                            <footer className="w-full py-6">
-                                <Footer />
-                            </footer>
-                            <ScrollRestoration nonce={nonce} />
-                            <Scripts nonce={nonce} />
-                            <Toaster theme={loaderData?.theme} />
-                        </body>
-                    </CartProvider>
-                </AuthProvider>
-            </ThemeProvider>
+            <PayPalScriptProvider options={initialOptions}>
+                <ThemeProvider defaultTheme={loaderData?.theme}>
+                    <AuthProvider user={loaderData?.user ?? null}>
+                        <NonceProvider nonce={nonce}>
+                            <CartProvider>
+                                <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden grid grid-rows-[auto_1fr_auto]">
+                                    <header className="sticky top-0 z-50 w-full bg-background pb-2">
+                                        <Navbar categories={loaderData?.categories || []} />
+                                    </header>
+                                    <main className="py-4 w-full h-full">{children}</main>
+                                    <footer className="w-full py-6">
+                                        <Footer />
+                                    </footer>
+                                    <ScrollRestoration nonce={nonce} />
+                                    <Scripts nonce={nonce} />
+                                    <Toaster theme={loaderData?.theme} />
+                                </body>
+                            </CartProvider>
+                        </NonceProvider>
+                    </AuthProvider>
+                </ThemeProvider>
+            </PayPalScriptProvider>
         </html>
     );
 }
@@ -176,21 +193,19 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     let title = "Something went wrong";
     let description = "An unexpected error occurred.";
     let stack: string | undefined;
+    if (error instanceof Error) {
+        error = new ServerException({}, error);
+    }
 
-    if (isRouteErrorResponse(error)) {
+    if (isRouteErrorResponse(error) && ServerException.isServerException(error.data)) {
+        code = error.data.code;
+        title = getReasonPhrase(code);
+        description = error.data.message!;
+        stack = error.data.stack || undefined;
+    } else if (isRouteErrorResponse(error)) {
         code = error.status;
-        title = error.status === 404 ? "Page not found" : "Error";
-        description = error.status === 404
-            ? "The page you're looking for doesn't exist or has been moved."
-            : error.statusText || description;
-    } else if (error instanceof ServerException) {
-        code = error.code;
-        title = error.type;
-        description = error.detail;
-    } else if (error instanceof Error) {
-        title = error.name || title;
-        description = error.message;
-        if (import.meta.env.DEV) stack = error.stack;
+        title = error.statusText || title;
+        description = error.data || description;
     }
 
     return <ErrorPage code={code} title={title} description={description} stack={stack} />;

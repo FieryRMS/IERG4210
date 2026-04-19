@@ -8,22 +8,32 @@ services:
       PGDATA: /var/lib/postgresql/data
     volumes:
       - db_data:/var/lib/postgresql/data
+  redis:
+    image: redis:8.6.2
   web:
     build:
       context: .
       target: web
+      args:
+        VITE_O_AUTH_CLIENT_ID: ${VITE_O_AUTH_CLIENT_ID}
     ports:
       - 3000:3000
     environment:
       - API_URL=http://api:8000
       - SIGNING_SECRET=${SIGNING_SECRET}
+      - APPLICATION_TOKEN=${APPLICATION_TOKEN}
   api:
     build:
       context: .
       target: api
     environment:
       - POSTGRES_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      - EXE_MODE=prod
+      - REDIS_URL=redis://redis:6379/0
+      - VITE_O_AUTH_CLIENT_ID=${VITE_O_AUTH_CLIENT_ID}
+      - O_AUTH_CLIENT_SECRET=${O_AUTH_CLIENT_SECRET}
+      - APPLICATION_TOKEN=${APPLICATION_TOKEN}
+      - SMTP_CONN=${SMTP_CONN}
+      - WEB_URL=${WEB_URL}
 
 volumes:
   db_data:

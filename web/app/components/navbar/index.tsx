@@ -1,5 +1,3 @@
-"use client";
-
 import * as React from "react";
 import { useLocation, useMatches, useNavigate, type Location, type UIMatch } from "react-router";
 import { Link } from "@/components/link-wrapper";
@@ -21,30 +19,18 @@ import {
     BreadcrumbPage,
     BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import {
-    Moon,
-    ShoppingCart,
-    Sun,
-    UserRound,
-    ChevronsRightIcon,
-    SearchIcon,
-    HomeIcon,
-    PlusIcon,
-    MinusIcon,
-    Contrast,
-} from "lucide-react";
+import { Moon, ShoppingCart, Sun, UserRound, ChevronsRightIcon, SearchIcon, HomeIcon, Contrast } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Theme, useTheme } from "@/hooks/theme-provider";
-import { LoginForm } from "./login-form";
+import { Theme, useTheme } from "@/hooks/theme";
+import { NavLoginForm } from "./login-form";
 import { Badge } from "@/components/ui/badge";
 import { ButtonGroup } from "@/components/ui/button-group";
 import type { LocationState, PageHandle } from "@/types";
 import type { Category } from "@/lib/generated/types.gen";
-import { useCart } from "@/hooks/cart-provider";
-import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../ui/item";
+import { useCart } from "@/hooks/cart";
+import { CartContents } from "@/components/cart";
 import { cn } from "@/lib/utils";
-import { Img } from "@/components/img-wrapper";
 
 export function Navbar({ categories }: { categories: Category[] }) {
     const { theme, toggleTheme } = useTheme();
@@ -58,7 +44,7 @@ export function Navbar({ categories }: { categories: Category[] }) {
     if (!location.state?.breadcrumbs?.length || location.state.breadcrumbs[0]?.pathname !== "/")
         breadcrumbs.unshift(root!);
 
-    const { cart, addQuantity, removeQuantity, setQuantity } = useCart();
+    const { cart, clearCart, setQuantity } = useCart();
 
     return (
         <NavigationMenu className="max-w-full grid w-full grid-cols-3 items-center gap-x-2 px-4 py-2 sticky top-0">
@@ -79,7 +65,7 @@ export function Navbar({ categories }: { categories: Category[] }) {
                     <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
                         <ul className="grid gap-3 p-1 md:w-100 md:grid-cols-2 list-none w-full">
                             {categories.map((category) => (
-                                <ListItem key={category.id} title={category.name} href={`/c/${category.id}`}>
+                                <ListItem key={category.id} title={category.name} href={`/c/${category.id}/${category.name}`}>
                                     {category.description}
                                 </ListItem>
                             ))}
@@ -122,7 +108,7 @@ export function Navbar({ categories }: { categories: Category[] }) {
                         <UserRound />
                     </NavigationMenuTrigger>
                     <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
-                        <LoginForm />
+                        <NavLoginForm />
                     </NavigationMenuContent>
                 </NavigationMenuItem>
 
@@ -132,83 +118,29 @@ export function Navbar({ categories }: { categories: Category[] }) {
                             <div className="relative flex items-center">
                                 <ShoppingCart />
                                 <Badge className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 h-5 min-w-5 p-0 px-0.5 rounded-full empty:h-2.5 empty:min-w-2.5">
-                                    {Object.keys(cart).length}
+                                    {Object.keys(cart?.products || {}).length}
                                 </Badge>
                             </div>
                             <span className="text-xs font-medium text-muted-foreground mt-1">
                                 $
-                                {Object.values(cart)
+                                {Object.values(cart?.products || {})
                                     .reduce((total, item) => total + item.p.price * item.q, 0)
                                     .toFixed(2)}
                             </span>
                         </div>
                     </NavigationMenuTrigger>
                     <NavigationMenuContent className="w-sm sm:w-sm lg:w-md">
-                        <div className="flex w-full flex-col">
-                            <ItemGroup className="p-2 space-y-4">
-                                {Object.values(cart).map(({ p, q }) => (
-                                    <Item key={p.id} variant="outline" role="listitem">
-                                        <ItemMedia variant="image">
-                                            <Img
-                                                src={p.images?.[0]?.url}
-                                                alt={p.name}
-                                                className="w-16 h-16 object-cover pointer-events-none select-none"
-                                                draggable={false}
-                                            />
-                                        </ItemMedia>
-                                        <ItemContent>
-                                            <ItemTitle className="line-clamp-1">{p.name}</ItemTitle>
-                                            <ItemDescription>${p.price}</ItemDescription>
-                                        </ItemContent>
-                                        <ItemContent className="flex-none text-center">
-                                            <ButtonGroup>
-                                                <Button
-                                                    variant="outline"
-                                                    aria-label="add-quantity"
-                                                    onClick={() => removeQuantity(p)}
-                                                >
-                                                    <MinusIcon />
-                                                </Button>
-                                                {(() => {
-                                                    const fn = (e: React.FormEvent<HTMLInputElement>) => {
-                                                        let value = parseInt(e.currentTarget.value, 10);
-                                                        if (isNaN(value)) value = q;
-                                                        setQuantity(p, value);
-                                                    };
-                                                    return (
-                                                        <Input
-                                                            defaultValue={q}
-                                                            className="w-12 text-center"
-                                                            onBlur={fn}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === "Enter") {
-                                                                    e.currentTarget.blur();
-                                                                }
-                                                            }}
-                                                        />
-                                                    );
-                                                })()}
-                                                <Button
-                                                    variant="outline"
-                                                    aria-label="remove-quantity"
-                                                    onClick={() => addQuantity(p)}
-                                                >
-                                                    <PlusIcon />
-                                                </Button>
-                                            </ButtonGroup>
-                                        </ItemContent>
-                                    </Item>
-                                ))}
-                                {Object.keys(cart).length === 0 && (
-                                    <Item
-                                        variant="outline"
-                                        className="text-center flex justify-center items-center text-muted-foreground h-full"
-                                    >
-                                        No items in cart.
-                                    </Item>
-                                )}
-                                <Button className="w-full mt-4">Checkout</Button>
-                            </ItemGroup>
+                        <div className="p-2">
+                            <CartContents
+                                variantItemMedia="image"
+                                cart={cart}
+                                setQuantity={setQuantity}
+                                clearCart={clearCart}
+                            >
+                                <Link to="/checkout" viewTransition>
+                                    <Button className="w-full mt-1">Goto Checkout</Button>
+                                </Link>
+                            </CartContents>
                         </div>
                     </NavigationMenuContent>
                 </NavigationMenuItem>

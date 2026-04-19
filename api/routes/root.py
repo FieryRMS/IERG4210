@@ -1,9 +1,8 @@
 from fastapi import APIRouter, Request
-
-from models.app import State
-from models import Health
+from models import Health, State
 
 router = APIRouter(tags=["root"])
+
 
 @router.get("/health")
 async def health_check(request: Request) -> Health:

@@ -1,12 +1,10 @@
 import uuid
 
 from fastapi import APIRouter, Request, status
+from models import Image, ImageCreate, ImageUpdate, Role, ServerNotFoundException, State
 from sqlmodel import select
 
-from db import Image, ImageCreate, ImageUpdate
-from models.app import State
-from models.errors import ServerNotFoundException
-from .users import with_role
+from .users import with_user
 
 router = APIRouter(prefix="/images", tags=["Images"])
 
@@ -31,7 +29,7 @@ async def get_image(request: Request, image_id: uuid.UUID) -> Image:
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-@with_role(["admin"])
+@with_user(roles=[Role.admin])
 async def new_image(request: Request, image: ImageCreate) -> Image:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]
@@ -43,7 +41,7 @@ async def new_image(request: Request, image: ImageCreate) -> Image:
 
 
 @router.put("/", status_code=status.HTTP_200_OK)
-@with_role(["admin"])
+@with_user(roles=[Role.admin])
 async def update_image(
     request: Request, image: ImageUpdate
 ) -> Image:
@@ -60,7 +58,7 @@ async def update_image(
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
-@with_role(["admin"])
+@with_user(roles=[Role.admin])
 async def delete_image(request: Request, id: uuid.UUID):
     state: State = request.state  # pyright: ignore[reportAssignmentType]
     session = state["session"]

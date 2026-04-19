@@ -1,27 +1,17 @@
-import { Sdk } from "./generated/sdk.gen";
-import { sessionCookie } from "@/cookies.server";
-import { createClient } from "./generated/client";
+import { sessionCookie } from "@/lib/security.server";
 import { ServerException } from "./errors";
+import type { Config } from "./generated/client";
 
-const getSdk = () => {
-    try {
-        return Sdk.__registry.get();
-    } catch {
-        const client = createClient({
-            baseUrl: process.env.API_URL,
-        });
-        client.interceptors.error.use((err, res, req, opt) => {
-            console.error(err, res, req, opt);
-            return err;
-        });
 
-        return new Sdk({ client });
-    }
-};
-
-export const applyAuth = async (request: Request) => {
+export const getAuth = async (request: Request): Promise<{ auth: Config["auth"]; }> => {
     const session: string | null = await sessionCookie.parse(request.headers.get("Cookie"));
-    return { auth: session || undefined };
+    return {
+        auth: (auth) => {
+            if (auth.name === "X-Session-Token") return session || undefined;
+            else if (auth.name === "X-Application-Token") return process.env.APPLICATION_TOKEN;
+            return undefined;
+        }
+    };
 };
 
 export const applySessionCookie = async (
@@ -37,13 +27,21 @@ export const applySessionCookie = async (
 };
 
 
-export const sdk = getSdk();
-
-export async function forward(
-    call: () => Promise<{ data?: unknown; error?: unknown; response: Response; }>,
-): Promise<Response> {
+export async function forward<T, E>(
+    call: () => Promise<{ data?: T; error?: E; response: Response; }>,
+    raw: true,
+): Promise<T>;
+export async function forward<T, E>(
+    call: () => Promise<{ data?: T; error?: E; response: Response; }>,
+    raw?: false,
+): Promise<Response>;
+export async function forward<T, E>(
+    call: () => Promise<{ data?: T; error?: E; response: Response; }>,
+    raw: boolean = false,
+): Promise<Response | T> {
     const { data, error, response } = await call();
-    if (error) throw ServerException.fromJson(error);
+    if (error) throw ServerException.fromJson(error).toResponse();
+    if (raw) return data!;
     const headers = await applySessionCookie(response.headers);
     return data === undefined || [
         204, 205, 304

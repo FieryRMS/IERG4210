@@ -4,7 +4,6 @@ import { z } from "zod";
 import { useAppForm } from "@/components/ui/form-tanstack";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { ServerValidationException } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { useState, useMemo, type JSX } from "react";
 import { type HTMLFormMethod } from "react-router";
@@ -57,7 +56,7 @@ type FieldConfig<T extends { id?: string }, TableTypes extends string = string> 
             isEditing: boolean;
             create: boolean;
             isSubmitting: boolean;
-            methods: Config<T, TableTypes>["methods"];
+            methods?: Config<T, TableTypes>["methods"];
         }) => boolean;
         Render: (props: {
             create?: boolean;
@@ -81,7 +80,7 @@ type FieldConfig<T extends { id?: string }, TableTypes extends string = string> 
 export type Config<T extends { id?: string }, TableTypes extends string = string, K extends keyof T = keyof T> = {
     TableType: TableTypes;
     desc: string;
-    methods: {
+    methods?: {
         post?: z.ZodObject;
         put?: z.ZodObject;
         delete?: z.ZodObject;
@@ -90,7 +89,7 @@ export type Config<T extends { id?: string }, TableTypes extends string = string
         config: Config<T, TableTypes, K>;
         method: HTMLFormMethod;
         value: Partial<Record<K, SchemaType>>;
-    }) => T | Promise<T>;
+    }) => T | Promise<T | void> | void;
     fields: FieldConfig<T, TableTypes>[];
 };
 
@@ -103,7 +102,7 @@ export function FieldConfigDefaults<
         name: field.key as string,
 
         disabled: ({ isEditing, create, isSubmitting, methods }) =>
-            (!isEditing && !create) || isSubmitting || methods.post === undefined,
+            (!isEditing && !create) || isSubmitting || methods?.post === undefined,
         Render: ({ disabled, field, className }) => {
             return (
                 <Input
@@ -112,7 +111,7 @@ export function FieldConfigDefaults<
                     value={field.state.value ?? ""}
                     name={field.name}
                     onChange={(e) => field.handleChange(e.target.value)}
-                    className={className}
+                    className={cn("field-sizing-content", className)}
                     readOnly={disabled}
                 />
             );
@@ -151,25 +150,20 @@ function RowGenerator<
     const [bState, setBState] = useState<
         "idle" | "edit" | "save" | "delete" | "create" | "ssubmit" | "dsubmit" | "csubmit"
     >("idle");
-    const state2method = (state: typeof bState): HTMLFormMethod | null => {
+    const state2method = (state: typeof bState) => {
         if (state === "ssubmit") return "put";
         if (state === "dsubmit") return "delete";
         if (state === "csubmit") return "post";
         return null;
     };
-    const method2schema = (method: ReturnType<typeof state2method>) => {
-        if (method === "post") return config.methods.post;
-        if (method === "put") return config.methods.put;
-        if (method === "delete") return config.methods.delete;
-        return null;
-    };
+
     const form = useAppForm({
         defaultValues,
         validators: {
             onChangeAsync: ({ formApi }) => {
                 let schema: z.ZodObject | undefined;
-                if (create) schema = config.methods.post;
-                else schema = config.methods.put;
+                if (create) schema = config.methods?.post;
+                else schema = config.methods?.put;
                 if (!schema) return;
                 const errors = formApi.parseValuesWithSchema(schema);
                 if (!errors) return errors;
@@ -187,8 +181,13 @@ function RowGenerator<
             onChangeAsyncDebounceMs: 300,
             onSubmitAsync: async ({ formApi }) => {
                 const method = state2method(bState);
-                const schema = method2schema(method);
-                if (!schema || !method) {
+                if (!method) {
+                    toast.error("Unexpected action: Report this to the developers!");
+                    return;
+                }
+                const schema = config.methods?.[method];
+
+                if (!schema) {
                     toast.error("Unexpected action: Report this to the developers!");
                     return;
                 }
@@ -206,7 +205,6 @@ function RowGenerator<
                     rollback();
                     return errors;
                 }
-                const value = schema.parse(formApi.state.values);
 
                 const dirtyFields = new Set(
                     Object.keys(formApi.fieldInfo)
@@ -217,27 +215,23 @@ function RowGenerator<
                         )
                         .map(String),
                 );
-                const updatedValue: Partial<Record<K, SchemaType>> = {};
-                for (const key of Object.keys(value) as K[]) {
+                const value: Partial<Record<K, SchemaType>> = {};
+                for (const key of Object.keys(formApi.state.values) as K[]) {
                     if (dirtyFields.has(key) || (key === "id" && method !== "post")) {
-                        updatedValue[key] = value[key] as SchemaType;
+                        value[key] = formApi.state.values[key] as SchemaType;
                     }
                 }
-
                 try {
-                    await onSubmit({ config, method, value: updatedValue });
+                    await onSubmit({ config, method, value });
                 } catch (e) {
-                    let ret: ServerValidationException["errors"] = {
+                    rollback();
+                    return {
                         form: {
                             _errors: [{ message: "Server Error", code: "SERVER_ERROR", path: [] }],
                         },
                         fields: {},
+                        ...((e as { errors?: object })?.errors || {}),
                     };
-                    if (e instanceof ServerValidationException) {
-                        ret = e.errors;
-                    }
-                    rollback();
-                    return ret;
                 }
                 setBState("idle");
             },
@@ -352,7 +346,7 @@ function RowGenerator<
                                                 form.handleSubmit();
                                             }
                                         }}
-                                        disabled={bState.includes("submit") || config.methods.post === undefined}
+                                        disabled={bState.includes("submit") || config.methods?.post === undefined}
                                     >
                                         {["idle", "create"].includes(bState) && (
                                             <ConfirmAnim
@@ -367,97 +361,113 @@ function RowGenerator<
                                     </Button>
                                 ) : (
                                     <>
-                                        <Button
-                                            className="p-2 mx-1 relative overflow-hidden group"
-                                            variant="outline"
-                                            type="button"
-                                            onClick={() => {
-                                                if (!isSubmitting && bState === "save" && canSubmit) {
-                                                    setBState("ssubmit");
-                                                    form.handleSubmit();
-                                                }
-                                                setBState((prev) => (prev === "idle" ? "edit" : prev));
-                                            }}
-                                            disabled={bState.includes("submit") || config.methods.put === undefined}
-                                        >
-                                            {["edit", "save"].includes(bState) && (
-                                                <ConfirmAnim
-                                                    className="bg-blue-500"
-                                                    onConfirm={() =>
-                                                        setBState((prev) => (prev === "edit" ? "save" : prev))
+                                        {config.methods?.put && (
+                                            <Button
+                                                className="p-2 mx-1 relative overflow-hidden group"
+                                                variant="outline"
+                                                type="button"
+                                                onClick={() => {
+                                                    if (!isSubmitting && bState === "save" && canSubmit) {
+                                                        setBState("ssubmit");
+                                                        form.handleSubmit();
                                                     }
-                                                    onStart={() =>
-                                                        setBState((prev) => (prev === "save" ? "edit" : prev))
-                                                    }
-                                                />
-                                            )}
-                                            <Pencil
-                                                className={
-                                                    "transition-all " +
-                                                    (!["edit", "save", "ssubmit"].includes(bState)
-                                                        ? "scale-100 rotate-0"
-                                                        : "scale-0 -rotate-90")
+                                                    setBState((prev) => (prev === "idle" ? "edit" : prev));
+                                                }}
+                                                disabled={
+                                                    bState.includes("submit") || config.methods?.put === undefined
                                                 }
-                                            />
-                                            <Check
-                                                className={
-                                                    "transition-all absolute " +
-                                                    (["edit", "save"].includes(bState)
-                                                        ? "scale-100 rotate-0"
-                                                        : "scale-0 rotate-90")
-                                                }
-                                            />
-                                            {bState === "ssubmit" && <Spinner className="absolute inset-0 m-auto" />}
-                                        </Button>
-                                        <Button
-                                            className="p-2 mx-1 relative overflow-hidden group"
-                                            variant="outline"
-                                            type="button"
-                                            onClick={() => {
-                                                if (!isSubmitting && bState === "delete" && canSubmit) {
-                                                    setBState("dsubmit");
-                                                    form.handleSubmit();
-                                                } else if (!isSubmitting && !bState.includes("submit")) {
-                                                    setBState("idle");
-                                                    form.reset();
-                                                }
-                                            }}
-                                            disabled={bState.includes("submit") || config.methods.delete === undefined}
-                                        >
-                                            {["idle", "delete"].includes(bState) && (
-                                                <ConfirmAnim
-                                                    className="bg-red-500"
-                                                    onConfirm={() => {
-                                                        setBState((prev) => (prev === "idle" ? "delete" : prev));
-                                                    }}
-                                                    onStart={() =>
-                                                        setBState((prev) => (prev === "delete" ? "idle" : prev))
-                                                    }
-                                                />
-                                            )}
-                                            {bState === "dsubmit" ? (
-                                                <Spinner />
-                                            ) : (
-                                                <>
-                                                    <Trash
-                                                        className={
-                                                            "transition-all " +
-                                                            (["idle", "delete", "dsubmit"].includes(bState)
-                                                                ? "scale-100 rotate-0"
-                                                                : "scale-0 -rotate-90")
+                                            >
+                                                {["edit", "save"].includes(bState) && (
+                                                    <ConfirmAnim
+                                                        className="bg-blue-500"
+                                                        onConfirm={() =>
+                                                            setBState((prev) => (prev === "edit" ? "save" : prev))
+                                                        }
+                                                        onStart={() =>
+                                                            setBState((prev) => (prev === "save" ? "edit" : prev))
                                                         }
                                                     />
-                                                    <X
-                                                        className={
-                                                            "transition-all absolute " +
-                                                            (!["idle", "delete", "dsubmit"].includes(bState)
-                                                                ? "scale-100 rotate-0"
-                                                                : "scale-0 rotate-90")
+                                                )}
+                                                <Pencil
+                                                    className={
+                                                        "transition-all " +
+                                                        (!["edit", "save", "ssubmit"].includes(bState)
+                                                            ? "scale-100 rotate-0"
+                                                            : "scale-0 -rotate-90")
+                                                    }
+                                                />
+                                                <Check
+                                                    className={
+                                                        "transition-all absolute " +
+                                                        (["edit", "save"].includes(bState)
+                                                            ? "scale-100 rotate-0"
+                                                            : "scale-0 rotate-90")
+                                                    }
+                                                />
+                                                {bState === "ssubmit" && (
+                                                    <Spinner className="absolute inset-0 m-auto" />
+                                                )}
+                                            </Button>
+                                        )}
+                                        {(config.methods?.delete || config.methods?.put) && (
+                                            <Button
+                                                className="p-2 mx-1 relative overflow-hidden group"
+                                                variant="outline"
+                                                type="button"
+                                                onClick={() => {
+                                                    if (!isSubmitting && bState === "delete" && canSubmit) {
+                                                        setBState("dsubmit");
+                                                        form.handleSubmit();
+                                                    } else if (!isSubmitting && !bState.includes("submit")) {
+                                                        setBState("idle");
+                                                        form.reset();
+                                                    }
+                                                }}
+                                                disabled={
+                                                    bState.includes("submit") ||
+                                                    (config.methods?.delete === undefined &&
+                                                        ["idle", "delete", "dsubmit"].includes(bState))
+                                                }
+                                            >
+                                                {["idle", "delete"].includes(bState) && (
+                                                    <ConfirmAnim
+                                                        className="bg-red-500"
+                                                        onConfirm={() => {
+                                                            setBState((prev) => (prev === "idle" ? "delete" : prev));
+                                                        }}
+                                                        onStart={() =>
+                                                            setBState((prev) => (prev === "delete" ? "idle" : prev))
                                                         }
                                                     />
-                                                </>
-                                            )}
-                                        </Button>
+                                                )}
+                                                {bState === "dsubmit" ? (
+                                                    <Spinner />
+                                                ) : (
+                                                    <>
+                                                        <Trash
+                                                            className={
+                                                                "transition-all " +
+                                                                (["idle", "delete", "dsubmit"].includes(bState) &&
+                                                                config.methods?.delete
+                                                                    ? "scale-100 rotate-0"
+                                                                    : "scale-0 -rotate-90")
+                                                            }
+                                                        />
+                                                        <X
+                                                            className={
+                                                                "transition-all absolute " +
+                                                                (!(
+                                                                    ["idle", "delete", "dsubmit"].includes(bState) &&
+                                                                    config.methods?.delete
+                                                                )
+                                                                    ? "scale-100 rotate-0"
+                                                                    : "scale-0 rotate-90")
+                                                            }
+                                                        />
+                                                    </>
+                                                )}
+                                            </Button>
+                                        )}
                                     </>
                                 )}
                             </>
@@ -475,7 +485,7 @@ export function TableGenerator<
     K extends keyof T & string = keyof T & string,
 >({ data, config, onSubmit }: { data: T[]; config: Config<T, TableTypes, K>; onSubmit: (updatedRows: T[]) => void }) {
     return (
-        <Table className="px-10">
+        <Table>
             <TableCaption className="text-center">{config.desc}</TableCaption>
             <TableHeader>
                 <TableRow>
@@ -495,13 +505,13 @@ export function TableGenerator<
                         config={config}
                         onSubmit={async ({ config, method, value }) => {
                             const result = await config.onSubmit({ config, method, value });
-
-                            if (method === "put") {
+                            console.log(result);
+                            if (result) {
                                 const next = data.map((row) =>
                                     row.id === item.id ? ({ ...row, ...result } as T) : row,
                                 );
                                 onSubmit?.(next);
-                            } else if (method === "delete") {
+                            } else {
                                 const next = data.filter((row) => row.id !== item.id);
                                 onSubmit?.(next);
                             }
@@ -510,19 +520,21 @@ export function TableGenerator<
                         }}
                     />
                 ))}
-                <RowGenerator
-                    row={{} as T}
-                    config={config}
-                    create
-                    onSubmit={async ({ config, method, value }) => {
-                        const result = await config.onSubmit({ config, method, value });
-                        if (method === "post") {
-                            const next = [...data, result];
-                            onSubmit?.(next);
-                        }
-                        return result;
-                    }}
-                />
+                {config.methods?.post && (
+                    <RowGenerator
+                        row={{} as T}
+                        config={config}
+                        create
+                        onSubmit={async ({ config, method, value }) => {
+                            const result = await config.onSubmit({ config, method, value });
+                            if (method === "post") {
+                                const next = [...data, result!];
+                                onSubmit?.(next);
+                            }
+                            return result;
+                        }}
+                    />
+                )}
             </TableBody>
         </Table>
     );

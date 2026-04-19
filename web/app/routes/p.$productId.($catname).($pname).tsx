@@ -9,14 +9,15 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
-import type { Route } from "./+types/p.$productId";
+import type { Route } from "./+types/p.$productId.($catname).($pname)";
 import { ShoppingCartIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { PageHandle } from "@/types";
 import type { Product } from "@/lib/generated/types.gen";
-import { useCart } from "@/hooks/cart-provider";
+import { useCart } from "@/hooks/cart";
 import { Img } from "@/components/img-wrapper";
-import { sdk, applyAuth } from "@/lib/server.utils";
+import {  getAuth } from "@/lib/server.utils";
+import { sdk } from "@/lib/utils";
 import { ServerNotFoundException } from "@/lib/errors";
 
 export function meta({ loaderData }: Route.MetaArgs) {
@@ -29,7 +30,7 @@ export function meta({ loaderData }: Route.MetaArgs) {
 export async function loader({ params, request }: Route.LoaderArgs) {
     const { data, error } = await sdk.products.getProductsByProductId({
         path: { product_id: params.productId },
-        ...await applyAuth(request),
+        ...await getAuth(request),
     });
     if (error || !data) throw new ServerNotFoundException();
     return data;
@@ -42,7 +43,7 @@ export default function ({ params, loaderData }: Route.ComponentProps) {
         .padStart(2, "0");
     const pid = params.productId;
 
-    const { addQuantity: addToCart } = useCart();
+    const { setQuantity: addToCart } = useCart();
 
     const p: Product | null = loaderData?.id === pid ? loaderData : null;
 

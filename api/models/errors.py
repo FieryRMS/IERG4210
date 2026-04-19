@@ -1,11 +1,18 @@
-from fastapi import status
+import http.client
+import os
 from typing import ClassVar
 
+import dotenv
+from fastapi import status
+from pydantic import Field, computed_field
 from pydantic.dataclasses import dataclass
-from pydantic import computed_field, Field
-import http.client
+
+dotenv.load_dotenv()  # Load environment variables from .env file
+
 
 from .base import BaseModel
+
+DEBUG = os.getenv("EXE_MODE", "prod") == "dev"
 
 
 class ValidationError(BaseModel):
@@ -22,11 +29,12 @@ class FormValidationError(BaseModel):
 @dataclass(kw_only=True)
 class ServerException(Exception):
     STATUS_CODE: ClassVar[int] = status.HTTP_500_INTERNAL_SERVER_ERROR
-    detail: str = ""
+    message: str = ""
 
     def __post_init__(self):
-        if not self.detail:
-            self.detail = self.desc()
+        if not self.message:
+            self.message = self.desc()
+        super().__init__(self.message)
 
     @computed_field
     @property
@@ -35,8 +43,19 @@ class ServerException(Exception):
 
     @computed_field
     @property
-    def type(self) -> str:
+    def name(self) -> str:
         return self.__class__.__name__
+
+    @computed_field
+    @property
+    def stack(self) -> str | None:
+        if DEBUG:
+            import traceback
+
+            return "".join(
+                traceback.format_exception(type(self), self, self.__traceback__)
+            )
+        return None
 
     @classmethod
     def desc(cls) -> str:
@@ -61,6 +80,7 @@ class ServerForbiddenException(ServerException):
 @dataclass(kw_only=True)
 class ServerNotFoundException(ServerException):
     STATUS_CODE: ClassVar[int] = status.HTTP_404_NOT_FOUND
+    message: str = "The requested resource has been permanently removed or does not exist."
 
 
 @dataclass(kw_only=True)
@@ -69,6 +89,35 @@ class ServerMethodNotAllowedException(ServerException):
 
 
 @dataclass(kw_only=True)
+class ServerConflictException(ServerException):
+    STATUS_CODE: ClassVar[int] = status.HTTP_409_CONFLICT
+
+
+@dataclass(kw_only=True)
+class ServerTooManyRequestsException(ServerException):
+    STATUS_CODE: ClassVar[int] = status.HTTP_429_TOO_MANY_REQUESTS
+
+
+@dataclass(kw_only=True)
 class ServerValidationException(ServerException):
     STATUS_CODE: ClassVar[int] = status.HTTP_422_UNPROCESSABLE_CONTENT
     errors: FormValidationError = Field(default_factory=FormValidationError)
+
+    @computed_field
+    @property
+    def stack(self) -> str | None:
+        stack = super().stack
+        return f"{self.errors.model_dump_json(indent=2)}\n{stack}" if stack else None
+
+
+__all__ = [
+    "ServerException",
+    "ServerBadRequestException",
+    "ServerUnauthorizedException",
+    "ServerForbiddenException",
+    "ServerNotFoundException",
+    "ServerMethodNotAllowedException",
+    "ServerConflictException",
+    "ServerTooManyRequestsException",
+    "ServerValidationException",
+]

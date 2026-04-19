@@ -1,5 +1,3 @@
-"use client";
-
 import { z } from "zod";
 import { useAppForm } from "@/components/ui/form-tanstack";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,28 +5,25 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { parseWithSchema } from "@/lib/utils";
+import { parseWithSchema, sdk } from "@/lib/utils";
 import { useState } from "react";
-import { useAuth } from "@/hooks/auth-provider";
-import type { User } from "@/lib/generated/types.gen";
+import { useAuth } from "@/hooks/auth";
+import type { ServerValidationException, User } from "@/lib/generated/types.gen";
 import { Link } from "react-router";
 import { LayoutDashboard, LogOut } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../ui/item";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { zUserChangePassword, zUserCreate, zUserLogin } from "@/lib/generated/zod.gen";
-import { ServerException, ServerValidationException } from "@/lib/errors";
+import { zUserChangePassword, zUserLogin, zUserRegister } from "@/lib/generated/zod.gen";
 import { toast } from "sonner";
 
-export type FormTypes = "login" | "register" | "change";
-
-const schemas: Record<FormTypes, typeof zUserLogin | typeof zUserCreate | typeof zUserChangePassword> = {
+const schemas = {
     login: zUserLogin,
-    register: zUserCreate,
+    register: zUserRegister,
     change: zUserChangePassword,
 };
+export type AuthFormType = keyof typeof schemas;
 
-export function LoginForm() {
+export function NavLoginForm() {
     const { user, setUser } = useAuth();
 
     if (user) {
@@ -41,8 +36,8 @@ export function LoginForm() {
 
         return (
             <div className="p-2 space-y-4">
-                <ItemGroup className="">
-                    <Item variant="outline" render={<a href="#" />} role="listitem">
+                <ItemGroup>
+                    <Item variant="outline" render={<Link to="/me" />} role="listitem">
                         <ItemMedia
                             variant="image"
                             className="bg-primary items-center justify-center text-primary-foreground"
@@ -73,29 +68,18 @@ export function LoginForm() {
                         </Link>
                     )}
 
-                    <Accordion className="w-full mx-auto space-y-2">
-                        <AccordionItem value="change-password" className="last:border-b border rounded-md">
-                            <AccordionTrigger className="py-3 px-5 text-base items-center">
-                                Change Password
-                            </AccordionTrigger>
-                            <AccordionContent className="flex flex-col gap-4 px-5">
-                                <Form type="change" onSuccess={setUser} />
-                            </AccordionContent>
-                        </AccordionItem>
-                    </Accordion>
-
                     <Button
                         variant="destructive"
                         className="w-full gap-2"
                         onClick={async () => {
-                            const response = await fetch("/api/me", { method: "DELETE" });
-                            if (!response.ok) {
-                                const error = ServerException.fromJson(await response.json().catch(() => null));
-                                toast.error(`Failed to sign out: ${error.detail}`);
-                                return;
-                            }
-                            toast.success("Signed out successfully!");
-                            setUser(null);
+                            sdk.users.deleteUsersMe().then(({ error }) => {
+                                if (error) {
+                                    toast.error(`Failed to sign out: ${error.message}`);
+                                    return;
+                                }
+                                toast.success("Signed out successfully!");
+                                setUser(null);
+                            });
                         }}
                     >
                         <LogOut className="size-3.5" />
@@ -112,30 +96,36 @@ export function LoginForm() {
                 <TabsTrigger value="login">Sign In</TabsTrigger>
                 <TabsTrigger value="register">Register</TabsTrigger>
             </TabsList>
-            {(["login", "register"] satisfies FormTypes[]).map((t) => (
-                <TabsContent key={t} value={t} className="mt-4">
-                    <Form type={t} onSuccess={setUser} />
+            {(["login", "register"] satisfies AuthFormType[]).map((t) => (
+                <TabsContent key={t} value={t} className="mt-4 space-y-3">
+                    <AuthForm type={t} onSuccess={setUser} />
+                    {t === "login" && (
+                        <div className="text-center text-xs text-muted-foreground pb-2">
+                            <Link to="/forgot-password" className="underline underline-offset-4">
+                                Forgot password?
+                            </Link>
+                        </div>
+                    )}
                 </TabsContent>
             ))}
         </Tabs>
     );
 }
 
-function Form({
+export function AuthForm({
     type,
     onSuccess,
     onCancel,
 }: {
-    type: FormTypes;
+    type: AuthFormType;
     onSuccess?: (user: User | null) => void;
     onCancel?: () => void;
 }) {
     const [submitError, setSubmitError] = useState<string | null>(null);
-    const apiSchema = schemas[type];
     const schema =
         type === "login"
-            ? apiSchema
-            : (apiSchema as z.ZodObject<{ password: z.ZodString } & Record<string, z.ZodTypeAny>>)
+            ? schemas[type]
+            : (schemas[type] as z.ZodObject<{ password: z.ZodString } & Record<string, z.ZodTypeAny>>)
                   .extend({ confirm_password: z.string() })
                   .refine((data) => data.password === data.confirm_password, {
                       message: "Passwords do not match",
@@ -144,61 +134,56 @@ function Form({
     const fields = schema.shape;
     const errorMap: z.core.ParseContext<z.core.$ZodIssue> = {
         error: (issue) => {
-            console.log({ issue }, "password" in (issue.path || []));
             if (issue.code === "invalid_format" && issue.format === "regex" && issue.path?.includes("password")) {
-                console.log("hit");
-                return {
-                    message:
-                        "Must include uppercase, lowercase, number, and special character",
-                };
+                return { message: "Must include uppercase, lowercase, number, and special character" };
             }
             return undefined;
         },
     };
     const form = useAppForm({
-        defaultValues: Object.fromEntries(Object.keys(fields).map((key) => [key, ""])) as z.infer<typeof schema>,
+        defaultValues: Object.fromEntries(Object.keys(fields).map((key) => [key, ""])),
         validators: {
             onChangeAsync: async ({ value, formApi }) => {
                 const dirtyFields = Object.keys(formApi.fieldInfo).filter(
                     (key) => formApi.getFieldMeta(key as keyof typeof formApi.fieldInfo)!.isDirty,
                 );
-                return parseWithSchema({
-                    value,
-                    schema,
-                    fields: dirtyFields,
-                    params: errorMap,
-                }).errors;
+                return parseWithSchema({ value, schema, fields: dirtyFields, params: errorMap }).errors;
             },
             onChangeAsyncDebounceMs: 300,
             onSubmitAsync: async ({ value }) => {
                 setSubmitError(null);
-                const { parsed, errors } = parseWithSchema({
-                    value,
-                    schema,
-                    params: errorMap,
-                });
+                const { parsed, errors } = parseWithSchema({ value, schema, params: errorMap });
                 if (errors) {
                     setSubmitError("Invalid input!");
                     return errors;
                 }
-                const response = await fetch(`/api/me/${type}`, {
-                    method: type === "change" ? "PUT" : "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(apiSchema.parse(parsed)),
-                });
-                if (!response.ok) {
-                    const error = ServerException.fromJson(await response.json().catch(() => null));
+                const { error, data } = await (async () => {
+                    switch (type) {
+                        case "change":
+                            return await sdk.users.putUsersChangePassword({ body: schemas[type].parse(parsed) });
+                        case "login":
+                            return await sdk.users.postUsersMe({ body: schemas[type].parse(parsed) });
+                        case "register":
+                            return await sdk.users.postUsersRegister({ body: schemas[type].parse(parsed) });
+                    }
+                })();
+                if (error) {
                     toast.error(
-                        `Failed to ${type === "change" ? "change password" : type === "login" ? "login" : "register"}: ${error.detail}`,
+                        `Failed to ${type === "change" ? "change password" : type === "login" ? "login" : "register"}: ${error.message}`,
                     );
-                    setSubmitError(error.detail);
-                    if (error instanceof ServerValidationException) return error.errors;
-                    return { form: { _error: error.detail } };
+                    setSubmitError(error.message!);
+                    if ((error as ServerValidationException).errors) return (error as ServerValidationException).errors;
+                    return { form: { form: error.message || "Server error", fields: {} } };
+                }
+                if (data && !data.verified) {
+                    toast.info("Please check your email to verify your account before signing in.");
+                    onSuccess?.(null);
+                    return;
                 }
                 toast.success(
                     `${type === "change" ? "Password changed" : type === "login" ? "Logged in" : "Registered"} successfully!`,
                 );
-                onSuccess?.(await response.json().catch(() => null));
+                onSuccess?.(data || null);
             },
         },
         onSubmit: async () => {},

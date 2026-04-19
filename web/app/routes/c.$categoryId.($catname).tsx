@@ -1,7 +1,8 @@
 import type { PageHandle } from "@/types";
-import type { Route } from "./+types/c.$categoryId";
+import type { Route } from "./+types/c.$categoryId.($catname)";
 import { Category } from "@/components/category";
-import { sdk, applyAuth } from "@/lib/server.utils";
+import { sdk } from "@/lib/utils";
+import { getAuth } from "@/lib/server.utils";
 import { ServerNotFoundException } from "@/lib/errors";
 
 export function meta({ loaderData }: Route.MetaArgs) {
@@ -15,7 +16,7 @@ export function meta({ loaderData }: Route.MetaArgs) {
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-    const auth = await applyAuth(request);
+    const auth = await getAuth(request);
     if (params.categoryId) {
         const { data: products, error: perror } = await sdk.products.getProductsCategoryByCategoryId({
             path: { category_id: params.categoryId },

@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
-import { prefsCookie } from "@/prefs.cookies";
+import { prefsCookie } from "@/lib/cookies";
 import { EnumX } from "@/lib/utils";
 
 export enum Theme {

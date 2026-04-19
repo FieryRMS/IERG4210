@@ -1,0 +1,43 @@
+{
+    "inputs": [
+        {
+            "inputURL": "https://raw.githubusercontent.com/paypal/paypal-rest-api-specifications/refs/heads/main/openapi/checkout_orders_v2.json",
+            "dispute": {
+                "prefix": "Orders",
+                "alwaysApply": false
+            },
+            "operationSelection": {
+                "includeTags": [
+                    "orders"
+                ]
+            },
+            "description": {
+                "append": true,
+                "title": {
+                    "value": "PayPal Orders API",
+                    "headingLevel": 1
+                }
+            }
+        },
+        {
+            "inputURL": "https://raw.githubusercontent.com/paypal/paypal-rest-api-specifications/refs/heads/main/openapi/payments_payment_v2.json",
+            "dispute": {
+                "prefix": "Payments",
+                "alwaysApply": false
+            },
+            "operationSelection": {
+                "includeTags": [
+                    "authorizations"
+                ]
+            },
+            "description": {
+                "append": true,
+                "title": {
+                    "value": "PayPal Payments API",
+                    "headingLevel": 1
+                }
+            }
+        }
+    ],
+    "output": "./openapi.json"
+}

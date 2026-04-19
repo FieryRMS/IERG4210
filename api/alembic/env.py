@@ -7,12 +7,10 @@ sys.path.insert(
 
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-
-from alembic import context
+import alembic_postgresql_enum  # pyright: ignore[reportUnusedImport]
 import dotenv
-from sqlalchemy import MetaData
+from alembic import context
+from sqlalchemy import MetaData, engine_from_config, pool
 from sqlmodel import SQLModel
 
 dotenv.load_dotenv()  # Load environment variables from .env file
@@ -45,7 +43,7 @@ naming_convention = {
 
 SQLModel.metadata = MetaData(naming_convention=naming_convention)
 
-from db import *
+from models import *
 
 target_metadata = SQLModel.metadata
 

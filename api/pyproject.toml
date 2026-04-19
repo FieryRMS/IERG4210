@@ -12,12 +12,38 @@ dependencies = [
     "pydantic-partial>=0.10.2",
     "sqlalchemy>=2.0.47",
     "sqlmodel>=0.0.37",
+    "alembic-postgresql-enum>=1.10.0",
+    "requests>=2.33.1",
+    "paypal",
+    "redis>=7.4.0",
+    "jinja2>=3.1.6",
+    "slowapi>=0.1.9",
 ]
 
 [tool.fastapi]
 entrypoint = "main:app"
 
+[tool.uv.sources]
+paypal = { path = "./generated/paypal" }
+
 [dependency-groups]
 dev = [
     "alembic[tz]>=1.18.4",
+    "openapi-generator-cli>=7.21.0",
+    "poethepoet>=0.44.0",
 ]
+
+[tool.poe.executor]
+type = "simple"
+
+[tool.poe.tasks]
+paypal_merge = "npx openapi-merge-cli"
+paypal = """openapi-generator-cli generate -i \
+            openapi.json \
+            -g python \
+            --additional-properties=packageName=paypal \
+            -o generated/paypal
+        """
+
+build = { sequence = ["paypal_merge","paypal"] }
+

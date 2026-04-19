@@ -1,27 +1,30 @@
+from dotenv import load_dotenv
+
+load_dotenv()
 import logging
 import os
 from collections.abc import Callable
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Annotated, Any
 
-import dotenv
-from fastapi import FastAPI, Request, Response
+import redis.asyncio as redis
+import routes
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
-from sqlmodel import create_engine, Session as SQLSession
-from models.errors import ServerException
-from models.errors import *
+from fastapi.security import APIKeyHeader
+from limiter import limiter
+from models import *
 from pydantic import TypeAdapter
-import routes
-import routes.categories
-from models.app import State
-
-dotenv.load_dotenv()  # Load environment variables from .env file
-
-from db import *
+from slowapi.errors import RateLimitExceeded
+from sqlmodel import Session as DBSession
+from sqlmodel import create_engine
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 DEBUG = os.getenv("EXE_MODE", "prod") == "dev"
 POSTGRES_URL = os.getenv("POSTGRES_URL")
+REDIS_URL = os.getenv("REDIS_URL")
+APPLICATION_TOKEN = os.getenv("APPLICATION_TOKEN")
 
 
 class ColoredFormatter(logging.Formatter):
@@ -90,6 +93,7 @@ async def lifespan(app: FastAPI):
     app.state.debug = DEBUG
     state: State = app.state  # pyright: ignore[reportAssignmentType]
     state["logger"] = logging.getLogger("IERG4210-API")
+    state["logger"].info("Starting API...")
 
     assert POSTGRES_URL is not None, "POSTGRES_URL environment variable must be set"
     state["engine"] = create_engine(POSTGRES_URL)
@@ -97,12 +101,36 @@ async def lifespan(app: FastAPI):
         EF = EndpointFilter(["/openapi.json"])
         logging.getLogger("uvicorn.access").addFilter(EF)
         state["logger"].addFilter(EF)
+        app.openapi()  # check if openapi can be generated at startup
+
+    assert REDIS_URL is not None, "REDIS_URL environment variable must be set"
+    state["redis"] = redis.from_url(REDIS_URL.replace("async+", "", 1))
+    state["logger"].info(f"Redis Status: {await state['redis'].ping()}") # pyright: ignore[reportGeneralTypeIssues, reportUnknownMemberType] # fmt: skip
+
+    state["logger"].info("API started")
     yield
     state["engine"].dispose()
+    await state["redis"].close()
+    state["logger"].info("API stopped")
 
 
 def custom_generate_unique_id(route: APIRoute):
     return f"{route.tags[0]}-{route.name}"
+
+
+_application_scheme = APIKeyHeader(
+    name="X-Application-Token",
+    auto_error=False,
+    scheme_name="ApplicationToken",
+    description="A token that authorizes the client application to access the API. It should be included in the request header with the name 'X-Application-Token'.",
+)
+
+
+async def verify_application_token(
+    token: Annotated[str | None, Depends(_application_scheme)],
+) -> None:
+    if token != APPLICATION_TOKEN:
+        raise ServerUnauthorizedException()
 
 
 errs: list[type[ServerException]] = [*ServerException.__subclasses__(), ServerException]
@@ -114,7 +142,11 @@ app = FastAPI(
     responses={
         err.STATUS_CODE: {"description": err.desc(), "model": err} for err in errs
     },
+    dependencies=[Depends(verify_application_token)],
 )
+
+app.state.limiter = limiter
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 
 @app.exception_handler(RequestValidationError)
@@ -149,6 +181,19 @@ async def validation_exception_handler(
     )
 
 
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_exceeded_handler(
+    request: Request, exc: RateLimitExceeded
+) -> Response:
+    adapter = TypeAdapter(ServerTooManyRequestsException)
+    obj = ServerTooManyRequestsException(message=f"Rate limit exceeded: {exc.detail}")
+    return Response(
+        content=adapter.dump_json(obj),
+        status_code=obj.code,
+        media_type="application/json",
+    )
+
+
 @app.exception_handler(ServerException)
 async def http_exception_handler(request: Request, exc: ServerException) -> Response:
     adapter = TypeAdapter(exc.__class__)
@@ -176,10 +221,15 @@ async def generic_exception_handler(request: Request, exc: Exception) -> Respons
 async def log_requests(
     request: Request[State], call_next: Callable[..., Any]
 ) -> Response:
-    request.state["logger"].debug(f"Request: {request.method} {request.url.path}")
+    addr = (
+        f"{request.client.host}:{request.client.port}" if request.client else "unknown"
+    )
+    request.state["logger"].debug(
+        f"Request: {addr} {request.method} {request.url.path}"
+    )
     response: Response = await call_next(request)
     request.state["logger"].debug(
-        f"Response: {request.method} {request.url.path} {response.status_code}"
+        f"Response: {addr} {request.method} {request.url.path} {response.status_code}"
     )
     return response
 
@@ -188,11 +238,9 @@ async def log_requests(
 async def inject_state(
     request: Request[State], call_next: Callable[..., Any]
 ) -> Response:
-    appstate: State = request.app.state
-    request.state["logger"] = appstate["logger"]
-    request.state["debug"] = appstate["debug"]
-    request.state["engine"] = appstate["engine"]
-    request.state["session"] = SQLSession(appstate["engine"])
+    for key in request.app.state:
+        request.state[key] = request.app.state[key]
+    request.state["session"] = DBSession(request.state["engine"])
     res = await call_next(request)
     request.state["session"].close()
     return res
@@ -203,3 +251,6 @@ app.include_router(routes.categories.router)
 app.include_router(routes.products.router)
 app.include_router(routes.images.router)
 app.include_router(routes.users.router)
+app.include_router(routes.orders.router)
+app.include_router(routes.transactions.router)
+app.include_router(routes.paypal.router)
