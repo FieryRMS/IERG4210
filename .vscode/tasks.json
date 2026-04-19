@@ -8,7 +8,8 @@
                 "fastapi-dev",
                 "npm-dev",
                 "npm-gen"
-            ]
+            ],
+            "problemMatcher": []
         },
         {
             "label": "fastapi-dev",
@@ -47,7 +48,9 @@
             "label": "npm-gen",
             "type": "shell",
             "command": "npm run gen",
-            "dependsOn": ["fastapi-dev"],
+            "dependsOn": [
+                "fastapi-dev"
+            ],
             "options": {
                 "cwd": "${workspaceFolder}/web"
             },
