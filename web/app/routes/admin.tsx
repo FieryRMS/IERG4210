@@ -72,6 +72,7 @@ export type TableTypes =
     | "Image"
     | "User"
     | "Session"
+    | "All Sessions"
     | "Product Images"
     | "Order"
     | "Transaction"
@@ -142,6 +143,8 @@ function TableCombobox<T>({
     );
 }
 
+type SessionWithUser = Session & { username: string };
+
 const config = getConfig("/images", "post")!;
 
 const url = z.union([
@@ -211,6 +214,16 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         });
         return map;
     }, [products]);
+    const allSessions = React.useMemo(() => {
+        const result: SessionWithUser[] = [];
+        users.forEach((u) => {
+            (u.sessions ?? []).forEach((session) => {
+                result.push({ ...session, username: u.username });
+            });
+        });
+        return result;
+    }, [users]);
+
     if (user?.role !== "admin") return <Navigate to="/" />;
 
     const PConfig: Config<Product, TableTypes> = {
@@ -704,6 +717,9 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                         { key: "id", disabled: () => true },
                         { key: "created_at", disabled: () => true },
                         { key: "user_id", disabled: () => true },
+                        { key: "ip_address", disabled: () => true },
+                        { key: "location", disabled: () => true },
+                        { key: "user_agent", disabled: () => true },
                     ]),
                 },
             },
@@ -799,6 +815,31 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         ]),
     };
 
+    const SConfig: Config<SessionWithUser, TableTypes> = {
+        TableType: "All Sessions",
+        desc: "All Sessions",
+        methods: { delete: zDeleteUsersSessionsByIdData.shape.path },
+        onSubmit: async ({ method, value }) => {
+            if (method === "delete") {
+                return sdk.users.deleteUsersSessionsById({ path: { id: value.id! as string } }).then(({ error }) => {
+                    if (error) {
+                        toast.error(`Failed to delete session: ${error.message}`);
+                        throw error;
+                    }
+                });
+            }
+        },
+        fields: FieldConfigDefaults<SessionWithUser, TableTypes>([
+            { key: "id", disabled: () => true },
+            { key: "created_at", disabled: () => true },
+            { key: "user_id", disabled: () => true },
+            { key: "username", disabled: () => true },
+            { key: "ip_address", disabled: () => true },
+            { key: "location", disabled: () => true },
+            { key: "user_agent", disabled: () => true },
+        ]),
+    };
+
     const TConfig: Config<Transaction, TableTypes> = {
         TableType: "Transaction",
         desc: "Transaction CRUD",
@@ -861,6 +902,22 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     ) : (
                         <TableGenerator data={users ?? []} config={UConfig} onSubmit={setUsers} />
                     )}
+                </div>
+                <div className="p-4 rounded shadow">
+                    <h2 className="text-xl font-semibold mb-2 w-full text-center">All Sessions</h2>
+                    <TableGenerator
+                        data={allSessions}
+                        config={SConfig}
+                        onSubmit={(updatedSessions) => {
+                            const remainingIds = new Set(updatedSessions.map((s) => s.id));
+                            setUsers((prev) =>
+                                prev.map((u) => ({
+                                    ...u,
+                                    sessions: u.sessions.filter((s) => remainingIds.has(s.id)),
+                                }))
+                            );
+                        }}
+                    />
                 </div>
                 <div className="p-4 rounded shadow">
                     <h2 className="text-xl font-semibold mb-2 w-full text-center">Orders</h2>
