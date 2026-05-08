@@ -143,7 +143,7 @@ function CheckoutView({
                 <div className={order && !order.order.paid ? "w-full" : "hidden"}>
                     <PayPalButtons
                         style={{ disableMaxWidth: true }}
-                        className="w-full p-2 bg-white rounded disabled:cursor-not-allowed disabled:opacity-50 z-0!"
+                        className="w-full p-2 bg-white rounded disabled:cursor-not-allowed disabled:opacity-50 z-0! relative"
                         createOrder={async () => {
                             if (!order) throw new Error("No order");
                             const { data, error } = await sdk.paypal.postPaypalMeById({
