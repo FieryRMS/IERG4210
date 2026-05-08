@@ -1,6 +1,6 @@
 import { PassThrough } from "node:stream";
 
-import type { RouterContextProvider, EntryContext, HandleErrorFunction } from "react-router";
+import type { RouterContextProvider, EntryContext, HandleErrorFunction, ServerInstrumentation } from "react-router";
 import { createReadableStreamFromReadable } from "@react-router/node";
 import { isRouteErrorResponse, ServerRouter } from "react-router";
 import { isbot } from "isbot";
@@ -8,6 +8,7 @@ import type { RenderToPipeableStreamOptions } from "react-dom/server";
 import { renderToPipeableStream } from "react-dom/server";
 import { buildSecurityHeaders, nonceContext } from "@/lib/security.server";
 import { ServerException } from "./lib/errors";
+import { getClientIPAddress } from "./lib/get-client-ip-address";
 
 export const streamTimeout = 5_000;
 
@@ -101,3 +102,21 @@ export const handleError: HandleErrorFunction = (error, { request }) => {
         }
     }
 };
+
+export const instrumentations: ServerInstrumentation[] = [
+    {
+        // Instrument the server handler
+        handler(handler) {
+            handler.instrument({
+                async request(handleRequest, { request }) {
+                    const clientUserAgent = request.headers.get("user-agent");
+                    // @ts-expect-error header type mismatch from library
+                    const ipAddress = getClientIPAddress(request.headers);
+                    const url = `${request.method} ${request.url}`;
+                    console.log(`${url} from ${ipAddress} (${clientUserAgent})`);
+                    await handleRequest();
+                },
+            });
+        },
+    },
+];
