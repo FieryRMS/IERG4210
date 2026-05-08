@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 load_dotenv()
 import logging
 import os
+import sys
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
@@ -28,18 +29,23 @@ POSTGRES_URL = os.getenv("POSTGRES_URL")
 REDIS_URL = os.getenv("REDIS_URL")
 APPLICATION_TOKEN = os.getenv("APPLICATION_TOKEN")
 
+def supports_color():
+    # Check if output is a terminal and supports ANSI
+    return sys.stdout.isatty() and (
+        sys.platform != "win32" or "ANSICON" in os.environ or "WT_SESSION" in os.environ
+    )
 
 class ColoredFormatter(logging.Formatter):
-    _LEVEL_COLORS = {
+    _level_colors = {
         logging.DEBUG: ("\033[46m", "\033[36m"),  # cyan
         logging.INFO: ("\033[42m", "\033[32m"),  # green
         logging.WARNING: ("\033[43m", "\033[33m"),  # yellow
         logging.ERROR: ("\033[41m", "\033[31m"),  # red
         logging.CRITICAL: ("\033[1;41m", "\033[1;31m"),  # bold red
     }
-    _RESET = "\033[0m"
-    _DIM = "\033[2m"
-    _NAME_COLORS = [
+    _reset = "\033[0m"
+    _dim = "\033[2m"
+    _name_colors = [
         "\033[34m",  # blue
         "\033[35m",  # magenta
         "\033[36m",  # cyan
@@ -52,17 +58,31 @@ class ColoredFormatter(logging.Formatter):
         "\033[93m",  # bright yellow
     ]
 
+    def __init__(self):
+        super().__init__()
+        if not supports_color():
+            self._reset = ""
+            self._dim = ""
+            self._level_colors = {
+                logging.DEBUG: ("", ""),
+                logging.INFO: ("", ""),
+                logging.WARNING: ("", ""),
+                logging.ERROR: ("", ""),
+                logging.CRITICAL: ("", ""),
+            }
+            self._name_colors = [""]
+
     def _name_color(self, name: str) -> str:
-        return self._NAME_COLORS[hash(name) % len(self._NAME_COLORS)]
+        return self._name_colors[hash(name) % len(self._name_colors)]
 
     def format(self, record: logging.LogRecord) -> str:
-        bcolor, fcolor = self._LEVEL_COLORS.get(
-            record.levelno, (self._RESET, self._RESET)
+        bcolor, fcolor = self._level_colors.get(
+            record.levelno, (self._reset, self._reset)
         )
-        ts = f"{self._DIM}[{self.formatTime(record, self.datefmt)}]{self._RESET}"
-        level = f"{bcolor}[{record.levelname}]{self._RESET}"
-        name = f"{self._name_color(record.name)}[{record.name}]{self._RESET}"
-        message = f"{fcolor}{record.getMessage()}{self._RESET}"
+        ts = f"{self._dim}[{self.formatTime(record, self.datefmt)}]{self._reset}"
+        level = f"{bcolor}[{record.levelname}]{self._reset}"
+        name = f"{self._name_color(record.name)}[{record.name}]{self._reset}"
+        message = f"{fcolor}{record.getMessage()}{self._reset}"
         if record.exc_info:
             message += "\n" + self.formatException(record.exc_info)
         return f"{ts}{level}{name} {message}"
