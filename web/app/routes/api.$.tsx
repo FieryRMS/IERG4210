@@ -40,7 +40,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         throw new ServerForbiddenException().toResponse();
     }
     const path = url.toString().replace(url.origin, "");
-    console.log(`API Request: ${request.method} ${path}`);
 
     const auth = await getAuth(request);
     const user = context.get(UserContext);
