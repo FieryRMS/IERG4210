@@ -7,12 +7,14 @@ from collections.abc import Callable
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
+import httpx
 import redis.asyncio as redis
 import routes
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from fastapi.security import APIKeyHeader
+from github import Github
 from limiter import limiter
 from models import *
 from pydantic import TypeAdapter
@@ -106,6 +108,44 @@ async def lifespan(app: FastAPI):
     assert REDIS_URL is not None, "REDIS_URL environment variable must be set"
     state["redis"] = redis.from_url(REDIS_URL.replace("async+", "", 1))
     state["logger"].info(f"Redis Status: {await state['redis'].ping()}") # pyright: ignore[reportGeneralTypeIssues, reportUnknownMemberType] # fmt: skip
+
+    domains_strict = (
+        Github()
+        .get_repo("disposable/disposable-email-domains")
+        .get_contents("domains_strict.txt")
+    )
+    assert domains_strict is not None and not isinstance(
+        domains_strict, list
+    ), "Failed to fetch disposable email domains from GitHub"
+
+    # match sha commit, if changed, recreate bloom filter
+    if await state["redis"].get("bloom:disposable_domains_sha") != domains_strict.sha.encode():
+        state["logger"].info("Updating disposable email domains bloom filter...")
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(domains_strict.download_url)
+                resp.raise_for_status()
+                domains = resp.text.splitlines()
+                await state[
+                    "redis"
+                ].bf().insert(  # pyright: ignore[reportUnknownMemberType]
+                    "bloom:disposable_domains",
+                    domains,
+                    capacity=len(domains) * 2,
+                    error=0.01,
+                )
+                await state["redis"].set(
+                    "bloom:disposable_domains_sha", domains_strict.sha
+                )
+                state["logger"].info(
+                    "Disposable email domains bloom filter updated successfully"
+                )
+        except Exception as e:
+            state["logger"].error(
+                f"Failed to update disposable email domains bloom filter: {e}"
+            )
+    else:
+        state["logger"].info("Disposable email domains bloom filter is up to date")
 
     state["logger"].info("API started")
     yield
