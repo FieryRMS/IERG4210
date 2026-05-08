@@ -41,6 +41,14 @@ import { ErrorPage } from "@/components/error-page";
 import { getReasonPhrase } from "http-status-codes";
 import { PayPalScriptProvider, type ReactPayPalScriptOptions } from "@paypal/react-paypal-js";
 
+const uptimeMiddleware: Route.MiddlewareFunction = async ({ request }, next) => {
+    const userAgent = request.headers.get("user-agent");
+    if (userAgent?.includes("Uptime-Kuma")) {
+        return new Response(null, { status: 200 });
+    }
+    return await next();
+}
+
 const authMiddleware: Route.MiddlewareFunction = async ({ request, context }, next) => {
     const { data, response: sdkResponse } = await sdk.users.getUsersMe(await getAuth(request));
     context.set(UserContext, data || null);
@@ -73,7 +81,7 @@ const csrfMiddleware: Route.MiddlewareFunction = async ({ request, context }, ne
     return response;
 };
 
-export const middleware: Route.MiddlewareFunction[] = [authMiddleware, csrfMiddleware, nonceMiddleware];
+export const middleware: Route.MiddlewareFunction[] = [uptimeMiddleware, authMiddleware, csrfMiddleware, nonceMiddleware];
 
 export const links: Route.LinksFunction = () => [
     { rel: "preconnect", href: "https://fonts.googleapis.com" },
