@@ -19,6 +19,11 @@ export default function handleRequest(
     routerContext: EntryContext,
     loadContext: RouterContextProvider,
 ) {
+    const userAgent = request.headers.get("user-agent");
+    if (userAgent?.includes("Uptime-Kuma")) {
+        return new Response(null, { status: 200 });
+    }
+
     const nonce = loadContext.get(nonceContext);
 
     responseHeaders.append("Critical-CH", "Sec-Ch-Prefers-Color-Scheme");
