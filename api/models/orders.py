@@ -20,7 +20,7 @@ class Currency(str, enum.Enum):
     Euro = "EUR"
     Hong_Kong_dollar = "HKD"
     HKD = "HKD"
-    # Israeli_new_shekel = "ILS" doesnt exist
+    # Israeli_new_shekel = "ILS" disgusting
     Malaysian_ringgit = "MYR"
     Mexican_peso = "MXN"
     New_Zealand_dollar = "NZD"
