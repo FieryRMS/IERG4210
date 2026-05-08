@@ -75,6 +75,11 @@ async def _get_location_from_ip(ip: str | None, state: State) -> str | None:
         return None
 
 
+async def _is_disposable_email(email: str, state: State) -> bool:
+    domain = email.split("@")[-1].lower()
+    return bool(await state["redis"].bf().exists("bloom:disposable_domains", domain)) # pyright: ignore[reportUnknownArgumentType, reportUnknownMemberType] # fmt: skip
+
+
 def _set_session_headers(response: Response, user_session: UserSession | None):
     expires = (
         user_session.created_at + timedelta(seconds=user_session.max_age)
@@ -160,7 +165,11 @@ async def login(request: Request, response: Response, credentials: UserLogin) ->
         db_user = session.exec(
             select(User).where(User.username == credentials.username)
         ).first()
-    if not db_user or not db_user.verify_password(credentials.password) or not db_user.verified:
+    if (
+        not db_user
+        or not db_user.verify_password(credentials.password)
+        or not db_user.verified
+    ):
         raise ServerUnauthorizedException(
             message="Invalid username/email or password. If you registered recently, please verify your email first."
         )
@@ -253,6 +262,10 @@ async def register(request: Request, user: UserRegister) -> User:
         return existing
 
     db_user = User.model_validate(user)
+
+    if await _is_disposable_email(db_user.email, state):
+        raise ServerBadRequestException(message="This email address is not allowed")
+
     db_user.set_password(user.password)
     verification_token = EmailVerificationToken(user_id=db_user.id)
     raw_token = verification_token.generate_token()
