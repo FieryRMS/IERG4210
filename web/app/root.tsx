@@ -69,7 +69,7 @@ const csrfMiddleware: Route.MiddlewareFunction = async ({ request, context }, ne
     if (["POST", "PUT", "DELETE", "PATCH"].includes(request.method)) {
         const csrfToken = request.headers.get("X-CSRF-Token");
         if (!csrfToken || !csrfSalt || !cstfTokenGenerator.verifySignedToken(csrfToken, csrfSalt)) {
-            throw new ServerForbiddenException();
+            throw new ServerForbiddenException().toResponse();
         }
     } else {
         if (!csrfSalt) csrfSalt = cstfTokenGenerator.generateSalt();
