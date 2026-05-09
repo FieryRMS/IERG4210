@@ -16,6 +16,7 @@ export interface SecurityHeaders {
     "X-Content-Type-Options": string;
     "Referrer-Policy": string;
     "Permissions-Policy": string;
+    "Strict-Transport-Security": string;
 }
 
 export function buildSecurityHeaders(nonce: string | undefined): SecurityHeaders {
@@ -38,6 +39,7 @@ export function buildSecurityHeaders(nonce: string | undefined): SecurityHeaders
         "X-Content-Type-Options": "nosniff",
         "Referrer-Policy": "strict-origin-when-cross-origin",
         "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+        "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
     };
 }
 
