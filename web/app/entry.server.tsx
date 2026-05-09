@@ -111,7 +111,6 @@ export const instrumentations: ServerInstrumentation[] = [
             handler.instrument({
                 async request(handleRequest, { request }) {
                     const clientUserAgent = request.headers.get("user-agent");
-                    // @ts-expect-error header type mismatch from library
                     const ipAddress = getClientIPAddress(request.headers);
                     const url = `${request.method} ${request.url}`;
                     console.log(`${url} from ${ipAddress} (${clientUserAgent})`);

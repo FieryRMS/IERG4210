@@ -1,7 +1,9 @@
-import { getClientIPAddress } from "@/lib/get-client-ip-address";
+import { logHoneypot } from "@/lib/honeypot.server";
 import type { Route } from "./+types/etc.passwd";
+
 export function loader({ request }: Route.LoaderArgs) {
-    const honeypot = `root:x:0:0:root:/root:/bin/bash
+    logHoneypot(request, "etc-passwd");
+    const body = `root:x:0:0:root:/root:/bin/bash
 daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
 bin:x:2:2:bin:/bin:/usr/sbin/nologin
 sys:x:3:3:sys:/dev:/usr/sbin/nologin
@@ -20,12 +22,5 @@ irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
 gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin
 nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
 `;
-    const clientUserAgent = request.headers.get("user-agent");
-    const ipAddress = getClientIPAddress(request.headers);
-    console.log(`Honeypot accessed! DUMBASS! IP: ${ipAddress}, User-Agent: ${clientUserAgent}`);
-    return new Response(honeypot, {
-        headers: {
-            "Content-Type": "text/plain",
-        },
-    });
+    return new Response(body, { headers: { "Content-Type": "text/plain" } });
 }
