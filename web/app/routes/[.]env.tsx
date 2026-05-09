@@ -1,6 +1,8 @@
-import { getClientIPAddress } from "@/lib/get-client-ip-address";
+import { logHoneypot } from "@/lib/honeypot.server";
 import type { Route } from "./+types/[.]env";
+
 export function loader({ request }: Route.LoaderArgs) {
+    logHoneypot(request, "dotenv");
     const honeypot = `
 # Database Configuration
 POSTGRES_DB=customer_prod_db
@@ -28,12 +30,5 @@ O_AUTH_CLIENT_SECRET=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n5o6
 # Payment Gateway
 PAYPAL_API_BASE_URL=https://api-m.paypal.com
 `;
-    const clientUserAgent = request.headers.get("user-agent");
-    const ipAddress = getClientIPAddress(request.headers);
-    console.log(`Honeypot accessed! DUMBASS! IP: ${ipAddress}, User-Agent: ${clientUserAgent}`);
-    return new Response(honeypot, {
-        headers: {
-            "Content-Type": "text/plain",
-        },
-    });
+    return new Response(honeypot, { headers: { "Content-Type": "text/plain" } });
 }
