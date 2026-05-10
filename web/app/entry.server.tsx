@@ -19,8 +19,14 @@ export default function handleRequest(
     routerContext: EntryContext,
     loadContext: RouterContextProvider,
 ) {
-
-    const nonce = loadContext.get(nonceContext);
+    
+    let nonce = undefined;
+    try {
+        nonce = loadContext.get(nonceContext);
+    }
+    catch (error) {
+        console.warn("Failed to retrieve nonce from context:", error);
+    }
 
     responseHeaders.append("Critical-CH", "Sec-Ch-Prefers-Color-Scheme");
     responseHeaders.append("Accept-CH", "Sec-Ch-Prefers-Color-Scheme");
