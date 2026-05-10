@@ -63,13 +63,7 @@ const nonceMiddleware: Route.MiddlewareFunction = async ({ context }, next) => {
     return await next();
 };
 
-const HONEYPOT_PATHS = new Set(["/wp-login.php", "/phpmyadmin", "/shell.php"]);
-
 const csrfMiddleware: Route.MiddlewareFunction = async ({ request, context }, next) => {
-    const url = new URL(request.url);
-    if (HONEYPOT_PATHS.has(url.pathname)) {
-        return await next();
-    }
     const cookieHeader = request.headers.get("Cookie");
     let csrfSalt = await csrfCookie.parse(cookieHeader);
     if (["POST", "PUT", "DELETE", "PATCH"].includes(request.method)) {
