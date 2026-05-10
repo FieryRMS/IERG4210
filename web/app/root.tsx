@@ -87,7 +87,7 @@ const csrfMiddleware: Route.MiddlewareFunction = async ({ request, context }, ne
     return response;
 };
 
-export const middleware: Route.MiddlewareFunction[] = [uptimeMiddleware, authMiddleware, csrfMiddleware, nonceMiddleware];
+export const middleware: Route.MiddlewareFunction[] = [uptimeMiddleware, nonceMiddleware, csrfMiddleware, authMiddleware];
 
 export const links: Route.LinksFunction = () => [
     { rel: "preconnect", href: "https://fonts.googleapis.com" },

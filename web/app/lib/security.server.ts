@@ -76,7 +76,10 @@ const createTokenGenerator = ({
         if (!hex || !sig) return false;
         const buf = Buffer.from(hex, 'hex');
         const expected = signToken(buf, secret + salt);
-        if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return false;
+        const sigBuf = Buffer.from(sig);
+        const expectedBuf = Buffer.from(expected);
+        if (sigBuf.length !== expectedBuf.length) return false;
+        if (!timingSafeEqual(sigBuf, expectedBuf)) return false;
         const expires = buf.readBigUInt64BE(buf.length - 8);
         return expires > BigInt(Date.now());
     };
