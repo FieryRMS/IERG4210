@@ -20,16 +20,26 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Spinner } from "./ui/spinner";
 import type { CartProviderState } from "@/hooks/cart";
+import { cn } from "@/lib/utils";
+
+function withResize(url: string | undefined, resize: number): string | undefined {
+    if (!url) return url;
+    return url.includes("?") ? `${url}&resize=${resize}` : `${url}?resize=${resize}`;
+}
 
 export function CartContents({
     children,
     variantItemMedia,
+    mediaClassName,
+    resize,
     cart,
     setQuantity,
     clearCart,
 }: {
     children?: React.ReactNode;
     variantItemMedia?: Parameters<typeof ItemMedia>[0]["variant"];
+    mediaClassName?: string;
+    resize?: number;
 } & Partial<CartProviderState>) {
     if (!cart || Object.keys(cart.products).length === 0) {
         return (
@@ -53,9 +63,9 @@ export function CartContents({
             <ItemGroup className="gap-2">
                 {items.map(({ p, q }) => (
                     <Item key={p.id} variant="outline" role="listitem">
-                        <ItemMedia variant={variantItemMedia} className="self-center! translate-y-0!">
+                        <ItemMedia variant={variantItemMedia} className={cn("self-center! translate-y-0!", mediaClassName)}>
                             <Img
-                                src={p.images?.[0]?.url}
+                                src={resize ? withResize(p.images?.[0]?.url, resize) : p.images?.[0]?.url}
                                 alt={p.name}
                                 className="w-full h-full object-cover pointer-events-none select-none"
                             />
@@ -85,7 +95,7 @@ export function CartContents({
                                     readOnly={!setQuantity}
                                 />
                                 {setQuantity && (
-                                    <Button variant="outline" aria-label="increase" onClick={() => setQuantity(p, 1)}>
+                                    <Button variant="outline" aria-label="increase" onClick={() => setQuantity(p)}>
                                         <PlusIcon />
                                     </Button>
                                 )}

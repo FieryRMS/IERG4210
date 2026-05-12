@@ -133,6 +133,7 @@ export function Navbar({ categories }: { categories: Category[] }) {
                         <div className="p-2">
                             <CartContents
                                 variantItemMedia="image"
+                                resize={0.2}
                                 cart={cart}
                                 setQuantity={setQuantity}
                                 clearCart={clearCart}

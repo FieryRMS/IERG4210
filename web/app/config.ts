@@ -14,7 +14,7 @@ export const uploadConfigs: UploadConfig[] = [
     {
         type: /^image\//,
         path: /^\/images(\/|\?|$)/,
-        methods: /^POST|PUT|PATCH$/i,
+        methods: /^POST|PATCH$/i,
         fields: ["root.url"],
         maxFileSize: 1024 * 1024 * 10, // 10MB
         maxFiles: 1,

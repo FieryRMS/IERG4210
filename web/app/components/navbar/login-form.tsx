@@ -160,7 +160,7 @@ export function AuthForm({
                 const { error, data } = await (async () => {
                     switch (type) {
                         case "change":
-                            return await sdk.users.putUsersChangePassword({ body: schemas[type].parse(parsed) });
+                            return await sdk.users.patchUsersChangePassword({ body: schemas[type].parse(parsed) });
                         case "login":
                             return await sdk.users.postUsersMe({ body: schemas[type].parse(parsed) });
                         case "register":
@@ -175,7 +175,7 @@ export function AuthForm({
                     if ((error as ServerValidationException).errors) return (error as ServerValidationException).errors;
                     return { form: { form: error.message || "Server error", fields: {} } };
                 }
-                if (data && !data.verified) {
+                if (type !== "change" && data && !data.verified) {
                     toast.info("Please check your email to verify your account before signing in.");
                     onSuccess?.(null);
                     return;
@@ -183,7 +183,8 @@ export function AuthForm({
                 toast.success(
                     `${type === "change" ? "Password changed" : type === "login" ? "Logged in" : "Registered"} successfully!`,
                 );
-                onSuccess?.(data || null);
+                if (type === "change") onSuccess?.(null);
+                else onSuccess?.(data || null);
             },
         },
         onSubmit: async () => {},

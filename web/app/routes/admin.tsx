@@ -231,7 +231,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         desc: "Product CRUD",
         methods: {
             post: zProductCreate,
-            put: zProductUpdate,
+            patch: zProductUpdate,
             delete: zDeleteProductsByIdData.shape.path,
         },
         onSubmit: async ({ method, value }) => {
@@ -244,8 +244,8 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                         }
                         return data;
                     });
-                case "put":
-                    return sdk.products.putProducts({ body: value as ProductUpdate }).then(({ data, error }) => {
+                case "patch":
+                    return sdk.products.patchProducts({ body: value as ProductUpdate }).then(({ data, error }) => {
                         if (error || !data) {
                             toast.error(`Failed to update product: ${error.message}`);
                             throw error;
@@ -300,7 +300,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     TableType: "Product Images",
                     methods: {
                         post: zDeleteImagesByIdData.shape.path,
-                        put: zDeleteImagesByIdData.shape.path,
+                        patch: zDeleteImagesByIdData.shape.path,
                         delete: zDeleteImagesByIdData.shape.path,
                     },
                     desc: "Manage images associated with the product - Click submit on product to save",
@@ -354,7 +354,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         desc: "Category CRUD",
         methods: {
             post: zCategoryCreate,
-            put: zCategoryUpdate,
+            patch: zCategoryUpdate,
             delete: zDeleteCategoriesByIdData.shape.path,
         },
         onSubmit: async ({ method, value }) => {
@@ -367,8 +367,8 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                         }
                         return data;
                     });
-                case "put":
-                    return sdk.categories.putCategories({ body: value as CategoryUpdate }).then(({ data, error }) => {
+                case "patch":
+                    return sdk.categories.patchCategories({ body: value as CategoryUpdate }).then(({ data, error }) => {
                         if (error || !data) {
                             toast.error(`Failed to update category: ${error.message}`);
                             throw error;
@@ -399,7 +399,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         TableType: "Image",
         methods: {
             post: zImageCreate.extend({ url }),
-            put: zImageUpdate.extend({ url: url.nullish() }),
+            patch: zImageUpdate.extend({ url: url.nullish() }),
             delete: zDeleteImagesByIdData.shape.path,
         },
         desc: "Image CRUD",
@@ -419,9 +419,9 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                             }
                             return data;
                         });
-                case "put":
+                case "patch":
                     return sdk.images
-                        .putImages({
+                        .patchImages({
                             body: Any2FormData(value) as unknown as ImageUpdate,
                             headers: { "Content-Type": null },
                             bodySerializer: null,
@@ -602,7 +602,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         TableType: "User",
         methods: {
             post: zUserCreate,
-            put: zUserUpdate,
+            patch: zUserUpdate,
             delete: zDeleteUsersByIdData.shape.path,
         },
         desc: "User CRUD",
@@ -616,8 +616,8 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                         }
                         return data;
                     });
-                case "put":
-                    return sdk.users.putUsers({ body: value as UserUpdate }).then(({ data, error }) => {
+                case "patch":
+                    return sdk.users.patchUsers({ body: value as UserUpdate }).then(({ data, error }) => {
                         if (error || !data) {
                             toast.error(`Failed to update user: ${error.message}`);
                             throw error;

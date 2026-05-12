@@ -119,6 +119,8 @@ function CheckoutView({
             <CardContent>
                 <CartContents
                     variantItemMedia="default"
+                    mediaClassName="w-32 h-32"
+                    resize={0.4}
                     cart={displayCart}
                     setQuantity={!order ? setQuantity : undefined}
                     clearCart={
@@ -157,7 +159,7 @@ function CheckoutView({
                         }}
                         onApprove={async (data, actions) => {
                             if (!order) return;
-                            const { data: result, error } = await sdk.paypal.putPaypalMeById({
+                            const { data: result, error } = await sdk.paypal.patchPaypalMeById({
                                 path: { id: data.orderID },
                             });
                             if (error || !result) {

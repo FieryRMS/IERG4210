@@ -40,7 +40,7 @@ async def new_image(request: Request, image: ImageCreate) -> Image:
     return db_image
 
 
-@router.put("/", status_code=status.HTTP_200_OK)
+@router.patch("/", status_code=status.HTTP_200_OK)
 @with_user(roles=[Role.admin])
 async def update_image(
     request: Request, image: ImageUpdate

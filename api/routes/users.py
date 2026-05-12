@@ -369,7 +369,7 @@ async def verify_email(request: Request, body: VerifyEmail):
     session.commit()
 
 
-@router.put("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+@router.patch("/change-password", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit("10/minute") # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType] # fmt: skip
 @with_session()
 async def change_password(
@@ -430,7 +430,7 @@ async def create_user(request: Request, user: UserCreate) -> User:
     return db_user
 
 
-@router.put("/", status_code=status.HTTP_200_OK)
+@router.patch("/", status_code=status.HTTP_200_OK)
 @with_user(roles=[Role.admin])
 async def update_user(request: Request, user: UserUpdate) -> User:
     state: State = request.state  # pyright: ignore[reportAssignmentType]

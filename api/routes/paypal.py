@@ -149,7 +149,7 @@ async def create_paypal_order(
     return transaction
 
 
-@router.put("/me/{id}", status_code=status.HTTP_200_OK)
+@router.patch("/me/{id}", status_code=status.HTTP_200_OK)
 @with_user()
 async def capture_paypal_order(request: Request, id: str, user: User) -> Transaction:
     state: State = request.state  # pyright: ignore[reportAssignmentType]

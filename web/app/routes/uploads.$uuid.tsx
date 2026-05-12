@@ -12,7 +12,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     const file = await fileStorage.get(`/uploads/${storageKey}`);
 
     if (!file) {
-        throw new ServerNotFoundException();
+        throw new ServerNotFoundException().toResponse();
     }
 
     if (resize) {

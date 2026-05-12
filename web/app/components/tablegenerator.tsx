@@ -82,7 +82,7 @@ export type Config<T extends { id?: string }, TableTypes extends string = string
     desc: string;
     methods?: {
         post?: z.ZodObject;
-        put?: z.ZodObject;
+        patch?: z.ZodObject;
         delete?: z.ZodObject;
     };
     onSubmit: (params: {
@@ -151,7 +151,7 @@ function RowGenerator<
         "idle" | "edit" | "save" | "delete" | "create" | "ssubmit" | "dsubmit" | "csubmit"
     >("idle");
     const state2method = (state: typeof bState) => {
-        if (state === "ssubmit") return "put";
+        if (state === "ssubmit") return "patch";
         if (state === "dsubmit") return "delete";
         if (state === "csubmit") return "post";
         return null;
@@ -163,7 +163,7 @@ function RowGenerator<
             onChangeAsync: ({ formApi }) => {
                 let schema: z.ZodObject | undefined;
                 if (create) schema = config.methods?.post;
-                else schema = config.methods?.put;
+                else schema = config.methods?.patch;
                 if (!schema) return;
                 const errors = formApi.parseValuesWithSchema(schema);
                 if (!errors) return errors;
@@ -263,7 +263,7 @@ function RowGenerator<
                                                 className="text-center read-only:opacity-80! border-primary/50 read-only:border-primary/10"
                                             />
                                         ) : (
-                                            <Drawer swipeDirection="down" snapPoints={["65rem", 1]}>
+                                            <Drawer swipeDirection="down" snapPoints={["30rem", "60rem", 1]}>
                                                 <DrawerTrigger
                                                     render={
                                                         <Button
@@ -306,7 +306,7 @@ function RowGenerator<
                                                                 if (fieldconfig.nested?.saveOnSubmit) {
                                                                     onSubmit({
                                                                         config,
-                                                                        method: "put",
+                                                                        method: "patch",
                                                                         value: {
                                                                             id: row.id,
                                                                         } as Partial<Record<K, SchemaType>>,
@@ -361,7 +361,7 @@ function RowGenerator<
                                     </Button>
                                 ) : (
                                     <>
-                                        {config.methods?.put && (
+                                        {config.methods?.patch && (
                                             <Button
                                                 className="p-2 mx-1 relative overflow-hidden group"
                                                 variant="outline"
@@ -374,7 +374,7 @@ function RowGenerator<
                                                     setBState((prev) => (prev === "idle" ? "edit" : prev));
                                                 }}
                                                 disabled={
-                                                    bState.includes("submit") || config.methods?.put === undefined
+                                                    bState.includes("submit") || config.methods?.patch === undefined
                                                 }
                                             >
                                                 {["edit", "save"].includes(bState) && (
@@ -409,7 +409,7 @@ function RowGenerator<
                                                 )}
                                             </Button>
                                         )}
-                                        {(config.methods?.delete || config.methods?.put) && (
+                                        {(config.methods?.delete || config.methods?.patch) && (
                                             <Button
                                                 className="p-2 mx-1 relative overflow-hidden group"
                                                 variant="outline"

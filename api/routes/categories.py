@@ -49,7 +49,7 @@ async def new_category(request: Request, category: CategoryCreate) -> Category:
     return db_category
 
 
-@router.put("/", status_code=status.HTTP_200_OK)
+@router.patch("/", status_code=status.HTTP_200_OK)
 @with_user(roles=[Role.admin])
 async def update_category(request: Request, category: CategoryUpdate) -> Category:
     state: State = request.state  # pyright: ignore[reportAssignmentType]
